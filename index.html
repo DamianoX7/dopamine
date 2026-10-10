@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>도파민 월드</title>
+  <meta name="description" content="오직 너만을 위한 작은 세상. 노래하고, 놀고, 나만의 커버를 만들어요.">
+  <meta name="theme-color" content="#ffe3f1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="도파민 월드">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <!-- Fonts: Jua + Fredoka for everything on the screen (Fredoka from 500 up, so that digits are as dark as Jua);
+       Nanum Gothic at 800 for the rare syllables Jua lacks; Gaegu (+ Gowun Dodum) for handwriting;
+       Caveat, DM Serif Display and Gowun Batang for the cover art. Korean fonts come in small slices, fetched as needed. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=DM+Serif+Display:ital@0;1&family=Fredoka:wght@500;600;700&family=Gaegu:wght@400;700&family=Gowun+Batang:wght@700&family=Gowun+Dodum&family=Jua&family=Nanum+Gothic:wght@800&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="cover.css">
+  <link rel="stylesheet" href="mallang.css">
+  <link rel="stylesheet" href="days.css">
+  <link rel="stylesheet" href="post.css">
+  <link rel="stylesheet" href="talk.css">
+  <link rel="stylesheet" href="opening.css">
+  <link rel="stylesheet" href="gate.css">
+</head>
+<body data-theme="pink">
+  <!-- Decorative background: soft blobs, floating hearts, late-night stars -->
+  <div id="bg" aria-hidden="true">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+    <div class="stars"></div>
+    <div class="moon"></div>
+    <div class="floaties"></div>
+  </div>
+
+  <header id="topbar">
+    <button class="logo" data-action="logo-tap" aria-label="도파민 월드 홈">
+      <span class="logo-heart">💗</span><span class="logo-text">도파민 월드</span>
+    </button>
+    <div class="hud">
+      <span class="pill" title="코인"><span aria-hidden="true">🪙</span> <b id="hud-coins">0</b><span class="sr-only"> 코인</span></span>
+      <span class="pill" title="레벨">Lv <b id="hud-level">1</b></span>
+      <button class="icon-btn" id="sound-btn" data-action="toggle-sound" aria-label="소리 켜짐" aria-pressed="true">🔊</button>
+    </div>
+  </header>
+
+  <div id="banner-slot"></div>
+
+  <main id="view" tabindex="-1"></main>
+
+  <div id="mini"></div>
+
+  <nav id="tabbar" aria-label="주 메뉴">
+    <a href="#/home" data-tab="home"><span class="ti" aria-hidden="true">🏠</span><span class="tl">홈</span></a>
+    <a href="#/studio" data-tab="studio" class="tab-studio"><span class="ti" aria-hidden="true">🎤</span><span class="tl">스튜디오</span></a>
+    <a href="#/covers" data-tab="covers"><span class="ti" aria-hidden="true">💿</span><span class="tl">내 커버</span></a>
+    <a href="#/arcade" data-tab="arcade"><span class="ti" aria-hidden="true">🎮</span><span class="tl">오락실</span></a>
+    <a href="#/me" data-tab="me"><span class="ti" aria-hidden="true">💗</span><span class="tl">나</span></a>
+  </nav>
+
+  <div id="overlays"></div>
+  <div id="toasts" role="status" aria-live="polite"></div>
+  <div id="pet-pop"></div>
+  <canvas id="confetti" aria-hidden="true"></canvas>
+
+  <noscript><div class="noscript">💗 도파민 월드는 JavaScript가 켜져 있어야 볼 수 있어요.</div></noscript>
+
+  <script src="js/config.js"></script>
+  <script src="js/gate.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/sync.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/art.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/talk.js"></script>
+  <script src="js/opening.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/days.js"></script>
+  <script src="js/weather.js"></script>
+  <script src="js/pet.js"></script>
+  <script src="js/present.js"></script>
+  <script src="js/post.js"></script>
+  <script src="js/photos.js"></script>
+  <script src="js/cover-host.js"></script>
+  <script src="js/views/home.js"></script>
+  <script src="js/views/arcade.js"></script>
+  <script src="js/mallang.js"></script>
+  <script src="js/views/me.js"></script>
+  <script src="js/main.js"></script>
+  <!-- The recording studio & covers library (ES modules); they attach themselves to CoverHost. -->
+  <script type="module" src="js/cover/host.js" onerror="CoverHost.fail()"></script>
+  <!-- The squishy playground (js/mallang) is loaded by js/mallang.js when it is first opened. -->
+  <!-- The fox's 3D world (js/fox, three.js in js/vendor) is loaded by js/pet.js when it is first needed. -->
+</body>
+</html>

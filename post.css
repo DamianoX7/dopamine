@@ -1,0 +1,144 @@
+/* ==================================================================
+   📮 Post — letters he writes and sends her (js/post.js): the letter
+   as she reads it, the card that says one has come, the list of the
+   ones she has kept, and the desk he writes at.
+   ================================================================== */
+
+/* ---------- a letter of his own, on its paper ---------- */
+.letter.is-post .letter-text {
+  font-size: 21px; /* these run longer than the one-line messages */
+}
+.letter.is-post.big .letter-text {
+  font-size: 23px;
+}
+.letter-date {
+  margin-top: 10px;
+  font-family: var(--font-hand);
+  font-size: 17px;
+  font-weight: 700;
+  text-align: right;
+  color: #a07a66;
+}
+
+/* ---------- "a letter has come" (Home, and 나 → 편지) ---------- */
+.letter-card.is-new {
+  background: var(--grad-soft);
+  box-shadow: var(--shadow), inset 0 0 0 2px var(--pink);
+}
+.letter-card.is-new .envelope {
+  animation: mailBob 1.6s ease-in-out infinite;
+}
+
+/* ---------- the letters she has kept ---------- */
+.post-kept {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 18px;
+}
+.paper.is-post {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  transform: none;
+}
+.paper.is-post:nth-child(even) {
+  transform: none;
+}
+.paper.is-post small {
+  display: block;
+  margin-bottom: 2px;
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #b0607f;
+}
+.section-title small {
+  font-size: 14px;
+  color: var(--ink-3);
+}
+
+/* ---------- the desk ---------- */
+.post-desk .card-title {
+  display: block;
+}
+.post-text {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  background-color: #fffaf2;
+  background-image: repeating-linear-gradient(transparent 0 28px, rgba(210, 160, 130, 0.22) 28px 29px);
+  background-attachment: local;
+  color: #5a3a2c;
+  font-family: var(--font-hand);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 29px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.post-text::placeholder {
+  color: #c0a596;
+}
+.post-text:focus {
+  border-color: var(--pink);
+  box-shadow: 0 0 0 4px var(--pink-soft);
+}
+.post-count {
+  margin: 6px 2px 12px;
+  text-align: right;
+}
+.post-day {
+  margin-top: 8px;
+}
+.post-desk .dialog-actions {
+  margin-top: 12px;
+}
+.post-desk .dialog-actions .btn {
+  padding-left: 12px;
+  padding-right: 12px;
+  white-space: nowrap;
+}
+.post-sent {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.post-sent li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+.post-sent li + li {
+  border-top: 1px solid var(--line);
+}
+.post-row {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+}
+.post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.post-peek {
+  display: block;
+  margin-top: 3px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-hand);
+  font-size: 18px;
+  font-weight: 700;
+}

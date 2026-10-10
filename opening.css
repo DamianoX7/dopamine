@@ -1,0 +1,141 @@
+/* ==================================================================
+   🔒 Opening — the doors of the rooms that open on a day of their own
+   (js/opening.js): the card on Home, the page behind a tab that is
+   still shut, the little lock on those tabs.
+   ================================================================== */
+
+/* Home: one card for both rooms, where the big SING button will be */
+.card.opening-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 16px 0 12px;
+  padding: 22px 16px 20px;
+  border: 0;
+  border-radius: 32px;
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+  background: var(--grad-soft);
+  box-shadow: var(--shadow), inset 0 0 0 2px rgba(255, 255, 255, 0.6);
+  transition: transform 0.15s;
+}
+.card.opening-card:active {
+  transform: scale(0.98);
+}
+.opening-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.opening-rooms {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.opening-rooms > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: var(--surface-solid);
+  box-shadow: 0 6px 14px -10px rgba(170, 50, 120, 0.55);
+  font-size: 16px;
+}
+.opening-rooms i {
+  font-style: normal;
+  font-size: 20px;
+  line-height: 1;
+}
+.opening-when {
+  color: var(--pink-deep);
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.opening-note {
+  color: var(--ink-2);
+  font-family: var(--font-hand);
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+/* The page behind a shut tab */
+.shut-room {
+  display: grid;
+  align-items: center;
+  min-height: 58vh;
+}
+.card.shut-card {
+  padding: 30px 18px 24px;
+  text-align: center;
+}
+.shut-lock {
+  font-size: 56px;
+  line-height: 1.15;
+  animation: shutBob 2.8s ease-in-out infinite;
+}
+@keyframes shutBob {
+  50% {
+    transform: translateY(-5px) rotate(-4deg);
+  }
+}
+.shut-when {
+  margin: 6px 0 12px;
+  color: var(--pink-deep);
+  font-size: 24px;
+  line-height: 1.3;
+}
+.shut-left {
+  margin: 0 0 12px;
+}
+.shut-note {
+  margin: 0 0 20px;
+  color: var(--ink-2);
+  font-family: var(--font-hand);
+  font-size: 19px;
+  line-height: 1.35;
+}
+.shut-card .chip-row {
+  justify-content: center;
+}
+
+/* The tabs that are not open yet */
+#tabbar a.is-shut {
+  position: relative;
+}
+#tabbar a.is-shut .ti,
+#tabbar a.is-shut .tl {
+  opacity: 0.5;
+}
+#tabbar a.is-shut .ti {
+  filter: grayscale(0.6);
+}
+#tabbar a.is-shut::after {
+  content: '🔒';
+  position: absolute;
+  top: 2px;
+  left: calc(50% + 9px);
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* A day's card without a challenge: only the missions */
+.challenge-card.no-challenge .missions {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+body.reduce-motion .shut-lock {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shut-lock {
+    animation: none;
+  }
+}

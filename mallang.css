@@ -1,0 +1,464 @@
+/* ==================================================================
+   🍡 말랑 놀이터 — the playground on the whole screen (js/mallang.js).
+   Everything here is Dopamine World's: its tokens, its buttons, its
+   themes and the late-night mode. The room the toy stands in is
+   painted by WebGL from --mg-wall and --mg-floor.
+   ================================================================== */
+
+.mallang {
+  /* the room: its back wall, its table, and how much of each toy's own colour is let into them (0 … 1) */
+  --mg-wall: #ffe6f2;
+  --mg-floor: #ffd3e6;
+  --mg-own: 0.3;
+  --mg-glass: rgba(255, 255, 255, 0.72);
+  --mg-rim: rgba(255, 255, 255, 0.7);
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--mg-wall);
+  color: var(--ink);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+body[data-theme='lavender'] .mallang {
+  --mg-wall: #efe6ff;
+  --mg-floor: #dfd2ff;
+}
+body[data-theme='peach'] .mallang {
+  --mg-wall: #fff0e4;
+  --mg-floor: #ffdfcc;
+}
+body[data-theme='night'] .mallang,
+body.late-night .mallang {
+  --mg-wall: #22123f;
+  --mg-floor: #3a2468;
+  --mg-own: 0.12;
+  --mg-glass: rgba(46, 29, 82, 0.74);
+  --mg-rim: rgba(255, 255, 255, 0.11);
+}
+
+/* the whole screen, faded in: a sliding panel would carry the picture off the place the fingers are */
+.overlay.is-mallang .ov-panel {
+  overflow: hidden;
+  background: var(--full-bg);
+  opacity: 0;
+  transform: none;
+  transition: opacity 0.25s ease;
+}
+.overlay.is-mallang.open .ov-panel {
+  opacity: 1;
+}
+.overlay.is-mallang.closing .ov-panel {
+  opacity: 0;
+  transform: none;
+}
+
+.mg-stage {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  opacity: 0;
+  touch-action: none;
+  transition: opacity 0.35s ease;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Ccircle cx='18' cy='18' r='12' fill='rgba(255,255,255,.5)' stroke='rgba(110,70,95,.5)' stroke-width='1.5'/%3E%3C/svg%3E") 18 18, pointer;
+}
+.mg-stage.down {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36'%3E%3Ccircle cx='18' cy='18' r='9' fill='rgba(255,255,255,.8)' stroke='rgba(110,70,95,.65)' stroke-width='1.5'/%3E%3C/svg%3E") 18 18, grabbing;
+}
+.mallang.is-ready .mg-stage {
+  opacity: 1;
+}
+/* a soft edge, as on the foxes' world */
+.mallang::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 120px rgba(170, 50, 120, 0.1);
+  pointer-events: none;
+}
+body[data-theme='night'] .mallang::after,
+body.late-night .mallang::after {
+  box-shadow: inset 0 0 160px rgba(8, 6, 30, 0.5);
+}
+
+/* shown until the toy drops in */
+.mg-wait {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 96px;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.mg-wait span {
+  animation: foxBob 2.6s ease-in-out infinite;
+}
+.mallang.is-ready .mg-wait {
+  opacity: 0;
+}
+
+.mg-ui {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.mg-top {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(var(--safe-t) + 10px) max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
+}
+.mg-btn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--mg-rim);
+  border-radius: 50%;
+  background: var(--mg-glass);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  font-size: 19px;
+  line-height: 1;
+  pointer-events: auto;
+  transition: transform 0.12s ease;
+}
+.mg-btn:active {
+  transform: scale(0.92);
+}
+.mg-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0 0 0 2px;
+  font-family: var(--font-head);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+.mg-title small {
+  display: block;
+  margin-top: 1px;
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.mg-hint {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--safe-t) + 70px);
+  width: max-content;
+  max-width: calc(100% - 24px);
+  margin: 0;
+  padding: 8px 16px;
+  border: 1px solid var(--mg-rim);
+  border-radius: 999px;
+  background: var(--mg-glass);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: var(--shadow);
+  font-size: 15px;
+  line-height: 1.35;
+  text-align: center;
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity 0.45s;
+}
+.mg-hint.on {
+  opacity: 1;
+}
+
+.mg-dock {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--safe-b) + 12px);
+  width: min(750px, calc(100% - 20px));
+  padding: 12px;
+  border: 1px solid var(--mg-rim);
+  border-radius: var(--r-lg);
+  background: var(--mg-glass);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  backdrop-filter: blur(18px) saturate(1.3);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+.mg-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mg-gap {
+  flex: 1;
+}
+.mg-tabs {
+  flex: none;
+  margin: 0;
+}
+.mg-tabs .seg-btn {
+  flex: none;
+  padding: 0 16px;
+  font-size: 15px;
+  white-space: nowrap;
+}
+.mg-dock .btn.small {
+  min-height: 42px;
+  padding: 7px 16px;
+  font-size: 15px;
+  white-space: nowrap;
+}
+.mg-dock .btn[disabled] {
+  opacity: 0.45;
+}
+.mg-grip.held {
+  transform: scale(0.94);
+}
+
+.mg-meter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 4px 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.mg-meter span {
+  min-width: 68px;
+}
+.mg-meter i {
+  flex: 1;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--meter-track);
+  overflow: hidden;
+}
+.mg-meter b {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--grad);
+  transition: width 0.25s;
+}
+
+.mg-chips {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+.mg-chips::-webkit-scrollbar {
+  display: none;
+}
+/* a mouse cannot swipe the row along: what does not fit goes on a second line */
+@media (hover: hover) and (pointer: fine) {
+  .mg-chips {
+    flex-wrap: wrap;
+  }
+}
+.mg-chip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 13px 5px 5px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 2px transparent;
+  color: var(--ink-2);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.2s, box-shadow 0.2s, color 0.2s;
+}
+/* the toy itself, small: its two colours */
+.mg-chip i {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #fff 0 10%, var(--a) 46%, var(--b) 100%);
+  box-shadow: inset -2px -3px 5px rgba(0, 0, 0, 0.07);
+}
+.mg-chip[aria-pressed='true'] {
+  background: var(--pink-soft);
+  box-shadow: inset 0 0 0 2px var(--pink);
+  color: var(--pink-deep);
+  font-weight: 600;
+}
+
+.mg-sorry {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 0;
+  padding: 24px;
+  text-align: center;
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+/* its door in the arcade */
+.mallang-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin: 14px 0;
+  padding: 16px 18px;
+  border: 0;
+  border-radius: var(--r-lg);
+  background: var(--grad-soft);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  text-align: left;
+  transition: transform 0.15s;
+}
+.mallang-card:active {
+  transform: scale(0.98);
+}
+.mallang-card .mc-toys {
+  flex: none;
+  display: flex;
+}
+.mallang-card .mc-toys i {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #fff 0 10%, var(--a) 46%, var(--b) 100%);
+  box-shadow: inset -3px -4px 7px rgba(0, 0, 0, 0.07), 0 6px 10px -6px rgba(120, 40, 90, 0.5);
+}
+.mallang-card .mc-toys i + i {
+  margin-left: -14px;
+}
+.mallang-card .mc-text {
+  flex: 1;
+  min-width: 0;
+}
+.mallang-card b {
+  display: block;
+  font-size: 17px;
+  font-weight: 600;
+}
+.mallang-card small {
+  display: block;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+.mallang-card .mc-go {
+  flex: none;
+  color: var(--pink-deep);
+  font-size: 22px;
+}
+
+@media (max-width: 380px) {
+  .mg-tabs .seg-btn {
+    padding: 0 12px;
+    font-size: 14px;
+  }
+  .mg-dock .btn.small {
+    padding: 7px 12px;
+    font-size: 14px;
+  }
+  .mg-title small {
+    display: none;
+  }
+}
+/* the narrowest phones: the two kinds get a row of their own, and the buttons share the next */
+@media (max-width: 350px) {
+  .mg-row {
+    flex-wrap: wrap;
+  }
+  .mg-gap {
+    display: none;
+  }
+  .mg-tabs {
+    flex: 1 1 100%;
+  }
+  .mg-tabs .seg-btn,
+  .mg-dock .btn.small {
+    flex: 1;
+  }
+}
+
+/* a phone on its side: the dock stands at the right, and the toy has the rest */
+@media (orientation: landscape) and (max-height: 520px) {
+  .mg-ui {
+    --side: min(290px, 46vw);
+  }
+  .mg-title small {
+    display: none;
+  }
+  .mg-dock {
+    left: auto;
+    right: calc(10px + env(safe-area-inset-right, 0px));
+    top: calc(var(--safe-t) + 62px);
+    bottom: calc(var(--safe-b) + 10px);
+    display: flex;
+    flex-direction: column;
+    width: var(--side);
+    padding: 10px;
+    transform: none;
+  }
+  .mg-row {
+    flex-wrap: wrap;
+  }
+  .mg-tabs .seg-btn {
+    min-height: 34px;
+    padding: 0 12px;
+    font-size: 14px;
+  }
+  .mg-dock .btn.small {
+    min-height: 38px;
+    padding: 6px 12px;
+    font-size: 14px;
+  }
+  .mg-dock [data-mg='recoat'] {
+    order: 3;
+    flex: 1 1 100%;
+  }
+  .mg-chips {
+    flex: 1;
+    min-height: 0;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    overflow: hidden auto;
+    touch-action: pan-y;
+  }
+  .mg-chip {
+    flex: 1 1 40%;
+    padding-right: 8px;
+    font-size: 13.5px;
+  }
+  .mg-hint {
+    top: auto;
+    bottom: calc(var(--safe-b) + 10px);
+    left: calc((100% - var(--side) - 10px - env(safe-area-inset-right, 0px) + env(safe-area-inset-left, 0px)) / 2);
+    max-width: calc(100% - var(--side) - 40px - env(safe-area-inset-right, 0px) - env(safe-area-inset-left, 0px));
+    font-size: 16px;
+  }
+}

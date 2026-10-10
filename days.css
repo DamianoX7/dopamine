@@ -1,0 +1,241 @@
+/* ==================================================================
+   💑 Our days — the card on Home and the calendar (js/days.js).
+   ================================================================== */
+
+/* ---------- Home: how many days, and what comes next ---------- */
+.days-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 12px 0 14px;
+  padding: 14px 12px 14px 18px;
+  background: var(--grad-soft);
+  color: var(--ink);
+  text-align: left;
+  transition: transform 0.15s;
+}
+.days-card:active {
+  transform: scale(0.98);
+}
+.days-main {
+  flex: 1;
+  min-width: 0;
+}
+.days-main .eyebrow {
+  display: block;
+  letter-spacing: 0.02em;
+}
+.days-num {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-head);
+  font-size: 19px;
+  line-height: 1.1;
+}
+.days-num b {
+  margin-right: 2px;
+  font-size: 38px;
+  font-weight: 600;
+  background: var(--grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.days-num.is-small {
+  font-size: 20px;
+}
+.days-next {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+  max-width: 48%;
+  text-align: right;
+}
+.days-next small {
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+.days-next b {
+  font-family: var(--font-head);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--pink-deep);
+}
+.days-next.is-today b {
+  font-size: 16px;
+}
+.days-emoji {
+  font-size: 30px;
+  animation: heartBeat 2.8s ease-in-out infinite;
+}
+.days-card .chev {
+  flex: none;
+  color: var(--ink-3);
+}
+.days-card.is-today {
+  box-shadow: var(--shadow), inset 0 0 0 2px var(--pink);
+}
+
+/* ---------- the calendar ---------- */
+.cal-hero {
+  text-align: center;
+  background: var(--grad-soft);
+}
+.cal-hero .days-num {
+  margin: 4px 0 2px;
+  font-size: 24px;
+}
+.cal-hero .days-num b {
+  font-size: 54px;
+}
+.cal-hero .hint {
+  margin: 0;
+}
+.cal-card {
+  padding: 16px 12px 14px;
+}
+.cal-nav {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+.cal-nav h2 {
+  min-width: 124px;
+  font-size: 19px;
+  text-align: center;
+}
+.cal-now {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  min-height: 32px;
+  padding: 5px 12px;
+  transform: translateY(-50%);
+}
+.cal-now:active {
+  transform: translateY(-50%) scale(0.96);
+}
+.cal-week,
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+.cal-week {
+  margin-bottom: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  text-align: center;
+}
+.cal-week .is-sun,
+.cal-day.is-sun b {
+  color: var(--danger);
+}
+.cal-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-height: 52px;
+  padding: 6px 0 2px;
+  border: 0;
+  border-radius: 14px;
+  background: none;
+  color: var(--ink);
+}
+.cal-day b {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+.cal-day span {
+  min-height: 20px;
+  font-size: 15px;
+  line-height: 20px;
+}
+.cal-day.has-day {
+  background: var(--surface-2);
+}
+.cal-day.is-today b {
+  min-width: 24px;
+  border-radius: 999px;
+  background: var(--grad);
+  color: #fff;
+  font-weight: 600;
+}
+.cal-day.is-sel {
+  box-shadow: inset 0 0 0 2px var(--pink);
+}
+.cal-picked {
+  margin: 12px 4px 0;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+.cal-picked-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 4px;
+}
+.cal-picked-head span {
+  color: var(--ink-2);
+  font-size: 13.5px;
+}
+.cal-picked-day {
+  margin: 4px 0 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+.cal-picked .hint {
+  margin: 4px 0 0;
+}
+
+.cal-list {
+  margin-top: 0;
+  padding: 6px;
+}
+.cal-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 10px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--ink);
+  text-align: left;
+}
+.cal-row:active {
+  background: var(--surface-2);
+}
+.cal-row + .cal-row {
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+}
+.cal-emoji {
+  flex: none;
+  width: 34px;
+  font-size: 26px;
+  text-align: center;
+}
+.cal-text {
+  flex: 1;
+  min-width: 0;
+}
+.cal-text b {
+  display: block;
+  font-weight: 600;
+}
+.cal-text small {
+  color: var(--ink-2);
+  font-size: 13px;
+}

@@ -1,0 +1,219 @@
+/* ==================================================================
+   💬 Talk — somebody speaking to her in a window along the bottom of
+   the screen (js/talk.js), and Lorelei's present, which is told that
+   way (js/present.js).
+   ================================================================== */
+
+/* The layer it lies on lets the view behind it show: nothing is dimmed, and a tap anywhere turns the page. */
+.overlay.is-sheet.is-talk:not(.is-full):not(.is-dialog):not(.is-celebrate) {
+  align-items: flex-end;
+  padding: 0 max(10px, env(safe-area-inset-right, 0px)) calc(var(--safe-b) + 14px) max(10px, env(safe-area-inset-left, 0px));
+  cursor: pointer;
+}
+.overlay.is-talk .ov-backdrop {
+  background: none;
+}
+.overlay.is-sheet.is-talk:not(.is-full):not(.is-dialog):not(.is-celebrate) .ov-panel,
+.overlay.is-sheet.is-talk.open:not(.is-full):not(.is-dialog):not(.is-celebrate) .ov-panel {
+  max-width: 620px;
+  max-height: none;
+  padding: 0;
+  overflow: visible;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
+
+.talk {
+  position: relative;
+  width: 100%;
+  padding-top: 20px; /* (room for the name tag, which stands half out of the window) */
+  transition: transform 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.25), opacity 0.2s ease;
+}
+/* it comes up from below — and goes the same way while something happens that is to be seen */
+.overlay.is-talk:not(.open) .talk,
+.talk.is-away {
+  opacity: 0;
+  transform: translateY(26px) scale(0.96);
+  pointer-events: none;
+}
+
+/* the window: cream, round as a pebble, the words in soft brown */
+.talk-box {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 124px;
+  padding: 30px 34px 30px;
+  border: 0;
+  border-radius: 46px 46px 54px 54px / 44px 44px 48px 48px;
+  background: #fffbe8;
+  color: #776650;
+  font: inherit;
+  font-size: 19px;
+  line-height: 1.5;
+  text-align: left;
+  box-shadow:
+    0 16px 30px -16px rgba(70, 45, 20, 0.6),
+    inset 0 -7px 0 rgba(226, 208, 160, 0.38);
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.talk-box:focus-visible {
+  outline: 3px solid rgba(255, 178, 29, 0.7);
+  outline-offset: 3px;
+}
+.talk-text {
+  display: block;
+  min-height: 3em;
+  white-space: pre-wrap; /* (a page may have line breaks of its own) */
+}
+/* who is speaking: a tag on the corner, a little askew */
+.talk-name {
+  position: absolute;
+  left: 26px;
+  top: -19px;
+  max-width: 70%;
+  padding: 5px 20px 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--talk-tint, #ff8a3c);
+  color: #fff;
+  font-size: 16px;
+  line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transform: rotate(-4deg);
+  box-shadow: 0 4px 0 rgba(90, 50, 30, 0.12);
+}
+/* "there is more": a small arrow that bobs, once the page is all there */
+.talk-more {
+  position: absolute;
+  right: 30px;
+  bottom: 13px;
+  width: 0;
+  height: 0;
+  border: 9px solid transparent;
+  border-top: 12px solid #ffb21d;
+  border-bottom: 0;
+  opacity: 0;
+}
+.talk.is-waiting .talk-more {
+  opacity: 1;
+  animation: talkMore 0.72s ease-in-out infinite;
+}
+@keyframes talkMore {
+  50% {
+    transform: translateY(5px);
+  }
+}
+
+/* something to answer: the choices, one above the other, over the right end of the window */
+.talk-ask {
+  position: absolute;
+  right: 12px;
+  bottom: calc(100% - 8px);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.talk-ask[hidden] {
+  display: none;
+}
+.talk-pick {
+  max-width: min(78vw, 360px);
+  padding: 10px 24px 11px;
+  border: 0;
+  border-radius: 999px;
+  background: #fffbe8;
+  color: #776650;
+  font-size: 17px;
+  line-height: 1.3;
+  box-shadow: 0 10px 20px -12px rgba(70, 45, 20, 0.7);
+  animation: talkPick 0.26s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+}
+.talk-pick:nth-child(2) {
+  animation-delay: 0.06s;
+}
+.talk-pick:nth-child(3) {
+  animation-delay: 0.12s;
+}
+.talk-pick:hover,
+.talk-pick:focus-visible {
+  outline: none;
+  background: #ffd34d;
+  color: #5b4520;
+}
+.talk-pick:active {
+  transform: scale(0.96);
+}
+@keyframes talkPick {
+  from {
+    opacity: 0;
+    transform: translateX(14px) scale(0.92);
+  }
+}
+
+@media (max-width: 420px) {
+  .talk-box {
+    min-height: 116px;
+    padding: 28px 26px 28px;
+    font-size: 18px;
+  }
+  .talk-name {
+    left: 20px;
+  }
+}
+body.reduce-motion .talk,
+body.reduce-motion .talk-more,
+body.reduce-motion .talk-pick {
+  transition: none;
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .talk,
+  .talk-more,
+  .talk-pick {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* ---------- Lorelei's present ---------- */
+/* while she tells it, the buttons of the foxes' world make way */
+.fox-room.talk-on .fox-hud {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0s linear 0.25s;
+}
+.fox-hud {
+  transition: opacity 0.25s ease;
+}
+/* "Lorelei has something for you": the chip over the view */
+.fox-mail.is-present {
+  background: linear-gradient(135deg, #ff7aa8, #ffb21d);
+  color: #fff;
+}
+.fox-mail.is-present small {
+  color: rgba(255, 255, 255, 0.92);
+}
+/* the fox she has been given, in the dialog that says so */
+.present-pic {
+  display: grid;
+  place-items: center;
+  margin: 6px 0 2px;
+}
+/* the achievement that comes with a present */
+.ach-gift {
+  display: block;
+  margin-top: 3px;
+  color: var(--pink-deep);
+  font-size: 12px;
+}
