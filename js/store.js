@@ -93,6 +93,7 @@ function defaultState() {
       taught: false, //      has she tapped the ground or a fox yet?
       toured: false, //      …and been told that the view slides over the country round the yard?
       metOwner: false, //    …and that the foxes have an owner now, who lives in the yard with them?
+      introduced: false, //  …and has that owner said her first hello, and shown her round? (js/meet.js)
     },
     mallang: { mode: 'soft', soft: 'fox', wax: 'cotton' }, // 말랑 놀이터: the toy she had out last (js/mallang.js)
     opening: { seen: false, greeted: false }, //           the rooms that open on a day of their own (js/opening.js): has she stood before them shut — and been told that they opened?

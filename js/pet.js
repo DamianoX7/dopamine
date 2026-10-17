@@ -393,7 +393,7 @@ const FoxHost = {
   onMail: () => FoxRoom.mailButton(), //      the letter moved on (mailbox → on its way → in a fox's mouth)
   onLetter: (id) => Pet.takeLetter(id), // she tapped the fox that has it
   onGift: () => Pet.takeGift(), //         …or the one that is back from an expedition with a gift
-  onPresent: (what) => Present.heard(what), // Lorelei has come forward with what she has for her
+  onPresent: (what) => OwnerSays.heard(what), // Lorelei has come forward with what she has to say (js/present.js)
   moodLine: () => Pet.moodLine(),
   line: (kind) => Pet.line(kind),
   onDecor: (id, at) => Pet.placed(id, at), //   she has moved or turned a thing in the yard: that is its place from now on
@@ -1724,6 +1724,13 @@ const FoxRoom = {
     setTimeout(() => splash.remove(), 520);
     if (!ok) FoxHost.say(Pet.line('greet'), 3000);
     if (!Pet.portrait()) Pet.drawPortrait();
+    if (Meet.due()) {
+      // her first time here: Lorelei says hello and shows her round (js/meet.js)
+      await sleep(700);
+      if (this.ov !== ov) return;
+      if (UI.top() === ov) await Meet.begin();
+      if (this.ov !== ov) return;
+    }
     Present.arrive(); // (if Lorelei has something for her, she calls before long)
     await sleep(900);
     if (this.ov !== ov || UI.top() !== ov) return;
@@ -1975,6 +1982,15 @@ const FoxRoom = {
     if (!this.ov) return;
     $('[data-fox-room]', this.ov.panel).classList.toggle('talk-on', !!on);
     if (on && FoxHost.api) FoxHost.api.hush();
+  },
+
+  /* She is speaking of something on the screen (js/meet.js): it shows, lit, though the other buttons are away.
+     'actions' the buttons along the bottom · 'shop' · 'camera' · 'trip' the compass · null: nothing any more */
+  point(what) {
+    if (!this.ov) return;
+    const root = $('[data-fox-room]', this.ov.panel);
+    if (what) root.dataset.point = what;
+    else delete root.dataset.point;
   },
 
   /* "Lorelei has something for you": there for as long as she has — a tap, and she gives it. */

@@ -196,6 +196,60 @@ body.reduce-motion .talk-pick {
 .fox-hud {
   transition: opacity 0.25s ease;
 }
+/* …but what she is speaking of shows, and is lit (js/meet.js, FoxRoom.point): the buttons along the bottom come up
+   over her window, the round ones at the side stay where they are */
+.fox-room.talk-on[data-point] .fox-hud {
+  opacity: 1;
+  visibility: visible;
+  transition: none;
+}
+.fox-room.talk-on[data-point] .fox-hud > * {
+  visibility: hidden;
+}
+.fox-room.talk-on[data-point='actions'] .fh-actions,
+.fox-room.talk-on[data-point='shop'] .fh-actions {
+  visibility: visible;
+  transform: translateY(-176px);
+  animation: pointUp 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+}
+@keyframes pointUp {
+  from {
+    opacity: 0;
+    transform: translateY(-150px);
+  }
+}
+.fox-room.talk-on[data-point='shop'] .fh-act:not(.is-shop) {
+  opacity: 0.3;
+}
+.fox-room.talk-on[data-point='camera'] .fox-cam:not(.is-trip),
+.fox-room.talk-on[data-point='trip'] .fox-cam.is-trip {
+  visibility: visible;
+}
+.fox-room.talk-on[data-point='actions'] .fh-act:not(.is-shop),
+.fox-room.talk-on[data-point='shop'] .fh-act.is-shop,
+.fox-room.talk-on[data-point='camera'] .fox-cam:not(.is-trip),
+.fox-room.talk-on[data-point='trip'] .fox-cam.is-trip {
+  box-shadow: 0 0 0 4px rgba(255, 178, 29, 0.9), 0 10px 24px -12px rgba(40, 10, 50, 0.7);
+  animation: pointGlow 1.1s ease-in-out infinite;
+}
+@keyframes pointGlow {
+  50% {
+    box-shadow: 0 0 0 8px rgba(255, 178, 29, 0.35), 0 10px 24px -12px rgba(40, 10, 50, 0.7);
+    transform: scale(1.06);
+  }
+}
+body.reduce-motion .fox-room.talk-on[data-point] .fh-actions,
+body.reduce-motion .fox-room.talk-on[data-point] .fh-act,
+body.reduce-motion .fox-room.talk-on[data-point] .fox-cam {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fox-room.talk-on[data-point] .fh-actions,
+  .fox-room.talk-on[data-point] .fh-act,
+  .fox-room.talk-on[data-point] .fox-cam {
+    animation: none;
+  }
+}
 /* "Lorelei has something for you": the chip over the view */
 .fox-mail.is-present {
   background: linear-gradient(135deg, #ff7aa8, #ffb21d);

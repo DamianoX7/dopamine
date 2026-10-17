@@ -1638,6 +1638,8 @@ export const LORELEI_POSES = {
   carry: pose({ aLf: 0.55, aRf: 0.55, eL: 1.45, eR: 1.45, aLo: -0.16, aRo: -0.16 }),
   // …and holding it out to somebody
   offer: pose({ aLf: 1.12, aRf: 1.12, eL: 0.62, eR: 0.62, aLo: -0.13, aRo: -0.13, lean: 0.1, hdx: -0.06 }),
+  // "…and this one here": her left hand towards somebody small beside her
+  show: pose({ aLf: 0.62, aLo: 0.5, eL: 0.22, wL: -0.3, lean: 0.06, hdz: -0.1, tilt: 0.03 }),
   // bent over the bowl, tipping the bag out
   pour: pose({ lean: 0.5, srx: 0.16, nrx: 0.18, hdx: 0.1, aLf: 0.75, aRf: 0.8, eL: 0.9, eR: 0.75, aLo: -0.2, aRo: -0.18, wR: 0.9, kL: 0.24, kR: 0.24, tL: 0.12, tR: 0.12, hy: -0.012, walk: 0 }),
   // the ball: drawn back, then let go

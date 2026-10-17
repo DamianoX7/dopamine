@@ -2377,12 +2377,14 @@ export class World {
   // ---------------------------------------------------------------- Lorelei's present
 
   /**
-   * Lorelei has a present for her. The app tells the story (js/present.js), a step at a time:
+   * Lorelei has the word. The app tells it (her present: js/present.js — her first hello: js/meet.js), a step at a time:
    *   'call'   she comes to the front of the yard and waves, `arg` in a bubble over her head; the view goes to her
    *   'speak'  she is speaking (`arg`) — or has stopped
    *   'show'   the parcel is in her hands
    *   'give'   …she holds it out, and puts it down before her
    *   'open'   it opens: the fox `arg` was in it (it comes out with the app's next sync)
+   *   'meet'   "…and this is the one": the fox `arg` steps up beside her
+   *   'wave'   a wave, to end with
    *   'end'    that was it
    */
   present(step, arg) {
@@ -2407,6 +2409,11 @@ export class World {
         this.spawn = { id: arg, x: g.at.x, z: g.at.z, yaw: Math.atan2(cam.x - g.at.x, cam.z - g.at.z) };
         this.fx.emit('✨', V(g.at.x, 0.24, g.at.z), { n: 12, spread: 0.24, rise: 0.75, life: 1.2, size: 0.14 });
         this.fx.emit('💗', V(g.at.x, 0.3, g.at.z), { n: 5, spread: 0.2, rise: 0.6, life: 1.4, size: 0.13 });
+      } else if (step === 'meet') {
+        // (one that is asleep is spoken of where it lies)
+        const fox = this.byId(arg) || this.lead;
+        g.fox = fox || null;
+        if (fox && !fox.brain.asleep) fox.brain.do('stepUp');
       }
     }
     this.wake();

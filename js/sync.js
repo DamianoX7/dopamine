@@ -15,8 +15,128 @@
 const SYNC_KEY = 'dopamineWorld.sync.v1';
 const SYNC_BEFORE_KEY = 'dopamineWorld.beforeSync.v1'; // this device's own progress, from before it joined a server that already had some
 
+/* ==================================================================
+   Cloud — the same thing on the published site, with Supabase in the
+   place of server.py (js/config.js → supabase; its login is sealed in
+   by tools/publish.py from data/supabase.json). Only the progress goes
+   there: one row in the table `progress` (data, rev), which only her
+   login can read or write (row level security). The covers and the
+   letters stay with server.py.
+
+   It answers the very requests server.py answers — `state?rev=`,
+   `state` (PUT, with the version it builds on), `all` (DELETE) — so
+   Sync below works the same with either. A save on top of a version
+   that is no longer the newest gets 409 and the newest, as there.
+   ================================================================== */
+const Cloud = {
+  cfg: (window.DW_CONFIG || {}).supabase || {},
+  session: null, // { token, uid, until }
+
+  get ready() {
+    const c = this.cfg;
+    return !!(c.url && c.key && c.email && c.password);
+  },
+
+  base() {
+    return String(this.cfg.url).replace(/\/+$/, '');
+  },
+
+  async login(timeout) {
+    const res = await this.fetch('POST', '/auth/v1/token?grant_type=password', { email: this.cfg.email, password: this.cfg.password }, { timeout, anon: true });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok || !out.access_token) {
+      console.warn('[Dopamine World] Supabase login failed — check data/supabase.json (tools/publish.py --set-supabase)', out);
+      throw Object.assign(new Error('cloud login'), { code: 'auth' });
+    }
+    this.session = { token: out.access_token, uid: out.user.id, until: Date.now() + (out.expires_in || 3600) * 1000 - 60000 };
+  },
+
+  fetch(method, path, body, o = {}) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), o.timeout || 15000);
+    const headers = { apikey: this.cfg.key, 'Content-Type': 'application/json' };
+    if (!o.anon) headers.Authorization = `Bearer ${this.session.token}`;
+    if (o.prefer) headers.Prefer = o.prefer;
+    return fetch(this.base() + path, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: ctl.signal,
+      cache: 'no-store',
+      keepalive: !!o.keepalive,
+    }).finally(() => clearTimeout(timer));
+  },
+
+  /* A request with her login (made, or made again, when needed). */
+  async rest(method, path, body, o = {}) {
+    if (!this.session || Date.now() > this.session.until) await this.login(o.timeout);
+    let res = await this.fetch(method, `/rest/v1/${path}`, body, o);
+    if (res.status === 401) {
+      await this.login(o.timeout);
+      res = await this.fetch(method, `/rest/v1/${path}`, body, o);
+    }
+    if (!res.ok && res.status !== 409) throw new Error(`cloud ${res.status}`);
+    return res;
+  },
+
+  mine() {
+    return `progress?user_id=eq.${this.session.uid}`;
+  },
+
+  async row(timeout) {
+    if (!this.session) await this.login(timeout);
+    const res = await this.rest('GET', `${this.mine()}&select=data,rev,updated_at`, undefined, { timeout });
+    return (await res.json())[0] || null;
+  },
+
+  reply(row, withJson = true) {
+    const out = { rev: row ? row.rev : 0, savedAt: row ? Date.parse(row.updated_at) : 0, epoch: 'cloud' };
+    if (row && withJson) out.json = JSON.stringify(row.data);
+    return out;
+  },
+
+  answer(out, status = 200) {
+    return new Response(JSON.stringify(out), { status, headers: { 'Content-Type': 'application/json' } });
+  },
+
+  /* What Sync.api() asks server.py, answered from Supabase. */
+  async api(path, o = {}) {
+    const method = o.method || 'GET';
+    const t = o.timeout;
+    if (path.startsWith('state') && method === 'GET') {
+      const have = new URLSearchParams(path.split('?')[1] || '').get('rev');
+      const row = await this.row(t);
+      return this.answer(this.reply(row, !row || String(row.rev) !== have));
+    }
+    if (path === 'state' && method === 'PUT') {
+      const { base, json } = o.json;
+      const data = JSON.parse(json);
+      if (!this.session) await this.login(t);
+      let res;
+      if (!base) {
+        res = await this.rest('POST', 'progress', { user_id: this.session.uid, data, rev: 1 }, { timeout: t, keepalive: o.keepalive, prefer: 'return=minimal' });
+        if (res.ok) return this.answer({ rev: 1, epoch: 'cloud' });
+      } else {
+        const body = { data, rev: base + 1, updated_at: new Date().toISOString() };
+        res = await this.rest('PATCH', `${this.mine()}&rev=eq.${base}`, body, { timeout: t, keepalive: o.keepalive, prefer: 'return=representation' });
+        if ((await res.json()).length) return this.answer({ rev: base + 1, epoch: 'cloud' });
+      }
+      // another device saved in between (or the row is gone): the newest, as server.py answers it
+      return this.answer(this.reply(await this.row(t)), 409);
+    }
+    if (path === 'all' && method === 'DELETE') {
+      if (!this.session) await this.login(t);
+      await this.rest('DELETE', this.mine(), undefined, { timeout: t });
+      return this.answer({ ok: true, epoch: 'cloud' });
+    }
+    throw new Error(`cloud: no ${method} ${path}`);
+  },
+};
+
 const Sync = {
   on: false, //      the server is there
+  cloud: false, //   …or, on the published site, Supabase is (see Cloud above)
+  where: '', //      which of the two the rev below belongs to
   status: 'off', //  off | ok | offline | locked
   rev: 0, //         the server's version this device last saw
   epoch: '', //      changes when everything on the server was deleted
@@ -35,6 +155,7 @@ const Sync = {
       this.epoch = m.epoch || '';
       this.dirty = !!m.dirty;
       this.key = m.key || '';
+      this.where = m.where || '';
     } catch (e) {
       /* start as a new device */
     }
@@ -42,7 +163,7 @@ const Sync = {
 
   saveMeta() {
     try {
-      localStorage.setItem(SYNC_KEY, JSON.stringify({ rev: this.rev, epoch: this.epoch, dirty: this.dirty, key: this.key }));
+      localStorage.setItem(SYNC_KEY, JSON.stringify({ rev: this.rev, epoch: this.epoch, dirty: this.dirty, key: this.key, where: this.where }));
     } catch (e) {
       /* ignore */
     }
@@ -65,8 +186,24 @@ const Sync = {
     if (typeof Views !== 'undefined' && Views.me && Router.is('me')) Views.me.fillStorage();
   },
 
+  /** Progress is being kept somewhere besides this browser. */
+  get live() {
+    return this.on || this.cloud;
+  },
+
+  /* The rev and epoch this device remembers belong to one place: moving to the other starts afresh. */
+  place(where) {
+    if (this.where === where) return;
+    if (this.where) {
+      this.rev = 0;
+      this.epoch = '';
+    }
+    this.where = where;
+  },
+
   /* ----- talking to the server ----- */
   async api(path, o = {}) {
+    if (this.cloud) return Cloud.api(path, o);
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), o.timeout || 15000);
     const headers = {};
@@ -111,8 +248,15 @@ const Sync = {
   async start() {
     this.loadMeta();
     this.sig = this.signature();
-    const info = await this.ping();
-    if (info === false) return;
+    // the published site (js/gate.js) has no server.py: Supabase, if it is set up — and only there, so that a copy
+    // opened to try something out never writes into her progress
+    const cloud = Cloud.ready && Gate.on;
+    const info = cloud ? false : await this.ping();
+    if (info === false) {
+      if (cloud) await this.startCloud();
+      return;
+    }
+    this.place('server');
     if (info === null) {
       // it synced before, so the server exists — it just can't be reached right now
       if (!this.rev) return;
@@ -124,6 +268,18 @@ const Sync = {
       else await this.pull(true);
     }
     this.libraryNow(); // if the studio modules loaded first, they were told "not yet"
+    this.watch();
+  },
+
+  async startCloud() {
+    this.cloud = true;
+    this.place('cloud');
+    if (!this.rev && State.onboarded) this.dirty = true; // what she did here before: the first save sends it
+    await this.pull(true);
+    this.watch();
+  },
+
+  watch() {
     setInterval(() => this.tick(), 20000);
     setInterval(() => this.libraryNow(), 60000);
     document.addEventListener('visibilitychange', () => {
@@ -135,7 +291,7 @@ const Sync = {
   },
 
   tick() {
-    if (!this.on || document.hidden || this.status === 'locked' || CoverHost.quiet) return;
+    if (!this.live || document.hidden || this.status === 'locked' || CoverHost.quiet) return;
     this.pull(false);
   },
 
@@ -148,7 +304,7 @@ const Sync = {
     if (this.busy) return;
     this.busy = true;
     try {
-      const res = await this.api(`state?rev=${this.rev}`, { timeout: boot ? 4000 : 10000 });
+      const res = await this.api(`state?rev=${this.rev}`, { timeout: boot ? (this.cloud ? 8000 : 4000) : 10000 });
       if (!res.ok) throw new Error(`state ${res.status}`);
       const remote = await res.json();
       if (this.epoch && remote.epoch !== this.epoch) {
@@ -218,7 +374,7 @@ const Sync = {
   /* ----- progress: this device → server ----- */
   /* Store.saveNow() reports every save; only real changes are sent. */
   noteSaved() {
-    if (!this.on) return;
+    if (!this.live) return;
     const sig = this.signature();
     if (sig === this.sig) return;
     this.sig = sig;
@@ -230,7 +386,7 @@ const Sync = {
   push: debounce(() => Sync.pushNow(), 2000),
 
   async pushNow() {
-    if (!this.on || !this.dirty || this.status === 'locked' || !State.onboarded) return;
+    if (!this.live || !this.dirty || this.status === 'locked' || !State.onboarded) return;
     if (this.busy) return void this.push();
     this.busy = true;
     const sent = this.sig;
@@ -258,7 +414,7 @@ const Sync = {
   /* The page is going away with something unsent: one last try that outlives the page. */
   lastCall() {
     Store.saveNow();
-    if (!this.on || !this.dirty || !this.rev || this.status !== 'ok' || !State.onboarded) return;
+    if (!this.live || !this.dirty || !this.rev || this.status !== 'ok' || !State.onboarded) return;
     this.api('state', { method: 'PUT', json: { base: this.rev, json: JSON.stringify(State) }, keepalive: true }).catch(() => {});
   },
 
@@ -305,14 +461,14 @@ const Sync = {
 
   /* "Delete everything": the server's copy goes too. This device forgets all but the passcode. */
   async wipe() {
-    if (this.on && this.status !== 'locked') {
+    if (this.live && this.status !== 'locked') {
       try {
         await this.api('all', { method: 'DELETE' });
       } catch (e) {
         /* unreachable — the local data is deleted anyway */
       }
     }
-    this.on = false; // nothing more is sent before the page reloads
+    this.on = this.cloud = false; // nothing more is sent before the page reloads
     try {
       localStorage.setItem(SYNC_KEY, JSON.stringify({ key: this.key }));
       ['dopamineWorld.syncGone.v1', SYNC_BEFORE_KEY].forEach((k) => localStorage.removeItem(k));

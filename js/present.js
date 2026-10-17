@@ -41,13 +41,81 @@ const PRESENT_LINES = {
   ],
 };
 
+/*
+   Lorelei has the floor. In the foxes' world the buttons make way; she comes to the front and calls — a bubble over
+   her head, as ever — and what she has to say comes in the window along the bottom (js/talk.js). It is how she gives
+   her present (below) and how she says her first hello (js/meet.js).
+*/
+const OwnerSays = {
+  on: false, //    she has the floor right now
+  ov: null, //     …in this opening of the foxes' world
+  live: false, //  …which is the 3D one (not the still picture of a device without it)
+  ready: null, //  called when she has come forward and waved
+
+  /** Is the foxes' world she began in still open? */
+  here() {
+    return !!this.ov && FoxRoom.ov === this.ov;
+  },
+
+  /* She steps forward and calls `line`. → false if the foxes' world was left meanwhile. */
+  async enter(line) {
+    this.ov = FoxRoom.ov;
+    this.on = true;
+    this.live = !!(FoxHost.api && !FoxHost.failed && FoxHost.stage);
+    FoxRoom.setPhoto(false);
+    if (FoxRoom.tab) FoxRoom.setShop(null);
+    Pet.previewing = null;
+    Pet.held = null;
+    FoxRoom.stageMode(true);
+    if (this.live) {
+      const came = new Promise((resolve) => (this.ready = resolve));
+      FoxHost.api.present('call', line);
+      await Promise.race([came, sleep(7000)]);
+      if (this.here()) await sleep(500);
+    }
+    return this.here();
+  },
+
+  /* A step of what the 3D side shows meanwhile (js/fox/world.js: present). */
+  show(step, arg) {
+    if (this.live && this.here() && FoxHost.api && FoxHost.stage) FoxHost.api.present(step, arg);
+  },
+
+  /* She has her say. → the answers that were given, or null if she was not heard to the end. */
+  async talk(pages) {
+    const said = await Talk.run(pages, { who: OWNER_NAME, tint: '#ff7aa8', voice: 1.2, speaking: (on) => this.show('speak', on) });
+    return said && this.here() ? said : null;
+  },
+
+  /* …and that was it: the buttons are back. */
+  leave() {
+    this.ready = null;
+    this.on = false;
+    if (FoxHost.api) FoxHost.api.present('end');
+    if (this.here()) {
+      FoxRoom.point(null);
+      FoxRoom.stageMode(false);
+    }
+    this.ov = null;
+  },
+
+  /* What the 3D side has to tell (js/fox/world.js: present). */
+  heard(what) {
+    if (what === 'ready' && this.ready) this.ready();
+  },
+
+  /* The foxes' world was left while she was coming forward: that is over at once, so that it can begin again next time. */
+  left() {
+    if (this.ready) this.ready();
+  },
+};
+
 const Present = {
   playing: false, //    she is being given it right now
   rehearsal: false, //  …or shown how it will be (nothing of it is kept)
   rehearsing: false, // he has asked to be shown (from then until it is over: the real one does not begin meanwhile)
   guest: null, //       a rehearsal: the fox that is in the yard for it, without being hers
   told: null, //        …and the day of theirs it speaks of (otherwise: today's)
-  ready: null, //       called when Lorelei has come forward and waved
   rested: null, //      the fox that went to rest to make room for the new one
   timer: 0,
 
@@ -98,7 +166,7 @@ const Present = {
 
   /* The story, page by page (js/talk.js), with what the foxes' world is to show at each. */
   pages() {
-    const show = (step, arg) => FoxHost.api && FoxHost.stage && FoxHost.api.present(step, arg);
+    const show = (step, arg) => OwnerSays.show(step, arg);
     const L = (key) => this.lines(key);
     const cued = (list, cue) => list.map((text, i) => (i ? text : { text, cue }));
     const [question, ...picks] = L('ask');
@@ -123,37 +191,21 @@ const Present = {
   */
   async begin({ rehearsal = false, days = null } = {}) {
     const ov = FoxRoom.ov;
-    if (this.playing || Talk.on || !ov || UI.top() !== ov) return false;
+    if (this.playing || OwnerSays.on || Talk.on || !ov || UI.top() !== ov) return false;
     if (!rehearsal && !this.waiting()) return false;
     this.playing = true;
     this.rehearsal = rehearsal;
     this.told = rehearsal ? days : null;
     clearTimeout(this.timer);
-    const live = !!(FoxHost.api && !FoxHost.failed && FoxHost.stage);
-    const here = () => FoxRoom.ov === ov;
-    FoxRoom.setPhoto(false);
-    if (FoxRoom.tab) FoxRoom.setShop(null);
-    Pet.previewing = null;
-    Pet.held = null;
-    FoxRoom.stageMode(true);
     FoxRoom.presentChip();
     let told = false;
     try {
-      if (live) {
-        // she comes to the front and calls; then she has her say
-        const came = new Promise((resolve) => (this.ready = resolve));
-        FoxHost.api.present('call', pick(this.lines('call')));
-        await Promise.race([came, sleep(7000)]);
-        if (here()) await sleep(500);
-      }
-      if (!here()) return false; // (she left while she was being called: it keeps — see left())
-      const said = await Talk.run(this.pages(), { who: OWNER_NAME, tint: '#ff7aa8', voice: 1.2, speaking: (on) => live && FoxHost.api.present('speak', on) });
-      told = !!said && here();
+      // she comes to the front and calls; then she has her say
+      if (!(await OwnerSays.enter(pick(this.lines('call'))))) return false; // (she left while she was being called: it keeps — see left())
+      told = !!(await OwnerSays.talk(this.pages()));
     } finally {
-      this.ready = null;
       this.playing = false;
-      if (FoxHost.api) FoxHost.api.present('end');
-      if (here()) FoxRoom.stageMode(false);
+      OwnerSays.leave();
     }
     if (!told || rehearsal) {
       // (a rehearsal leaves nothing behind — nor does a story that was not told to its end)
@@ -239,8 +291,8 @@ const Present = {
     const ov = FoxRoom.ov;
     const tryIt = () => {
       if (FoxRoom.ov !== ov || !this.waiting()) return;
-      // (not over a letter she is reading, the shop, the camera: when she is back with the foxes)
-      if (!this.playing && UI.top() === ov && !FoxRoom.tab && !FoxRoom.photoOn) return void this.begin();
+      // (not over a letter she is reading, the shop, the camera, Lorelei's first hello: when she is back with the foxes)
+      if (!this.playing && !OwnerSays.on && UI.top() === ov && !FoxRoom.tab && !FoxRoom.photoOn) return void this.begin();
       this.timer = setTimeout(tryIt, 2000);
     };
     this.timer = setTimeout(tryIt, 1400);
@@ -251,7 +303,7 @@ const Present = {
     clearTimeout(this.timer);
     this.guest = null;
     this.told = null;
-    if (this.ready) this.ready(); // (Lorelei was calling her: that is over at once, so that it can begin again when she is back)
+    OwnerSays.left(); // (Lorelei was calling her: that is over at once, so that it can begin again when she is back)
   },
 
   /* The line under the achievement about what comes with it (나 → 업적). */
@@ -270,11 +322,6 @@ const Present = {
     if (this.due()) return `100일이 됐어요. 여우 세상에 들어가면 ${her} 상점에 없는 여우 ${fox} 전해 줘요.`;
     const key = addDays(Days.start, PRESENT.day - 1);
     return `우리가 만난 지 100일째 되는 날(${fmtDay(key)}, ${dLabel(daysBetween(dateKey(), key))})부터, 여우 세상에 들어가면 ${her} 상점에 없는 여우 ${fox} 선물로 줘요. 업적 ‘백일’과 함께예요.`;
-  },
-
-  /* What the 3D side has to tell (js/fox/world.js: present). */
-  heard(what) {
-    if (what === 'ready' && this.ready) this.ready();
   },
 
   /*

@@ -39,7 +39,7 @@ const CALM = { wag: 0, ears: 0, mouth: 0, pant: 0, chew: 0, eyes: 'open', breath
 const FREE = new Set(['wander', 'lookAbout', 'sitAwhile', 'lieAwhile', 'sniffAbout', 'groom', 'yawn', 'stretch', 'shake', 'mope', 'follow', 'visit', 'greetBack', 'snuggle', 'nuzzle', 'lookOn']);
 const RESTING = new Set(['sitAwhile', 'lieAwhile', 'groom', 'snuggle', 'sleep', 'mope', 'strokedBy']);
 // …and what it finishes first, whatever the weather does
-const INTENT = new Set(['fetchLetter', 'present', 'bringGift', 'eat', 'playBall', 'party', 'lullaby', 'strike', 'model', 'depart', 'alight', 'wake', 'petted', 'greet', 'arrive', 'unwrapped', 'lookOn', 'sing', 'takeCover']);
+const INTENT = new Set(['fetchLetter', 'present', 'bringGift', 'eat', 'playBall', 'party', 'lullaby', 'strike', 'model', 'depart', 'alight', 'wake', 'petted', 'greet', 'arrive', 'unwrapped', 'lookOn', 'stepUp', 'sing', 'takeCover']);
 
 export class Brain {
   constructor(world, fox) {
@@ -1524,6 +1524,38 @@ export class Brain {
       if (t < next) continue;
       next = t + rand(1.4, 2.6);
       if (Math.random() < 0.45) this.lookAt(w.owner, 0.9);
+      else this.lookAtYou(0.95);
+    }
+  }
+
+  /**
+   * Lorelei is telling somebody about it (world.present: 'meet'): up to her it goes — in front of her and a little to
+   * her left, where it can be seen — gives a hop, and sits there, pleased with itself, for as long as she speaks.
+   */
+  *stepUp() {
+    const a = this.a;
+    const w = this.w;
+    const her = w.owner;
+    this.close = true;
+    const spot = () => {
+      const yaw = her.anim.yaw;
+      return this.clampPoint(her.anim.pos.x + Math.sin(yaw) * 0.46 + Math.cos(yaw) * 0.36, her.anim.pos.z + Math.cos(yaw) * 0.46 - Math.sin(yaw) * 0.36, 1);
+    };
+    this.lookAt(her, 0.8);
+    yield* this.goTo(0, 0, { speed: 'trot', stop: 0.1, timeout: 6, moving: spot });
+    yield* this.turnTo(this.toCamera(), 8);
+    this.lookAtYou(1);
+    a.mood.wag = 1;
+    a.mood.eyes = 'happy';
+    yield* this.hop(0.15);
+    a.mood.eyes = 'open';
+    a.setPose('sit', 5);
+    for (let t = 0, next = 1.6; w.gifting && t < 180; ) {
+      t += yield;
+      a.mood.wag = 0.6 + 0.3 * Math.sin(t * 2.4);
+      if (t < next) continue;
+      next = t + rand(1.6, 3);
+      if (Math.random() < 0.4) this.lookAt(her, 0.9);
       else this.lookAtYou(0.95);
     }
   }

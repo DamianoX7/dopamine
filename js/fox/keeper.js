@@ -577,6 +577,28 @@ export class Keeper extends Brain {
           if (fox && Math.sin(t * 0.7) > 0) this.lookAt(fox, 0.9);
           else this.lookAtYou(0.9);
         }
+      } else if (g.step === 'meet') {
+        // "…and this is the one": a hand towards it and a look — then back to whoever she is talking to
+        const fox = g.fox && w.foxes.includes(g.fox) ? g.fox : null;
+        if (g.t < 2.6) {
+          a.setPose('show', 7);
+          // (a glance down at it, not a bow over it: her face stays to be seen)
+          if (fox && g.t < 1.5) this.lookAt(fox, 0.5);
+          else this.lookAtYou(1);
+          a.mood.eyes = g.t > 0.7 && g.t < 1.9 ? 'happy' : 'open';
+        } else {
+          a.setPose('stand', 5);
+          this.lookAtYou(1);
+        }
+      } else if (g.step === 'wave') {
+        if (g.t < 1.7) {
+          a.setPose('wave', 8);
+          a.add.eR = Math.sin(g.t * 11) * 0.36;
+          a.mood.eyes = g.t > 0.4 && g.t < 1.4 ? 'happy' : 'open';
+        } else {
+          a.still();
+          a.setPose('stand', 5);
+        }
       }
     }
     a.still();

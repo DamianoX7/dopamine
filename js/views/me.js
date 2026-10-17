@@ -632,6 +632,8 @@ Views.me = {
         <p class="hint">${
           Sync.on
             ? '진행 상황과 커버는 이 기기와 우리 서버에 함께 저장돼서, 휴대폰과 컴퓨터에서 같은 내용이 보여요. 그 밖의 곳으로는 나가지 않아요.'
+            : Sync.cloud
+            ? '진행 상황은 이 기기와 우리만 열 수 있는 클라우드(Supabase)에 함께 저장돼서, 휴대폰과 컴퓨터에서 같은 내용이 보여요. 녹음과 커버는 이 기기 밖으로 나가지 않아요.'
             : '녹음은 직접 내려받거나 공유하지 않는 한 이 기기 밖으로 나가지 않아요. 계정도, 업로드도, 추적도 없어요.'
         }</p>
         <p class="hint">팁: 아이폰에서는 “홈 화면에 추가”를 해 두면 Safari가 녹음을 더 잘 보관해요. 아끼는 커버는 내려받아서 오래오래 간직하세요.</p>
@@ -672,6 +674,12 @@ Views.me = {
         <p class="hint">켜 두면 이 기기에서는 지금부터 열려 있어요. 다른 기기에는 아무 영향이 없어요.</p>`
             : ''
         }
+      </div>
+      <div class="card">
+        <h2 class="card-title">👋 ${esc(OWNER_NAME)}의 첫인사</h2>
+        <p class="hint">${Meet.note()}</p>
+        <p class="hint">미리 보기는 처음 온 사람에게 하듯 처음부터 끝까지 보여 주지만, 아무것도 저장되지 않아요(이름 짓기는 건너뛰어요). ${esc(josa(OWNER_NAME, '이/가'))} 하는 말은 <code>js/config.js</code>의 <code>meetLines</code>로 바꿀 수 있어요.</p>
+        <button class="btn soft" data-action="meet-rehearse">👀 미리 보기</button>
       </div>
       <div class="card">
         <h2 class="card-title">🎁 100일 선물</h2>
@@ -715,9 +723,9 @@ Views.me = {
     const rows = [];
     rows.push(`<li><span>녹음 저장 방식</span><b>${DB.isPersistent() ? 'IndexedDB ✓' : '임시 (메모리에만) ⚠️'}</b></li>`);
     rows.push(`<li><span>이 기기의 커버</span><b>${Music.released().length}곡</b></li>`);
-    if (Sync.on) {
+    if (Sync.live) {
       const state = {
-        ok: '<b>켜짐 ✓</b>',
+        ok: Sync.cloud ? '<b>진행 상황 켜짐 ✓</b>' : '<b>켜짐 ✓</b>',
         offline: '<b>서버에 연결할 수 없어요 ⚠️</b>',
         locked: '<button class="btn soft small" data-action="sync-unlock">🔑 비밀번호 입력</button>',
       }[Sync.status];
