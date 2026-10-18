@@ -185,6 +185,14 @@ const WAXES = [
     id: 'butter', name: '버터', shape: 'butter', knot: false, face: 3, gloss: 0.22, trans: 0.5, powder: 0.12, depth: 0.3, lobe: 0.8, sit: 0.97, wide: 1.35, look: [47, 0.42], see: 0.5,
     waxA: '#fffdf7', waxB: '#fff8e8', base: '#ffeb96', deep: '#ffc44a', bg: '#eef3f8', floor: '#e0e8f1', accent: '#3f82c9', dot: ['#fff1b8', '#f7b52e'],
   },
+  {
+    // 청사과 왁뿌 (타오바오 수제 "청사과 왁뿌 슬랑이", "사각사각 왁뿌볼"): a white ball of clay (base; core: how big) in a thick coat of
+    // clear green jelly wax with silver stars, sequins, glitter and little green-apple charms set in it (see Glitter). It does not break
+    // into shards: pressed, the clear wax crunches (사각사각) and goes white like slush, and worked on, the whole thing ends up one pale
+    // green dough (see App.crunchy). waxA: a white thing seen through a ball's radius of the clear wax; waxB: the slush it goes to.
+    id: 'apple', name: '청사과', slush: true, core: 0.62, chill: true, voice: 'crunch', gloss: 0.25, trans: 0.3, stretch: 0.24, pull: 1.4, stick: 0.36,
+    waxA: '#d6e870', waxB: '#e0efb0', base: '#fbfcf5', deep: '#eef6dc', bg: '#eef7e0', floor: '#dcedc6', accent: '#5aa82c', dot: ['#e2f7a4', '#8fd13a'],
+  },
 ].map((w) => ({ ...INSIDE, ...w }));
 
 // where a fox keeps its parts, as directions from its middle (the left ear, cheek and paw mirror the right ones)
@@ -425,14 +433,15 @@ const Sound = {
     this.grain(this.ctx.currentTime + 0.004, 2400, 0.5, dur, 0.06, this.bus, 'bandpass', 0.18);
   },
 
-  /** A crunchy filling being worked: n tiny crackles over the next moment (within), and now and then a bubble going. */
-  crunch(pan, n, within = 0.03) {
+  /** A crunchy filling being worked: n tiny crackles over the next moment (within), and now and then a bubble going.
+      ice 0…1: clear wax going to slush (사각사각) instead: crisper, and no bubbles. cold 0…1: just out of the freezer, it is louder. */
+  crunch(pan, n, within = 0.03, ice = 0, cold = 0) {
     if (!this.live() || n < 1 || !this.room(n)) return;
-    const t = this.ctx.currentTime + 0.004, to = this.at(pan);
+    const t = this.ctx.currentTime + 0.004, to = this.at(pan), loud = 1 + 0.4 * cold;
     for (let i = 0; i < n; i++) {
       const at = t + rand() * within;
-      if (rand() < 0.2) this.tone(at, 520 + rand() * 480, 1150 + rand() * 650, 0.016 + rand() * 0.02, 0.12 + rand() * 0.2, to);
-      else this.grain(at, 1700 * Math.pow(4.2, rand()), 2.5 + rand() * 5, 0.004 + rand() * 0.011, 0.8 + rand() * 1.6, to);
+      if (rand() < 0.2 * (1 - ice)) this.tone(at, 520 + rand() * 480, 1150 + rand() * 650, 0.016 + rand() * 0.02, 0.12 + rand() * 0.2, to);
+      else this.grain(at, 1700 * Math.pow(4.2, rand()) * (1 + 0.35 * ice), 2.5 + rand() * 5, (0.004 + rand() * 0.011) * (1 - 0.3 * ice), (0.8 + rand() * 1.6) * loud, to);
     }
   },
 
@@ -547,6 +556,12 @@ function knotMesh() {
   return { pos, nrm, idx: g.idx };
 }
 
+/** Two directions square to s and to each other. */
+function across(s) {
+  const e1 = V.norm(V.cross(Math.abs(s[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0], s));
+  return [e1, V.cross(s, e1)];
+}
+
 /** Keeps the part of a polygon where a·u + b·v ≤ c. */
 function clip(poly, a, b, c) {
   const out = [];
@@ -597,6 +612,8 @@ class Squish {
     this.tossed = false;
     this.spin = [0, 0, 0];
     this.give = 1; //         how much the body as a whole may deform (unbroken wax: not at all)
+    this.stiff = 0; //        how hard it is to press into (0…1): a finger goes in that much less far
+    this.crush = new Float32Array(this.n); // (clear wax that goes to slush) how far it has gone, over each point of the skin, 0…1
     this.limb = new Int32Array(0); // points that stick out (ears, a tail), and how loosely each follows the body (0…1)
     this.lag = new Float32Array(0);
     this.was = new Float32Array(0); //  where those points belonged last frame, and how fast that was moving
@@ -667,6 +684,7 @@ class Squish {
     this.settled = true;
     this.off.fill(0);
     this.vel.fill(0);
+    this.crush.fill(0);
     this.E.fill(0);
     this.Ev.fill(0);
     this.lean = [0, 0];
@@ -920,7 +938,7 @@ class Squish {
       t.near.length = 0;
       const ax = t.ra[0], ay = t.ra[1], az = t.ra[2], dx = t.d[0], dy = t.d[1], dz = t.d[2];
       const lobe2 = toy.lobe * toy.lobe, w2 = t.w * t.w, ring2 = w2 * 5.76, far2 = Math.max(lobe2, ring2);
-      const pulls = dx * dx + dy * dy + dz * dz > 1e-9, swell = toy.bulge * toy.depth * t.pr;
+      const pulls = dx * dx + dy * dy + dz * dz > 1e-9, swell = toy.bulge * toy.depth * t.pr * (1 - this.stiff);
       for (let i = 0, j = 0; i < n; i++, j += 3) {
         const ex = rest[j] - ax, ey = rest[j + 1] - ay, ez = rest[j + 2] - az, d2 = ex * ex + ey * ey + ez * ez;
         if (d2 > far2) continue;
@@ -968,7 +986,7 @@ class Squish {
       // fingers: the skin under one is pushed in at least as deep as the finger is
       for (const t of touches) {
         if (!t.live || t.pr < 0.001) continue;
-        const depth = toy.depth * t.pr * (t.fist ? 0.62 : 1), px = t.dir[0], py = t.dir[1], pz = t.dir[2], near = t.near;
+        const depth = toy.depth * t.pr * (t.fist ? 0.62 : 1) * (1 - this.stiff), px = t.dir[0], py = t.dir[1], pz = t.dir[2], near = t.near;
         for (let q = 0; q < near.length; q += 2) {
           const i = near[q], j = i * 3, want = depth * near[q + 1] * free[i];
           const have = off[j] * px + off[j + 1] * py + off[j + 2] * pz;
@@ -1636,6 +1654,82 @@ class Crumbs {
   }
 }
 
+// ------------------------------------------------------------------ glitter
+
+const CHARM = 0, STAR = 1, SEQUIN = 2, FLAKE = 3; // the pictures in View.charms
+
+/* What is set in a coat of clear jelly wax: little green-apple charms,
+   star sequins, round sequins and glitter, each a flat piece at a depth
+   and a slant of its own. Each rides on a point of the skin, as far in
+   from it as it started, so a dent or a squeeze carries it along. */
+class Glitter {
+  constructor() {
+    this.count = 0;
+    this.bits = [];
+  }
+
+  /** A fresh lot, set in between the clay ball in the middle (core: how big it is) and the skin. */
+  scatter(seed, ball, core) {
+    const rnd = rng(seed), bits = [];
+    // how many of each, and how big
+    for (const [kind, many, size] of [[CHARM, 6, 0.26], [STAR, 30, 0.1], [SEQUIN, 30, 0.07], [FLAKE, 150, 0.035]]) {
+      for (let k = 0; k < many; k++) {
+        const y = rnd() * 2 - 1, a = rnd() * TAU, s = Math.sqrt(1 - y * y);
+        let d = [s * Math.cos(a), y, s * Math.sin(a)];
+        if (kind === CHARM && k < 4) d = V.norm([d[0], d[1], 0.35 + 0.65 * Math.abs(d[2])]); // (most of the charms on the side that faces you when it arrives)
+        let v = 0, best = -2;
+        for (let i = 0, j = 0; i < ball.n; i++, j += 3) {
+          const dd = d[0] * ball.dir[j] + d[1] * ball.dir[j + 1] + d[2] * ball.dir[j + 2];
+          if (dd > best) {
+            best = dd;
+            v = i;
+          }
+        }
+        // the charms were set in facing out, near the top of the wax; the rest lie any way, anywhere in it
+        const lean = kind === CHARM ? 0.5 : 2.5, n = V.norm(V.add(d, [(rnd() - 0.5) * lean, (rnd() - 0.5) * lean, (rnd() - 0.5) * lean]));
+        const [e1, e2] = across(n), spin = rnd() * TAU, u = V.add(V.mul(e1, Math.cos(spin)), V.mul(e2, Math.sin(spin)));
+        const tint = kind !== FLAKE ? [1, 1, 1] : [[1, 0.86, 0.5], [0.92, 0.96, 1], [0.66, 0.95, 0.5]][Math.floor(rnd() * 3)]; // gold, silver or green
+        bits.push({ kind, v, n, u, w: V.cross(n, u), tint, size: size * (0.75 + 0.5 * rnd()), deep: kind === CHARM ? lerp(core + 0.14, 0.92, rnd()) : lerp(core + 0.04, 0.95, rnd()) });
+      }
+    }
+    this.bits = bits;
+    const m = (this.count = bits.length);
+    this.pos = new Float32Array(m * 12);
+    this.nrm = new Float32Array(m * 12);
+    this.tint = new Float32Array(m * 16); // its colour, and how much it sparkles
+    this.uv = new Float32Array(m * 16); //   where in the picture; and how far in it is, and how crushed the wax round it is (see FS_GLITTER)
+    this.idx = new Uint16Array(m * 6);
+    const flash = [0.5, 1.6, 1.3, 2]; // (by kind: a charm is clay with a glaze; the rest are shiny)
+    bits.forEach((b, i) => {
+      const u0 = (b.kind % 2) * 0.5, v0 = (b.kind >> 1) * 0.5;
+      [[u0, v0 + 0.5], [u0 + 0.5, v0 + 0.5], [u0 + 0.5, v0], [u0, v0]].forEach(([u, v], c) => this.uv.set([u, v, b.deep, 0], i * 16 + c * 4));
+      for (let c = 0; c < 4; c++) this.tint.set([...b.tint, flash[b.kind]], i * 16 + c * 4);
+      this.idx.set([i * 4, i * 4 + 1, i * 4 + 2, i * 4, i * 4 + 2, i * 4 + 3], i * 6);
+    });
+    this.stamp = (this.stamp || 0) + 1;
+  }
+
+  /** Puts each where the skin it rides on has now taken it. */
+  place(ball) {
+    const { pos, nrm, uv } = this, C = ball.C, Q = ball.Q;
+    this.bits.forEach((b, i) => {
+      const j = b.v * 3, k = b.deep, h = b.size / 2;
+      for (let c = 0; c < 4; c++) uv[i * 16 + c * 4 + 3] = ball.crush[b.v];
+      const p = [C[0] + (ball.pos[j] - C[0]) * k, C[1] + (ball.pos[j + 1] - C[1]) * k, C[2] + (ball.pos[j + 2] - C[2]) * k];
+      const n = M3.apply(Q, b.n), u = V.mul(M3.apply(Q, b.u), h), w = V.mul(M3.apply(Q, b.w), h);
+      for (let c = 0; c < 4; c++) {
+        const su = c === 0 || c === 3 ? -1 : 1, sw = c < 2 ? -1 : 1, q = i * 12 + c * 3;
+        pos[q] = p[0] + u[0] * su + w[0] * sw;
+        pos[q + 1] = p[1] + u[1] * su + w[1] * sw;
+        pos[q + 2] = p[2] + u[2] * su + w[2] * sw;
+        nrm[q] = n[0];
+        nrm[q + 1] = n[1];
+        nrm[q + 2] = n[2];
+      }
+    });
+  }
+}
+
 // ------------------------------------------------------------------ drawing
 
 const PITCH = (32 * Math.PI) / 180; // how steeply the table is looked down on (unless the toy has a look of its own)
@@ -1956,6 +2050,122 @@ const FS_CRUMB = `
   }
 `;
 
+/* A coat of clear jelly wax (청사과 왁뿌) is the skin itself, drawn twice over what is inside it: once (uPass 0) for how much of what is
+   behind it still shows, coloured by the wax it is seen through, to multiply by; and once (uPass 1) for what it gives back itself, to add:
+   the white it goes where it is crushed, its shine, what it mirrors. Both are worked out as the page's colours are, one over another. */
+const VS_JELLY = `
+  attribute vec3 aPos, aNrm, aRest; attribute float aCrush;
+  uniform mat4 uVP;
+  varying vec3 vPos, vNrm, vRest; varying float vCrush;
+  void main() { vPos = aPos; vNrm = aNrm; vRest = aRest; vCrush = aCrush; gl_Position = uVP * vec4(aPos, 1.); }
+`;
+const FS_JELLY = `
+  precision highp float;
+  varying vec3 vPos, vNrm, vRest; varying float vCrush;
+  uniform float uPass;
+  uniform mat3 uLocal; uniform vec3 uMid; // the world as the toy sees it: about its middle, turned back and its squash undone
+  uniform float uCore; //                   how big the clay ball in the middle is
+  uniform vec3 uJelly, uSlush; //           how much of each colour a ball's radius of the clear wax takes out (as a power of e); the slush
+  uniform float uFrost; //                  0…1: just out of the freezer, rime has formed on it
+  ${GLSL_NOISE}
+  ${GLSL_LIGHT}
+  // how near the nearest crack is, in a net of them through the wax with a cell for each unit of p
+  float craze(vec3 p) {
+    vec3 i = floor(p), f = fract(p);
+    float d1 = 8., d2 = 8.;
+    for (int x = -1; x <= 1; x++) for (int y = -1; y <= 1; y++) for (int z = -1; z <= 1; z++) {
+      vec3 g = vec3(float(x), float(y), float(z)), o = vec3(hash13(i + g), hash13(i + g + 17.3), hash13(i + g + 41.9));
+      float d = length(g + o - f);
+      if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
+    }
+    return d2 - d1;
+  }
+  vec3 srgb(vec3 c) { return pow(max(c, 0.), vec3(1. / 2.2)); }
+  void main() {
+    vec3 N = normalize(vNrm), V = normalize(uCam - vPos), R = reflect(-V, N), r = normalize(vRest);
+    float ndv = max(dot(N, V), 0.), F = .04 + .96 * pow(1. - ndv, 5.);
+    // how far a line of sight goes through the clear wax: in to the clay ball if it meets it, or else out through the far side
+    vec3 o = uLocal * (vPos - uMid), d = normalize(uLocal * -V);
+    float b = dot(o, d), c2 = dot(o, o), hit = b * b - c2 + uCore * uCore, leave = b * b - c2 + 1.;
+    float len = mix(max(-b + sqrt(max(leave, 0.)), 0.), max(-b - sqrt(max(hit, 0.)), 0.), smoothstep(0., .04, hit)); // (a soft edge to the clay ball)
+    // crushed, it crazes white along cracks, the cracks multiply, and then it is all white slush (where it is still clear, none of that is worked out)
+    float c = vCrush, white = 0.;
+    if (c > .02) {
+      float lines = (1. - smoothstep(.02, .07, craze(r * 6.5))) * smoothstep(.02, .3, c);
+      if (c > .25) lines += (1. - smoothstep(.02, .06, craze(r * 14. + 5.))) * smoothstep(.25, .6, c);
+      white = .94 * clamp(max(lines * .85, smoothstep(.45, .95, c + .15 * (fbm(r * 7.) - .5))), 0., 1.);
+    }
+    float haze = .16 * (1. - exp(-2. * len)) * (1. - white); // (clear as it is, it is not quite clear)
+    float rime = 0.;
+    if (uFrost > 0.) rime = uFrost * clamp(.12 + .3 * (.6 * vnoise(r * 55.) + .4 * vnoise(r * 23.)) + .2 * smoothstep(.3, .8, fbm(r * 4.)) + .4 * pow(1. - ndv, 2.), 0., .8);
+    // (thin, it is nearly clear; seen through edge on it is deep green, more so than the way through alone would make it)
+    vec3 through = exp(-uJelly * pow(len, 1.6));
+    // a ball of it bends the light: what shows through it is partly not what is behind it but the room round about, the more so at its edge
+    float bent = mix(.2, .6, 1. - smoothstep(0., .04, hit)) * (1. - white);
+    if (uPass < .5) {
+      gl_FragColor = vec4(srgb(through) * (1. - white) * (1. - bent) * (1. - haze) * (1. - F * .85) * (1. - rime), 1.);
+      return;
+    }
+    float dif = clamp((dot(N, uKey) + .45) / 1.45, 0., 1.), fil = clamp(dot(N, uFill) * .5 + .5, 0., 1.);
+    float ao = mix(.55, 1., smoothstep(0., .7, vPos.y));
+    vec3 amb = mix(uFloor, uSky, N.y * .5 + .5), lit = vec3(dif * .72 + fil * .1) + amb * .32 * ao;
+    // the slush: pale green and white in streaks, grainy, with glitter glinting in it
+    vec3 slush = mix(uSlush, vec3(1.), .55 * smoothstep(.35, .7, fbm(r * 4. + 3.))) * (.9 + .2 * vnoise(r * 70.));
+    vec3 g = floor(r * 90.), H = normalize(uKey + V);
+    float glint = step(.9, hash13(g)) * pow(max(dot(normalize(N + vec3(hash13(g + 1.), hash13(g + 2.), hash13(g + 3.)) - .5), H), 0.), 20.);
+    vec3 col = srgb(slush * lit) * white + srgb(exp(-uJelly) * lit) * haze + glint * white * 1.5;
+    col += srgb(through * room(refract(-V, N, .7))) * bent * (1. - haze) * (1. - F * .85) * (1. - rime);
+    // fine glitter all through the clear wax, at three depths, twinkling
+    vec3 Vo = uLocal * V;
+    float spark = 0.;
+    for (int k = 0; k < 3; k++) {
+      float fk = float(k);
+      vec3 p = (r - Vo * (.05 + .07 * fk)) * (26. + 6. * fk), id = floor(p) + fk * 7.;
+      vec3 off = vec3(hash13(id + 1.3), hash13(id + 2.7), hash13(id + 4.1)) - .5;
+      float flake = smoothstep(.16, .05, length(fract(p) - .5 - off * .6)) * step(.6, hash13(id));
+      spark += flake * (pow(max(dot(normalize(off + N * .4), H), 0.), 16.) * 2.5 + .15);
+    }
+    col += spark * (1. - white) * vec3(1., .98, .9);
+    col += srgb(room(R)) * F * .85;
+    if (uFrost > 0.) {
+      vec3 q = floor(r * 150.);
+      col += srgb(vec3(.92, .96, 1.) * (dif * .7 + .3 * amb)) * rime;
+      col += step(.93, hash13(q)) * pow(max(dot(normalize(N + vec3(hash13(q + 1.), hash13(q + 2.), hash13(q + 3.)) - .5), H), 0.), 30.) * uFrost * 2.;
+    }
+    col += srgb(vec3(pane(R, uKey, vec2(.2, .26), .035) * 1.15 + pane(R, uFill, vec2(.07, .3), .05) * .3)) * (1. - .7 * rime);
+    gl_FragColor = vec4(col, 1.);
+  }
+`;
+
+/* What is set in the clear wax (see Glitter): flat pieces cut out of a picture (View.charms) that catch the light now and then. They are
+   drawn between the two goes at the wax, coloured by only as much of it as is in front of them; and as the wax round one goes to slush,
+   less and less of it shows. */
+const VS_GLITTER = `
+  attribute vec3 aPos, aNrm; attribute vec4 aTint, aUv;
+  uniform mat4 uVP;
+  varying vec3 vPos, vNrm; varying vec4 vTint, vUv;
+  void main() { vPos = aPos; vNrm = aNrm; vTint = aTint; vUv = aUv; gl_Position = uVP * vec4(aPos, 1.); }
+`;
+const FS_GLITTER = `
+  precision mediump float;
+  varying vec3 vPos, vNrm;
+  varying vec4 vTint, vUv; // its colour and how much it sparkles; where in the picture, how far in it is (from the middle, 1 at the skin), how crushed the wax round it is
+  uniform sampler2D uCharms;
+  uniform vec3 uCam, uKey, uMid, uJelly;
+  float hash12(vec2 p) { vec3 q = fract(vec3(p.xyx) * .1031); q += dot(q, q.yzx + 33.33); return fract((q.x + q.y) * q.z); }
+  void main() {
+    vec4 tex = texture2D(uCharms, vUv.xy);
+    if (tex.a < .5 || hash12(gl_FragCoord.xy) < vUv.w * .8) discard;
+    vec3 V = normalize(uCam - vPos), N = normalize(vNrm);
+    N *= sign(dot(N, V) + 1e-4); // (seen from either side)
+    float dif = .85 + .3 * max(dot(N, uKey), 0.); // (lit from all round: it is in a bright room, inside something clear)
+    float flash = pow(max(dot(N, normalize(uKey + V)), 0.), 24.) * vTint.w;
+    float front = (1. - vUv.z) / max(dot(normalize(vPos - uMid), V), .3); // the wax in front of it
+    vec3 seen = pow(exp(-uJelly * pow(front, 1.6)), vec3(1. / 2.2));
+    gl_FragColor = vec4((tex.rgb / tex.a * vTint.rgb * dif + flash) * seen, 1.);
+  }
+`;
+
 class View {
   constructor(canvas) {
     const opts = { antialias: true, alpha: false, powerPreference: 'high-performance' };
@@ -1970,15 +2180,19 @@ class View {
     this.pShadow = this.program(VS_SHADOW, FS_WHITE, ['aPos']);
     this.pBlur = this.program(VS_BLUR, FS_BLUR, ['aPos']);
     this.pCrumb = this.program(VS_CRUMB, FS_CRUMB, ['aP']);
+    this.pJelly = this.program(VS_JELLY, FS_JELLY, ['aPos', 'aNrm', 'aRest', 'aCrush']);
+    this.pGlitter = this.program(VS_GLITTER, FS_GLITTER, ['aPos', 'aNrm', 'aTint', 'aUv']);
     this.shade = [this.target(SHADE), this.target(SHADE)];
     this.floor = this.buffer(new Float32Array([-60, -60, 60, -60, -60, 60, 60, 60]));
     this.whole = this.buffer(new Float32Array([-1, -1, 3, -1, -1, 3]));
     const knot = knotMesh();
     this.knot = { pos: this.buffer(knot.pos), nrm: this.buffer(knot.nrm), idx: this.buffer(knot.idx, true), count: knot.idx.length };
     this.shellStamp = -1;
+    this.glitterStamp = -1;
     this.col = null;
     this.to = null;
     this.label();
+    this.charms();
 
     const self = this;
     this.cam = {
@@ -2040,6 +2254,106 @@ class View {
       gl.useProgram(prog.p);
       gl.uniform1i(prog.u.uLabel, 1);
     }
+  }
+
+  /** The pictures of what is set in clear wax, drawn once side by side (see Glitter): a little green-apple charm, a star sequin, a round
+      sequin, a flake of glitter (white: it is tinted). */
+  charms() {
+    const gl = this.gl, c = document.createElement('canvas'), g = c.getContext('2d'), S = 256;
+    c.width = c.height = 2 * S;
+    const at = (kind, draw) => {
+      g.save();
+      g.translate((kind % 2) * S + S / 2, (kind >> 1) * S + S / 2);
+      draw();
+      g.restore();
+    };
+    at(CHARM, () => {
+      // half a green apple: green skin round pale flesh, two pips, a stalk and a leaf
+      const apple = (k) => {
+        g.beginPath();
+        g.moveTo(0, -66 * k);
+        g.bezierCurveTo(40 * k, -108 * k, 110 * k, -80 * k, 102 * k, -6 * k);
+        g.bezierCurveTo(96 * k, 62 * k, 52 * k, 104 * k, 18 * k, 98 * k);
+        g.quadraticCurveTo(0, 92 * k, -18 * k, 98 * k);
+        g.bezierCurveTo(-52 * k, 104 * k, -96 * k, 62 * k, -102 * k, -6 * k);
+        g.bezierCurveTo(-110 * k, -80 * k, -40 * k, -108 * k, 0, -66 * k);
+        g.closePath();
+      };
+      g.translate(0, 14);
+      g.lineCap = 'round';
+      g.strokeStyle = '#6b4a2b';
+      g.lineWidth = 13;
+      g.beginPath();
+      g.moveTo(0, -62);
+      g.quadraticCurveTo(4, -94, 14, -110);
+      g.stroke();
+      g.fillStyle = '#4fae2a';
+      g.beginPath();
+      g.ellipse(46, -98, 34, 15, -0.5, 0, TAU);
+      g.fill();
+      apple(1);
+      g.fillStyle = '#86d13c';
+      g.fill();
+      apple(0.78);
+      g.fillStyle = '#fbf6dc';
+      g.fill();
+      g.fillStyle = '#5a3a22';
+      for (const s of [-1, 1]) {
+        g.beginPath();
+        g.ellipse(s * 16, 14, 9, 15, s * 0.35, 0, TAU);
+        g.fill();
+      }
+    });
+    at(STAR, () => {
+      // silver, with a little rainbow in it
+      const shine = g.createLinearGradient(-90, -90, 90, 90);
+      shine.addColorStop(0, '#ffffff');
+      shine.addColorStop(0.45, '#dde4ec');
+      shine.addColorStop(0.7, '#f2e8ff');
+      shine.addColorStop(1, '#c6d0da');
+      g.fillStyle = shine;
+      g.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = -Math.PI / 2 + (i * Math.PI) / 5, r = i % 2 ? 46 : 112;
+        g.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      }
+      g.closePath();
+      g.fill();
+    });
+    at(SEQUIN, () => {
+      // a green disc with a hole in the middle
+      const shine = g.createRadialGradient(-30, -30, 10, 0, 0, 104);
+      shine.addColorStop(0, '#ecffcf');
+      shine.addColorStop(0.6, '#93d85c');
+      shine.addColorStop(1, '#5fb83e');
+      g.fillStyle = shine;
+      g.beginPath();
+      g.arc(0, 0, 104, 0, TAU);
+      g.moveTo(20, 0);
+      g.arc(0, 0, 20, 0, TAU, true);
+      g.fill('evenodd');
+    });
+    at(FLAKE, () => {
+      g.fillStyle = '#fff';
+      g.beginPath();
+      for (let i = 0; i < 6; i++) g.lineTo(Math.cos((i * Math.PI) / 3) * 104, Math.sin((i * Math.PI) / 3) * 104);
+      g.closePath();
+      g.fill();
+    });
+
+    gl.activeTexture(gl.TEXTURE2); // a unit of its own, as the print on the butter has
+    gl.bindTexture(gl.TEXTURE_2D, gl.createTexture());
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true); // so that, made smaller, the pieces do not go dark round the edges (FS_GLITTER undoes it)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.useProgram(this.pGlitter.p);
+    gl.uniform1i(this.pGlitter.u.uCharms, 2);
   }
 
   program(vs, fs, attrs) {
@@ -2120,6 +2434,7 @@ class View {
       this.bRest = this.buffer(ball.rest, false, true);
       this.bDir = this.buffer(ball.dir);
       this.bIdx = this.buffer(ball.idx, true);
+      this.bCrush = this.buffer(ball.crush, false, true);
     } else this.fill(this.bRest, ball.rest);
   }
 
@@ -2129,6 +2444,7 @@ class View {
     this.to = { bg: lin(toy.bg), floor, dark: floor.map((c, i) => c * lerp(0.5, 0.45 + 0.45 * deep[i], see)), base: lin(toy.base), deep };
     if (now || !this.col) this.col = JSON.parse(JSON.stringify(this.to));
     if (toy.wax) this.wax = { a: lin(toy.waxA), b: lin(toy.waxB), see: toy.see || 0 };
+    if (toy.slush) this.jelly = { absorb: lin(toy.waxA).map((c) => -Math.log(Math.max(c, 1e-3))), slush: lin(toy.waxB) };
   }
 
   draw(app, dt) {
@@ -2215,8 +2531,9 @@ class View {
     gl.enable(gl.CULL_FACE);
     u = this.use(this.pSoft, [[this.bPos, 3], [this.bNrm, 3], [this.bRest, 3], [this.bDir, 3]]);
     this.light(u);
-    gl.uniformMatrix3fv(u.uM, false, M3.gl(M3.ident()));
-    gl.uniform3f(u.uT, 0, 0, 0);
+    const core = toy.slush ? toy.core : 1; // (a toy in a coat of clear wax: the coat is its skin, and this is the clay ball inside it)
+    gl.uniformMatrix3fv(u.uM, false, M3.gl(M3.ident().map((v) => v * core)));
+    gl.uniform3f(u.uT, ball.C[0] * (1 - core), ball.C[1] * (1 - core), ball.C[2] * (1 - core));
     gl.uniform3fv(u.uBase, col.base);
     gl.uniform3fv(u.uDeep, col.deep);
     gl.uniform4f(u.uMat, toy.gloss, toy.trans, toy.clear, toy.powder);
@@ -2225,19 +2542,6 @@ class View {
     gl.uniform1f(u.uTime, app.time);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.bIdx);
     gl.drawElements(gl.TRIANGLES, ball.idx.length, gl.UNSIGNED_SHORT, 0);
-
-    if (toy.knot) {
-      // the knot stands on its bit of skin, poking out through any wax
-      const k = ball.knot * 3, n = V.norm([ball.nrm[k], ball.nrm[k + 1], ball.nrm[k + 2]]), out = waxed && shell.whole + shell.stuck > 0 ? 0.03 : -0.012;
-      u = this.use(this.pSoft, [[this.knot.pos, 3], [this.knot.nrm, 3], [this.knot.pos, 3], [this.knot.pos, 3]]);
-      gl.uniformMatrix3fv(u.uM, false, M3.gl(M3.arc([0, 1, 0], n)));
-      gl.uniform3f(u.uT, ball.pos[k] + n[0] * out, ball.pos[k + 1] + n[1] * out, ball.pos[k + 2] + n[2] * out);
-      gl.uniform3fv(u.uBase, col.base.map((c) => lerp(c, 1, 0.75)));
-      gl.uniform4f(u.uMat, 1, 0.9, 0.7, 0);
-      gl.uniform4f(u.uFx, 0, 0, 0, 0);
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.knot.idx);
-      gl.drawElements(gl.TRIANGLES, this.knot.count, gl.UNSIGNED_SHORT, 0);
-    }
 
     if (waxed) {
       u = this.use(this.pShell, [[this.sPos, 3], [this.sNrm, 3], [this.sRest, 3], [this.sKind, 1]]);
@@ -2259,7 +2563,76 @@ class View {
       gl.uniform3fv(u.uColB, this.wax.b.map((c) => Math.pow(c * 0.8 + 0.2, 1 / 2.2)));
       gl.drawArrays(gl.POINTS, 0, crumbs.max);
     }
+
+    if (toy.slush) {
+      // the clear wax, in three goes: what still shows through it (the clay ball, the table behind)…
+      this.fill(this.bCrush, ball.crush);
+      const jelly = (pass) => {
+        u = this.use(this.pJelly, [[this.bPos, 3], [this.bNrm, 3], [this.bRest, 3], [this.bCrush, 1]]);
+        if (!pass) {
+          this.light(u);
+          gl.uniformMatrix3fv(u.uLocal, false, M3.gl(ball.Ai));
+          gl.uniform3fv(u.uMid, ball.C);
+          gl.uniform1f(u.uCore, toy.core);
+          gl.uniform3fv(u.uJelly, this.jelly.absorb);
+          gl.uniform3fv(u.uSlush, this.jelly.slush);
+          gl.uniform1f(u.uFrost, smooth(0, 0.6, app.cold));
+        }
+        gl.uniform1f(u.uPass, pass);
+        gl.enable(gl.BLEND);
+        if (pass) gl.blendFunc(gl.ONE, gl.ONE);
+        else gl.blendFunc(gl.ZERO, gl.SRC_COLOR);
+        gl.depthMask(false);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.bIdx);
+        gl.drawElements(gl.TRIANGLES, ball.idx.length, gl.UNSIGNED_SHORT, 0);
+        gl.depthMask(true);
+        gl.disable(gl.BLEND);
+      };
+      jelly(0);
+
+      // …what is set in it…
+      const glitter = app.glitter;
+      if (this.glitterStamp !== glitter.stamp) {
+        this.glitterStamp = glitter.stamp;
+        for (const b of [this.gPos, this.gNrm, this.gTint, this.gUv, this.gIdx]) if (b) gl.deleteBuffer(b);
+        this.gPos = this.buffer(glitter.pos, false, true);
+        this.gNrm = this.buffer(glitter.nrm, false, true);
+        this.gTint = this.buffer(glitter.tint);
+        this.gUv = this.buffer(glitter.uv, false, true);
+        this.gIdx = this.buffer(glitter.idx, true);
+      }
+      glitter.place(ball);
+      this.fill(this.gPos, glitter.pos);
+      this.fill(this.gNrm, glitter.nrm);
+      this.fill(this.gUv, glitter.uv);
+      u = this.use(this.pGlitter, [[this.gPos, 3], [this.gNrm, 3], [this.gTint, 4], [this.gUv, 4]]);
+      gl.uniformMatrix4fv(u.uVP, false, cam.vp);
+      gl.uniform3fv(u.uCam, cam.eye);
+      gl.uniform3fv(u.uKey, KEY);
+      gl.uniform3fv(u.uMid, ball.C);
+      gl.uniform3fv(u.uJelly, this.jelly.absorb);
+      gl.disable(gl.CULL_FACE);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.gIdx);
+      gl.drawElements(gl.TRIANGLES, glitter.count * 6, gl.UNSIGNED_SHORT, 0);
+      gl.enable(gl.CULL_FACE);
+
+      // …and what the wax gives back itself: where it has gone white, its shine, what it mirrors
+      jelly(1);
+    }
+
+    if (toy.knot) {
+      // the knot stands on its bit of skin, poking out through any wax
+      const k = ball.knot * 3, n = V.norm([ball.nrm[k], ball.nrm[k + 1], ball.nrm[k + 2]]), out = waxed && shell.whole + shell.stuck > 0 ? 0.03 : -0.012;
+      u = this.use(this.pSoft, [[this.knot.pos, 3], [this.knot.nrm, 3], [this.knot.pos, 3], [this.knot.pos, 3]]);
+      gl.uniformMatrix3fv(u.uM, false, M3.gl(M3.arc([0, 1, 0], n)));
+      gl.uniform3f(u.uT, ball.pos[k] + n[0] * out, ball.pos[k + 1] + n[1] * out, ball.pos[k + 2] + n[2] * out);
+      gl.uniform3fv(u.uBase, col.base.map((c) => lerp(c, 1, 0.75)));
+      gl.uniform4f(u.uMat, 1, 0.9, 0.7, 0);
+      gl.uniform4f(u.uFx, 0, 0, 0, 0);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.knot.idx);
+      gl.drawElements(gl.TRIANGLES, this.knot.count, gl.UNSIGNED_SHORT, 0);
+    }
   }
 }
 
-export { TAU, clamp, lerp, smooth, damp, rand, V, M3, TOYS, WAXES, SLAB, PITCH, AIM, shapeAt, Sound, buzz, Squish, Shell, Crumbs, View };
+export { TAU, clamp, lerp, smooth, damp, rand, V, M3, TOYS, WAXES, SLAB, PITCH, AIM, shapeAt, Sound, buzz, Squish, Shell, Crumbs, Glitter, View };

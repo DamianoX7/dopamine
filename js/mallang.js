@@ -57,7 +57,7 @@ const Mallang = {
             <button class="btn soft small" type="button" data-mg="recoat" hidden>다시 코팅</button>
             <button class="btn primary small mg-grip" type="button" data-mg="grip">꽉 쥐기</button>
           </div>
-          <div class="mg-meter" data-mg="meter" hidden><span data-mg="meterText">왁스 100%</span><i><b data-mg="meterBar"></b></i></div>
+          <div class="mg-meter" data-mg="meter" hidden><span data-mg="meterText">왁스 100%</span><i><b data-mg="meterBar"></b></i><button class="btn soft small mg-chill" type="button" data-mg="chill" hidden>❄️ 얼리기</button></div>
           <div class="mg-chips" data-mg="chips"></div>
         </section>
       </div>

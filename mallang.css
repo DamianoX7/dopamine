@@ -256,6 +256,14 @@ body.late-night .mallang::after {
   background: var(--grad);
   transition: width 0.25s;
 }
+/* the freezer, for a toy that may go in it (small whatever the size of the screen, which the dock's other buttons are not) */
+.mg-dock .mg-meter .btn.mg-chill {
+  flex: none;
+  min-height: 32px;
+  margin: -4px 0;
+  padding: 4px 12px;
+  font-size: 13.5px;
+}
 
 .mg-chips {
   display: flex;

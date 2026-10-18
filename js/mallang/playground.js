@@ -6,10 +6,11 @@
    shown on, the sound switch, the theme and what is remembered; this
    side plays.
    ================================================================== */
-import { clamp, lerp, smooth, damp, rand, V, M3, TOYS, WAXES, SLAB, PITCH, AIM, shapeAt, Sound, buzz, Squish, Shell, Crumbs, View } from './engine.js';
+import { clamp, lerp, smooth, damp, rand, V, M3, TOYS, WAXES, SLAB, PITCH, AIM, shapeAt, Sound, buzz, Squish, Shell, Crumbs, Glitter, View } from './engine.js';
 
 // where the fingers of a squeezing hand go: four round the middle, and the thumb on top
 const FIST = [[-0.82, 0.12, 0.56], [0.82, 0.05, 0.57], [-0.6, 0.1, -0.79], [0.62, 0.22, -0.76], [0.05, 0.86, 0.5]];
+const STONE = 1.15; // colder than this (see freeze), a toy is frozen too hard to crush: 짱돌
 const SIDEWAYS = '(orientation: landscape) and (max-height: 520px)'; // a phone on its side (the same words as in mallang.css)
 
 /** Keeps a pointer's moves coming to the element it went down on, even after it wanders off it. */
@@ -53,6 +54,9 @@ class Playground {
     this.seen = null; //    …and how far it has got with what the toy asks of it: it eases there
     this.crunch = 0; //     crackles a crunchy toy still owes (see crackle), and how long since it last let some out
     this.since = 0;
+    this.clear = 1; //      how much of a coat of clear wax is still clear, not yet slush (see crunchy)
+    this.cold = 0; //       how cold the toy is: 1 after ten minutes in the freezer, 2 left in too long (see freeze); it warms up again
+    this.freezer = null; // in the freezer now: { t }
     this.box = { left: 0, top: 0, width: 1, height: 1 };
 
     this.stage = this.$('stage');
@@ -62,6 +66,7 @@ class Playground {
     this.ball = new Squish(coarse ? 4 : 5);
     this.shell = new Shell(this.ball);
     this.crumbs = new Crumbs(700);
+    this.glitter = new Glitter();
 
     const kept = host.kept() || {};
     Sound.lend = host.audio;
@@ -156,6 +161,10 @@ class Playground {
       Sound.wake();
       this.recoat();
     });
+    this.on(this.$('chill'), 'click', () => {
+      Sound.wake();
+      this.freeze();
+    });
   }
 
   /** The row of toys for the kind that is showing. */
@@ -186,6 +195,8 @@ class Playground {
       tab.setAttribute('aria-selected', on ? 'true' : 'false');
     }
     this.$('recoat').hidden = this.$('meter').hidden = this.mode !== 'wax';
+    this.$('recoat').textContent = this.next.slush ? `새 ${this.next.name}` : '다시 코팅'; // clear wax gone to slush cannot be put back: there are more in the box
+    this.$('chill').hidden = !this.next.chill;
   }
 
   save() {
@@ -202,6 +213,7 @@ class Playground {
   /** What to try first with the toy that has just arrived. */
   hello() {
     const toy = this.toy;
+    if (toy.slush) return '꾹 누르면 사각사각 부서져요 · 꽉 쥐어도 돼요';
     if (toy.wax) return '꾹 눌러서 왁스를 바사삭 깨 보세요';
     return toy.hint || (toy.roll ? '꾹 누르고, 쭉 당겨 보세요 · 바닥을 밀면 굴러가요' : '꾹 누르고, 쭉 당겨 보세요');
   }
@@ -267,6 +279,7 @@ class Playground {
     this.resize();
     this.save();
     Sound.tap();
+    this.freezer = null; // (taken out of the freezer to make room, if it was in there)
     if (this.swap) return;
     this.swap = true;
     this.coat = null;
@@ -279,8 +292,16 @@ class Playground {
   wear(toy, now) {
     const { ball, shell } = this;
     this.toy = this.next = toy;
+    this.cold = 0;
     ball.reset(toy.shape);
-    if (toy.wax) {
+    if (toy.slush) {
+      // a coat of clear wax is no shell of shards: it is the skin itself, and goes to slush where it is worked (see crunchy)
+      shell.clear();
+      ball.free.fill(1);
+      ball.freeTo.fill(1);
+      this.glitter.scatter(this.seed++, ball, toy.core);
+      this.clear = 1;
+    } else if (toy.wax) {
       shell.build(this.seed++);
       ball.free.fill(0);
     } else {
@@ -295,9 +316,17 @@ class Playground {
     this.chips();
   }
 
-  /** A new coat of wax: the table is cleared, the wax runs down over the ball, then sets. */
+  /** A new coat of wax: the table is cleared, the wax runs down over the ball, then sets. (Clear wax gone to slush cannot be: a new one
+      comes out of the box instead.) */
   recoat() {
-    if (this.coat || this.swap || !this.toy.wax) return;
+    if (this.coat || this.swap || this.freezer || !this.toy.wax) return;
+    if (this.toy.slush) {
+      this.swap = true; // tossed away, and the same again drops in, new
+      this.dropAll();
+      this.ball.toss();
+      Sound.tap();
+      return;
+    }
     this.coat = { t: 0, step: 0 };
     this.dropAll();
     this.shell.sweep();
@@ -342,6 +371,64 @@ class Playground {
     }
   }
 
+  /** Ten minutes in the freezer (a moment, here): cold, it crunches louder, but left in too long it is as hard as a stone (짱돌) until it
+      has warmed up a little. */
+  freeze() {
+    if (this.freezer || this.swap || this.coat || !this.toy.chill) return;
+    this.freezer = { t: 0 };
+    this.dropAll();
+    this.ball.toss();
+    Sound.tap();
+    this.say(this.cold > 0.5 ? '또 얼려요? 너무 오래 얼리면 짱돌이 돼요…' : '냉동실에서 10분만 얼릴게요…', 3);
+  }
+
+  freezing(dt) {
+    const f = this.freezer, ball = this.ball;
+    f.t += dt;
+    if (ball.lift > 5) {
+      // in the freezer: well out of sight, and too high up to throw a shadow on the table
+      ball.lift = 12;
+      ball.liftV = 0;
+    }
+    if (f.t < 1.8 || ball.lift < 5) return;
+    this.freezer = null;
+    this.cold = Math.min(2, this.cold + 1);
+    ball.tossed = false; // and out it comes
+    ball.lift = 5;
+    ball.liftV = -6;
+    this.say(this.cold > 1.5 ? '너무 오래 얼려서 짱돌이 됐어요! 손으로 주물러서 녹여 주세요' : '꽁꽁! 차가우면 더 사각사각해요', 5);
+  }
+
+  /** Out of the freezer it warms up again: by itself on the table, and sooner in a hand. */
+  thaw(dt) {
+    let warm = 1 / 50;
+    for (const t of this.touches) if (t.live) warm += t.fist ? 1 / 120 : 1 / 60;
+    const was = this.cold;
+    this.cold = Math.max(0, this.cold - warm * dt);
+    if (was > STONE && this.cold <= STONE) this.say('이제 부서질 만큼 녹았어요!', 3);
+  }
+
+  /** Clear wax going to slush. Round each finger it goes by as much as the finger has just gone in or slid (and a little all the while it is
+      held down); squeezing the whole toy works it all; and where it has gone white, the edge of it creeps on a little way, as cracks do. */
+  crunchy(dt) {
+    const { ball } = this, crush = ball.crush, nbr = ball.nbr, n = ball.n;
+    const give = 1 - smooth(STONE, STONE + 0.45, this.cold); // (frozen hard, it will not)
+    for (const t of this.touches) {
+      if (!t.live) continue;
+      const did = (Math.abs(t.pr - t.felt) * 1.1 + t.slide * dt * 0.8 + t.pr * dt * 0.08) * give;
+      t.felt = t.pr;
+      for (let q = 0; q < t.near.length; q += 2) crush[t.near[q]] = Math.min(1, crush[t.near[q]] + did * t.near[q + 1]);
+    }
+    const E = ball.E, squeezed = Math.sqrt(E[0] * E[0] + E[1] * E[1] + E[2] * E[2] + 2 * (E[3] * E[3] + E[4] * E[4] + E[5] * E[5])) * dt * 0.35 * give;
+    let gone = 0;
+    for (let i = 0, q = 0; i < n; i++, q += 6) {
+      const near = (crush[nbr[q]] + crush[nbr[q + 1]] + crush[nbr[q + 2]] + crush[nbr[q + 3]] + crush[nbr[q + 4]] + crush[nbr[q + 5]]) / 6;
+      const c = (crush[i] = Math.min(1, crush[i] + squeezed + Math.max(0, near - crush[i] - 0.15) * Math.min(1, dt * 3)));
+      gone += smooth(0.05, 0.85, c);
+    }
+    this.clear = 1 - gone / n;
+  }
+
   // ---- fingers (x, y: a place in the playground, in pixels from its top left corner)
 
   /** The direction, from the toy's middle, of the bit of skin under a point (or nothing, off the toy). */
@@ -368,12 +455,14 @@ class Playground {
       pr: 0, hold: 0, //                                   how far in it has sunk (0…1), and for how long
       d: [0, 0, 0], dv: [0, 0, 0], //                      how far it has dragged that bit of skin
       dir: [0, 0, -1], near: [], slide: 0, over: true, waxy: false,
-      heard: 0, //                                         how far in it was when last listened to (see crackle)
+      heard: 0, felt: 0, //                                how far in it was when last listened to (see crackle), and when it last crushed (see crunchy)
     };
     t.waxy = !!this.toy.wax && this.shell.waxAt(a);
-    if (!t.waxy) Sound.squish(this.pan(this.ball.posed(t.ra)), this.toy.voice);
+    if (this.cold > STONE) Sound.thud(0.2); // frozen as hard as a stone: a finger only knocks on it
+    else if (!t.waxy) Sound.squish(this.pan(this.ball.posed(t.ra)), this.toy.voice);
     this.touches.push(t);
     if (this.hintFor > 1.2) this.hintFor = 1.2;
+    if (this.cold > STONE && this.hintFor <= 0) this.say('꽁꽁 얼었어요! 손으로 주무르면 녹아요', 3);
     return t;
   }
 
@@ -408,7 +497,7 @@ class Playground {
     capture(this.stage, e);
     this.stage.classList.add('down');
     const x = e.clientX - this.box.left, y = e.clientY - this.box.top;
-    const a = this.swap ? null : this.pick(x, y);
+    const a = this.swap || this.freezer ? null : this.pick(x, y);
     // on the toy it is a finger; anywhere else it rolls the toy round
     this.pointers.set(e.pointerId, a ? this.touch(a, x, y, e.pointerType) : { rolling: true, x, y, t: performance.now() });
   }
@@ -425,7 +514,7 @@ class Playground {
       this.flick = [lerp(this.flick ? this.flick[0] : 0, ay / dt, 0.5), lerp(this.flick ? this.flick[1] : 0, ax / dt, 0.5), 0];
     } else if (p.gone) {
       // it got away: take hold again wherever the pointer is on it now
-      const a = this.swap ? null : this.pick(x, y);
+      const a = this.swap || this.freezer ? null : this.pick(x, y);
       if (a) this.pointers.set(e.pointerId, this.touch(a, x, y, e.pointerType));
     } else {
       p.x = x;
@@ -447,15 +536,16 @@ class Playground {
 
   /** A whole hand round it, for as long as the button is held. */
   squeeze(on) {
-    if (on === this.gripping || (on && this.swap)) return;
+    if (on === this.gripping || (on && (this.swap || this.freezer))) return;
     this.gripping = on;
     if (on) {
       Sound.wake();
       for (const f of FIST) {
         const a = V.norm(M3.applyT(this.ball.Q, V.norm(f)));
-        this.touches.push({ live: true, gone: false, fist: true, a, ra: shapeAt(this.toy.shape, a[0], a[1], a[2]), w: 0.52, pr: 0, hold: 0, d: [0, 0, 0], dv: [0, 0, 0], dir: V.mul(a, -1), near: [], slide: 0, over: true, waxy: false, heard: 0 });
+        this.touches.push({ live: true, gone: false, fist: true, a, ra: shapeAt(this.toy.shape, a[0], a[1], a[2]), w: 0.52, pr: 0, hold: 0, d: [0, 0, 0], dv: [0, 0, 0], dir: V.mul(a, -1), near: [], slide: 0, over: true, waxy: false, heard: 0, felt: 0 });
       }
-      if (!this.toy.wax || !this.shell.whole) Sound.squish(0, this.toy.voice, 1.5);
+      if (this.cold > STONE) Sound.thud(0.3);
+      else if (!this.toy.wax || !this.shell.whole) Sound.squish(0, this.toy.voice, 1.5);
       if (this.hintFor > 1.2) this.hintFor = 1.2;
     } else {
       let deep = 0;
@@ -466,7 +556,7 @@ class Playground {
         }
       }
       const voice = this.toy.voice;
-      if (deep > 0.45 && (!this.toy.wax || !this.shell.whole) && voice !== 'crunch') voice === 'foam' ? Sound.air(1.5) : voice === 'wet' ? Sound.blub(0) : Sound.pop(0, 0.7, 0.8);
+      if (deep > 0.45 && (!this.toy.wax || !this.shell.whole) && voice !== 'crunch' && this.cold <= STONE) voice === 'foam' ? Sound.air(1.5) : voice === 'wet' ? Sound.blub(0) : Sound.pop(0, 0.7, 0.8);
     }
   }
 
@@ -521,13 +611,14 @@ class Playground {
     }
   }
 
-  /** A crunchy toy crackles for as long as something in it is on the move: a finger going in or sliding, a dent filling out again. */
+  /** A crunchy toy crackles for as long as something in it is on the move: a finger going in or sliding, a dent filling out again.
+      (Clear wax goes 사각사각, the less the more of it has gone to slush; frozen hard, it does not at all.) */
   crackle(dt) {
-    const { ball, toy } = this;
-    let work = ball.flow * dt * 380, at = 0, weight = 0;
+    const { ball, toy } = this, how = toy.slush ? (0.2 + 0.8 * this.clear) * (1 - smooth(STONE, STONE + 0.45, this.cold)) : 1;
+    let work = ball.flow * dt * 380 * how, at = 0, weight = 0;
     for (const t of this.touches) {
       if (t.live) {
-        const did = Math.abs(t.pr - t.heard) * toy.depth * (t.fist ? 26 : 60) + t.slide * dt * t.pr * 30;
+        const did = (Math.abs(t.pr - t.heard) * toy.depth * (t.fist ? 26 : 60) + t.slide * dt * t.pr * 30) * how;
         work += did;
         at += this.pan(ball.posed(t.ra)) * did;
         weight += did;
@@ -539,7 +630,7 @@ class Playground {
     if (this.since < 0.03) return; // they are let out a few at a time, over the moment that follows
     const n = Math.min(Math.floor(this.crunch), 14);
     if (n > 0) {
-      Sound.crunch(weight > 0 ? at / weight : this.pan(ball.C), n, this.since);
+      Sound.crunch(weight > 0 ? at / weight : this.pan(ball.C), n, this.since, toy.slush ? 1 : 0, Math.min(1, this.cold));
       if (n > 5) buzz(8);
     }
     this.crunch = Math.min(this.crunch - n, 6);
@@ -581,7 +672,21 @@ class Playground {
   /** The meter and the hint. */
   tell(dt) {
     const { toy, shell } = this;
-    if (toy.wax && shell.count) {
+    if (toy.slush) {
+      // the meter is how much of the clear wax is still clear
+      const pct = Math.round(this.clear * 100);
+      if (pct !== this.shown) {
+        this.shown = pct;
+        this.$('meterText').textContent = `왁스 ${pct}%`;
+        this.$('meterBar').style.width = pct + '%';
+      }
+      this.$('recoat').disabled = pct > 97 || !!this.freezer;
+      if (!this.done && pct <= 2) {
+        this.done = true;
+        Sound.chime();
+        this.say('다 부쉈어요! 이제 마음껏 주물러 보세요', 5);
+      }
+    } else if (toy.wax && shell.count) {
       const pct = Math.round(((shell.whole + shell.stuck) / shell.count) * 100);
       if (pct !== this.shown) {
         this.shown = pct;
@@ -599,6 +704,7 @@ class Playground {
         this.say(`남은 조각은 문지르거나 꽉 쥐면 떨어져요 · 바닥을 밀면 ${SLAB[toy.shape] ? '뒤집혀요' : '굴러가요'}`, 6);
       }
     }
+    if (toy.chill) this.$('chill').disabled = !!this.freezer || this.swap;
     if (this.hintFor > 0 && (this.hintFor -= dt) <= 0) this.$('hint').classList.remove('on');
   }
 
@@ -616,17 +722,22 @@ class Playground {
       ball.lift = 5;
       ball.liftV = -6;
       this.swap = false;
-      this.say(toy === this.toy ? '' : this.hello(), 5);
+      this.say(toy === this.toy && !toy.slush ? '' : this.hello(), 5); // (the same one again, gone to slush: a new one out of the box)
     }
+    if (this.freezer) this.freezing(dt);
     if (this.coat) this.coating(dt);
     this.grip = damp(this.grip, this.gripping ? 1 : 0, this.gripping ? 9 : 14, dt);
     this.feel(dt);
-    ball.give = this.toy.wax && shell.count ? smooth(0.4, 0.95, 1 - shell.whole / shell.count) : 1;
+    if (this.cold > 0 && !this.freezer) this.thaw(dt);
+    // cold, it is firmer, and frozen hard it hardly gives at all; clear wax not yet gone to slush holds it a little firm too
+    ball.stiff = Math.min(0.95, 0.9 * smooth(STONE, STONE + 0.45, this.cold) + 0.15 * Math.min(1, this.cold) + (this.toy.slush ? 0.3 * this.clear : 0));
+    ball.give = (this.toy.slush ? 0.6 + 0.4 * (1 - this.clear) : this.toy.wax && shell.count ? smooth(0.4, 0.95, 1 - shell.whole / shell.count) : 1) * (1 - ball.stiff);
     let turning = false;
     for (const p of this.pointers.values()) if (p.rolling) turning = true;
     if (ball.turning && !turning) ball.wake = true; // let go of, however that came about: it may have been left standing on an edge
     ball.turning = turning;
     this.moved = ball.step(dt, this.toy, this.touches, this.grip);
+    if (this.toy.slush) this.crunchy(dt);
     if (this.toy.voice === 'crunch') this.crackle(dt);
     if (this.toy.wax && (this.moved || shell.busy)) shell.update(dt, this.touches);
     this.crumbs.update(dt, ball);
