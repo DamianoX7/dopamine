@@ -268,11 +268,16 @@ async function boot() {
   Pet.tick();
   UI.updateHud();
   UI.lastDopa = State.dopamine.points;
+  if (Cloud.writer) {
+    // his login (js/gate.js): he has come to write her a letter — and nothing else he does here reaches her
+    if (!behindDoor()) history.replaceState(null, '', '#/me/write');
+    UI.banner('writer', '✍️ 편지 쓰는 로그인으로 들어왔어요. 보낸 편지는 그녀의 기기로 가고, 그 밖에 여기서 하는 건 이 기기에만 남아요.');
+  }
   Router.init();
   Opening.watch(); // the rooms that open on a day of their own: how their doors stand, and the moment they open
   Post.start(); // letters he sent her that have come since she was last here
   Present.wake(); // …and a day of theirs on which Lorelei has something for her
-  if (!State.onboarded) Onboarding.show();
+  if (!State.onboarded && !Cloud.writer) Onboarding.show();
 
   const newDay = () => {
     if (!Game.ensureDaily()) return;

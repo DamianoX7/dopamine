@@ -17,16 +17,24 @@ const SYNC_BEFORE_KEY = 'dopamineWorld.beforeSync.v1'; // this device's own prog
 
 /* ==================================================================
    Cloud — the same thing on the published site, with Supabase in the
-   place of server.py (js/config.js → supabase; its login is sealed in
-   by tools/publish.py from data/supabase.json). Only the progress goes
-   there: one row in the table `progress` (data, rev), which only her
-   login can read or write (row level security). The covers and the
-   letters stay with server.py.
+   place of server.py (js/config.js → supabase). The login typed in at
+   the door (js/gate.js) is a Supabase user as well, and tools/publish.py
+   seals that user into the config behind it:
+
+   • hers keeps her progress there — one row in the table `progress`
+     (data, rev), which only she can read or write (row level
+     security) — and gets the letters;
+   • his (`writer`) keeps no progress there: it sends her the letters.
+
+   The table `letters` takes them (tools/supabase.sql: he may put one
+   in, and take it back unread; she may read them, and say when she
+   has). The covers stay with server.py.
 
    It answers the very requests server.py answers — `state?rev=`,
-   `state` (PUT, with the version it builds on), `all` (DELETE) — so
-   Sync below works the same with either. A save on top of a version
-   that is no longer the newest gets 409 and the newest, as there.
+   `state` (PUT, with the version it builds on), `all` (DELETE), and
+   `letters` (js/post.js) — so Sync below and Post work the same with
+   either. A save on top of a version that is no longer the newest
+   gets 409 and the newest, as there.
    ================================================================== */
 const Cloud = {
   cfg: (window.DW_CONFIG || {}).supabase || {},
@@ -37,6 +45,16 @@ const Cloud = {
     return !!(c.url && c.key && c.email && c.password);
   },
 
+  /** On the published site, signed in with a Supabase user: hers, or his. */
+  get on() {
+    return this.ready && Gate.on;
+  },
+
+  /** …his: the one the letters are written with. */
+  get writer() {
+    return this.on && !!this.cfg.writer;
+  },
+
   base() {
     return String(this.cfg.url).replace(/\/+$/, '');
   },
@@ -45,7 +63,7 @@ const Cloud = {
     const res = await this.fetch('POST', '/auth/v1/token?grant_type=password', { email: this.cfg.email, password: this.cfg.password }, { timeout, anon: true });
     const out = await res.json().catch(() => ({}));
     if (!res.ok || !out.access_token) {
-      console.warn('[Dopamine World] Supabase login failed — check data/supabase.json (tools/publish.py --set-supabase)', out);
+      console.warn('[Dopamine World] Supabase login failed — is this login a user under Authentication → Users, with the same password? (tools/publish.py --set-login / --set-writer)', out);
       throw Object.assign(new Error('cloud login'), { code: 'auth' });
     }
     this.session = { token: out.access_token, uid: out.user.id, until: Date.now() + (out.expires_in || 3600) * 1000 - 60000 };
@@ -67,15 +85,20 @@ const Cloud = {
     }).finally(() => clearTimeout(timer));
   },
 
-  /* A request with her login (made, or made again, when needed). */
+  /* A request with this login — hers, or his (made, or made again, when needed). */
   async rest(method, path, body, o = {}) {
+    // (an answer is always read, even one there is nothing in: one left unread is cut off when it is cleared away,
+    //  and the browser lists the request as failed although it went through)
+    const drain = (res) => res.text().catch(() => '');
     if (!this.session || Date.now() > this.session.until) await this.login(o.timeout);
     let res = await this.fetch(method, `/rest/v1/${path}`, body, o);
     if (res.status === 401) {
+      await drain(res);
       await this.login(o.timeout);
       res = await this.fetch(method, `/rest/v1/${path}`, body, o);
     }
-    if (!res.ok && res.status !== 409) throw new Error(`cloud ${res.status}`);
+    if (!res.ok && res.status !== 409) throw Object.assign(new Error(`cloud ${res.status} ${await drain(res)}`), { code: 'refused', status: res.status });
+    if (o.prefer === 'return=minimal' || (method === 'DELETE' && !o.prefer)) await drain(res); // (nothing in it to read)
     return res;
   },
 
@@ -130,6 +153,44 @@ const Cloud = {
       return this.answer({ ok: true, epoch: 'cloud' });
     }
     throw new Error(`cloud: no ${method} ${path}`);
+  },
+
+  /* What Post.call() asks server.py's letter box, answered from the table `letters` (columns: id, body, sent_at, day,
+     read_at — the letter's id, text, at, on and read). Throws with a code: 'refused' (row level security, or a letter
+     she has read and that cannot be taken back), 'auth' (the login), 'offline' (nothing answered). */
+  async letters(path, o = {}) {
+    const method = o.method || 'GET';
+    const m = /^letters(?:\/([^/]+)(\/read)?)?$/.exec(path);
+    try {
+      if (!m) throw new Error(`cloud: no ${method} ${path}`);
+      const one = m[1] ? `letters?id=eq.${encodeURIComponent(decodeURIComponent(m[1]))}` : '';
+      if (!m[1] && method === 'GET') {
+        const rows = await (await this.rest('GET', 'letters?select=id,body,sent_at,day,read_at&order=sent_at.asc')).json();
+        return { letters: rows.map((r) => ({ id: r.id, text: r.body, at: +r.sent_at || 0, on: r.day || '', read: +r.read_at || 0 })) };
+      }
+      if (!m[1] && method === 'POST') {
+        const l = o.json;
+        // (409: sent again after an answer that got lost — it is there already)
+        await this.rest('POST', 'letters', { id: l.id, body: l.text, sent_at: l.at, day: l.on || '' }, { prefer: 'return=minimal' });
+        return { ok: true };
+      }
+      if (m[2] && method === 'POST') {
+        await this.rest('PATCH', `${one}&read_at=eq.0`, { read_at: o.json.read }, { prefer: 'return=minimal' });
+        return { ok: true };
+      }
+      if (m[1] && !m[2] && method === 'DELETE') {
+        const gone = await (await this.rest('DELETE', `${one}&read_at=eq.0`, undefined, { prefer: 'return=representation' })).json();
+        if (!gone.length) {
+          const [left] = await (await this.rest('GET', `${one}&select=read_at`)).json();
+          if (left && +left.read_at) throw Object.assign(new Error('she has read it'), { code: 'refused' });
+        }
+        return { ok: true };
+      }
+      throw new Error(`cloud: no ${method} ${path}`);
+    } catch (e) {
+      if (!e.code) e.code = 'offline';
+      throw e;
+    }
   },
 };
 
@@ -249,13 +310,14 @@ const Sync = {
     this.loadMeta();
     this.sig = this.signature();
     // the published site (js/gate.js) has no server.py: Supabase, if it is set up — and only there, so that a copy
-    // opened to try something out never writes into her progress
-    const cloud = Cloud.ready && Gate.on;
-    const info = cloud ? false : await this.ping();
-    if (info === false) {
-      if (cloud) await this.startCloud();
+    // opened to try something out never writes into her progress. (His login keeps none there: it is for writing her
+    // letters, and whatever else is done on his device stays on it.)
+    if (Gate.on) {
+      if (Cloud.on && !Cloud.writer) await this.startCloud();
       return;
     }
+    const info = await this.ping();
+    if (info === false) return;
     this.place('server');
     if (info === null) {
       // it synced before, so the server exists — it just can't be reached right now
@@ -273,7 +335,7 @@ const Sync = {
 
   async startCloud() {
     this.cloud = true;
-    this.place('cloud');
+    this.place(`cloud:${Cloud.cfg.email}`); // (another login: another row — this device starts afresh with it)
     if (!this.rev && State.onboarded) this.dirty = true; // what she did here before: the first save sends it
     await this.pull(true);
     this.watch();

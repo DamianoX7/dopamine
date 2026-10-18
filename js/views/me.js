@@ -143,7 +143,7 @@ const Door = {
 
   /** Shuts it. Where he is still on one of its pages, nothing of what was behind it stays on the screen. */
   shut() {
-    if (!this.isOpen) return;
+    if (!this.isOpen || Cloud.writer) return; // (on his login it stands open: that login has said who he is)
     this.isOpen = false;
     PostDesk.list = null;
     if (!behindDoor()) return; // (he has left: another view is on its way)
@@ -158,6 +158,7 @@ const Door = {
   },
 };
 
+Door.isOpen = Cloud.writer;
 window.addEventListener('hashchange', () => {
   if (!behindDoor()) Door.shut();
 });
@@ -622,6 +623,7 @@ Views.me = {
           ? `<div class="card">
         <h2 class="card-title">🔑 로그인</h2>
         <p class="hint">이 기기는 로그인되어 있어요. 로그아웃해도 노래와 진행 상황은 이 기기에 그대로 남아 있어요.</p>
+        ${Cloud.on ? `<ul class="kv"><li><span>${Cloud.writer ? '편지 쓰는 계정' : '로그인한 계정'}</span><b>${esc(Cloud.cfg.email)}</b></li></ul>` : ''}
         <button class="btn soft" data-action="gate-leave">로그아웃</button>
       </div>`
           : ''
@@ -633,7 +635,9 @@ Views.me = {
           Sync.on
             ? '진행 상황과 커버는 이 기기와 우리 서버에 함께 저장돼서, 휴대폰과 컴퓨터에서 같은 내용이 보여요. 그 밖의 곳으로는 나가지 않아요.'
             : Sync.cloud
-            ? '진행 상황은 이 기기와 우리만 열 수 있는 클라우드(Supabase)에 함께 저장돼서, 휴대폰과 컴퓨터에서 같은 내용이 보여요. 녹음과 커버는 이 기기 밖으로 나가지 않아요.'
+            ? '진행 상황은 이 기기와 우리만 열 수 있는 클라우드(Supabase)에 함께 저장돼서, 휴대폰과 컴퓨터에서 같은 내용이 보여요. 남자친구의 편지도 거기를 거쳐 와요. 녹음과 커버는 이 기기 밖으로 나가지 않아요.'
+            : Cloud.writer
+            ? '보낸 편지는 우리만 열 수 있는 클라우드(Supabase)를 거쳐 그녀의 기기로 가요. 그 밖의 것(진행 상황, 녹음, 커버)은 이 기기 밖으로 나가지 않아요.'
             : '녹음은 직접 내려받거나 공유하지 않는 한 이 기기 밖으로 나가지 않아요. 계정도, 업로드도, 추적도 없어요.'
         }</p>
         <p class="hint">팁: 아이폰에서는 “홈 화면에 추가”를 해 두면 Safari가 녹음을 더 잘 보관해요. 아끼는 커버는 내려받아서 오래오래 간직하세요.</p>
@@ -662,6 +666,7 @@ Views.me = {
       <div class="card">
         <h2 class="card-title">✍️ 편지 써서 보내기</h2>
         <p class="hint">아래의 메시지는 무작위로 하나씩 열려요. 따로 전하고 싶은 말은 편지로 써서 보내면 여우가 물어다 줘요.</p>
+        ${Cloud.writer ? '<p class="hint">⚠️ 편지 쓰는 로그인에서 고친 메시지는 이 기기에만 남고, 그녀에게는 가지 않아요. 미리 보기는 그대로 볼 수 있어요.</p>' : ''}
         <a class="btn primary" href="#/me/write">✍️ 편지 쓰기</a>
       </div>
       <div class="card">
@@ -919,5 +924,5 @@ Object.assign(Changes, {
 
 /* 🔑 The published site (js/gate.js): log out on this device. */
 Actions['gate-leave'] = async () => {
-  if (await UI.confirm({ icon: '🔑', title: '로그아웃할까요?', text: '이 기기에서만 로그아웃해요. 다시 들어오려면 아이디와 비밀번호가 필요해요.', ok: '로그아웃' })) Gate.leave();
+  if (await UI.confirm({ icon: '🔑', title: '로그아웃할까요?', text: `이 기기에서만 로그아웃해요. 다시 들어오려면 ${Gate.email ? '이메일과' : '아이디와'} 비밀번호가 필요해요.`, ok: '로그아웃' })) Gate.leave();
 };

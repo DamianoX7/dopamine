@@ -12,6 +12,9 @@
    Where a letter goes when it is sent:
    • the site runs on the save server (server.py): to the server's
      letter box (api/letters), and from there to every device of hers;
+   • the published site (js/gate.js), opened with his login: to the
+     table `letters` in Supabase (Cloud in js/sync.js), and from there
+     to every device opened with hers;
    • opened any other way (Live Server, a plain static host): into the
      letter box of this browser — there is nothing else to send it to.
    (Not by a link for her to tap: a messenger opens links in a browser
@@ -31,6 +34,23 @@ const Post = {
   fetching: null,
   lastFetch: 0,
   askedKey: '',
+
+  /** Where letters go and come from: 'server' (server.py), 'cloud' (Supabase, on the published site) or 'here' (this browser). */
+  box() {
+    return Sync.on ? 'server' : Cloud.on ? 'cloud' : 'here';
+  },
+
+  /** Is this one of her devices, the ones letters come to? On the server, one that shares her world; on the published
+   *  site, one opened with her login (not with his, which only writes). */
+  hers() {
+    const box = this.box();
+    return box === 'server' ? Sync.status === 'ok' : box === 'cloud' ? !Cloud.writer : true;
+  },
+
+  /** What the letter box is called, for "it cannot be reached just now". */
+  boxName() {
+    return this.box() === 'cloud' ? '클라우드' : '저장 서버';
+  },
 
   /* ----- the letter box (her side) ----- */
 
@@ -161,6 +181,7 @@ const Post = {
 
   /** The server's letter box. Throws { code: 'locked' } where the passcode is missing or wrong, { code: 'offline' } where nothing answers. */
   async call(path, o = {}) {
+    if (this.box() === 'cloud') return Cloud.letters(path, o); // (the same requests, answered from Supabase)
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 12000);
     const headers = {};
@@ -184,7 +205,7 @@ const Post = {
   async send(text, on) {
     text = wellFormed(wellFormed(text).slice(0, LETTER_MAX));
     on = on || '';
-    if (!Sync.on) {
+    if (this.box() === 'here') {
       State.post.inbox.push({ id: uid('l'), text, at: Date.now(), on, via: 'here', read: 0 });
       Store.save();
       this.changed();
@@ -197,7 +218,7 @@ const Post = {
     this.keepPending(letter);
     await this.call('letters', { method: 'POST', json: letter });
     this.keepPending(null);
-    if (Sync.status === 'ok') this.fetch(true); // this device is one of hers as well
+    if (this.hers()) this.fetch(true); // this device is one of hers as well
     return 'server';
   },
 
@@ -222,7 +243,7 @@ const Post = {
 
   /** Takes a letter back, as long as she has not read it. */
   async unsend(id) {
-    if (Sync.on) await this.call(`letters/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (this.box() !== 'here') await this.call(`letters/${encodeURIComponent(id)}`, { method: 'DELETE' });
     const before = State.post.inbox.length;
     State.post.inbox = State.post.inbox.filter((l) => l.id !== id || l.read);
     if (State.post.inbox.length !== before) {
@@ -233,7 +254,7 @@ const Post = {
 
   /** What the composer lists: the newest first, each with whether she has read it. */
   async list() {
-    if (!Sync.on) return State.post.inbox.slice().sort((a, b) => b.at - a.at);
+    if (this.box() === 'here') return State.post.inbox.slice().sort((a, b) => b.at - a.at);
     const out = await this.call('letters');
     return (Array.isArray(out.letters) ? out.letters : [])
       .filter((l) => l && typeof l.id === 'string' && typeof l.text === 'string')
@@ -241,10 +262,10 @@ const Post = {
       .sort((a, b) => b.at - a.at);
   },
 
-  /* ----- the save server → this device (her devices only: the ones that share her world) ----- */
+  /* ----- the save server (or Supabase) → this device (her devices only) ----- */
 
   async fetch(now) {
-    if (!Sync.on || Sync.status !== 'ok' || document.hidden) return;
+    if (this.box() === 'here' || !this.hers() || document.hidden) return;
     if (!now && Date.now() - this.lastFetch < POST_EVERY) return;
     if (this.fetching) return this.fetching;
     this.lastFetch = Date.now();
@@ -294,7 +315,7 @@ const Post = {
 
   /** Tells the server which letters she has read, so that he can see it where he wrote them. */
   report(remote) {
-    if (!Sync.on || Sync.status !== 'ok') return;
+    if (this.box() === 'here' || !this.hers()) return;
     const known = remote ? new Map(remote.filter(Boolean).map((l) => [l.id, l])) : null;
     for (const l of State.post.inbox) {
       if (!l.read || l.via !== 'server' || l.told) continue;
@@ -338,9 +359,23 @@ const PostDesk = {
 
   html() {
     if (!Door.isOpen) return Door.html('✍️ 편지 쓰기', '쉿… 여기는 편지를 쓰는 곳이에요.', '남자친구가 편지를 써서 보내는 곳이에요. 다 쓴 편지는 여우가 물어다 줄 거예요.');
+    if (Post.box() === 'cloud' && !Cloud.writer) {
+      // her login: letters reach this device, but they are written with his (the table takes them from him only)
+      return `<section class="me-sub post-desk">
+        ${subHead('✍️ 편지 쓰기')}
+        <div class="card center">
+          <div class="empty-icon" aria-hidden="true">💌</div>
+          <h2>편지는 남자친구 로그인으로 써요</h2>
+          <p class="hint">이 기기는 그녀의 로그인으로 들어와 있어요. 편지는 남자친구가 자기 로그인으로 들어온 기기에서 쓰고 보내요. 보낸 편지는 이 기기로 와요.</p>
+        </div>
+        <a class="btn ghost wide" href="#/me/messages">✏️ 랜덤 메시지 편집으로</a>
+      </section>`;
+    }
     const d = Post.draft();
     const today = dateKey();
-    const where = !Sync.on
+    const where = Post.box() === 'cloud'
+      ? '보내면 그녀가 로그인한 모든 기기에 도착하고, 여우가 물어다 줘요. 사이트를 열어 둔 기기에는 몇 분 안에 가요.'
+      : !Sync.on
       ? '보내면 이 브라우저의 우편함에 들어가고, 여우가 물어다 줘요. 다른 기기로는 가지 않아요 (저장 서버로 연 사이트에서만 다른 기기로 전해져요).'
       : {
           ok: '보내면 저장 서버를 거쳐 그녀의 모든 기기에 도착하고, 여우가 물어다 줘요.',
@@ -379,7 +414,7 @@ const PostDesk = {
     const list = this.list;
     if (!list) return '<p class="hint">불러오는 중…</p>';
     if (list.error === 'locked') return '<p class="hint">서버 비밀번호를 넣으면 보낸 편지가 보여요.</p><button class="btn soft small" data-action="post-key">🔑 비밀번호 입력</button>';
-    if (list.error) return '<p class="hint">지금은 저장 서버에 닿지 않아요. 잠시 뒤에 다시 열어 주세요.</p>';
+    if (list.error) return `<p class="hint">지금은 ${Post.boxName()}에 닿지 않아요. 잠시 뒤에 다시 열어 주세요.</p>`;
     if (!list.length) return '<p class="hint">아직 보낸 편지가 없어요.</p>';
     const today = dateKey();
     return `<ul class="post-sent">${list
@@ -398,6 +433,7 @@ const PostDesk = {
 
   /** Fetches the sent letters and fills them in (the page itself is not rebuilt: he may be typing). */
   async load() {
+    if (Post.box() === 'cloud' && !Cloud.writer) return; // (her login: the desk has nothing to list)
     try {
       this.list = await Post.list();
     } catch (e) {
@@ -469,7 +505,7 @@ const PostDesk = {
       this.list = null;
       Router.refresh();
     } catch (e) {
-      UI.toast(e.code === 'offline' ? '지금은 저장 서버에 닿지 않아요. 편지는 그대로 있으니 잠시 뒤에 다시 보내 주세요.' : '편지를 보내지 못했어요. 편지는 그대로 있어요.', { icon: '⚠️', ms: 4800 });
+      UI.toast(e.code === 'offline' ? `지금은 ${Post.boxName()}에 닿지 않아요. 편지는 그대로 있으니 잠시 뒤에 다시 보내 주세요.` : '편지를 보내지 못했어요. 편지는 그대로 있어요.', { icon: '⚠️', ms: 4800 });
     } finally {
       this.busy = false;
     }
@@ -531,7 +567,7 @@ Object.assign(Actions, {
       }
       UI.toast('편지를 되돌렸어요', { icon: '🗑️' });
     } catch (e) {
-      UI.toast(e.code === 'locked' ? '서버 비밀번호가 필요해요' : e.code === 'refused' ? '그사이에 읽은 편지라서 되돌릴 수 없어요' : '지금은 저장 서버에 닿지 않아요', { icon: '⚠️' });
+      UI.toast(e.code === 'locked' ? '서버 비밀번호가 필요해요' : e.code === 'refused' ? '그사이에 읽은 편지라서 되돌릴 수 없어요' : `지금은 ${Post.boxName()}에 닿지 않아요`, { icon: '⚠️' });
     }
     PostDesk.load();
   },
