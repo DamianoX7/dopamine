@@ -95,14 +95,15 @@ const RUFF_TUFTS = [
 ];
 // The plume of its tail as it is carried when it stands, station by station from the root backwards (seen from the
 // side): [how far behind the root, its top, its underside, the level at which it is widest, half its width there].
-// A short stalk out of the rump; then, all at once, a lobe that hangs below the root and a hump that rises above the
-// back; and from there it thins away backwards to a point that droops.
+// Out of the rump thick, as it is in her picture — no stalk: from the root it swells straight into a lobe that hangs
+// below the root and a hump that rises above the back; and from there it thins away backwards to a point that droops.
 const PLUME = [
-  [0.03, 0.346, 0.306, 0.326, 0.02],
-  [0.095, 0.345, 0.301, 0.324, 0.022],
-  [0.118, 0.35, 0.235, 0.3, 0.06],
-  [0.132, 0.37, 0.2, 0.305, 0.078],
-  [0.15, 0.398, 0.18, 0.32, 0.092],
+  [0.03, 0.385, 0.27, 0.33, 0.055],
+  [0.06, 0.39, 0.252, 0.322, 0.064],
+  [0.095, 0.395, 0.228, 0.312, 0.075],
+  [0.118, 0.398, 0.207, 0.305, 0.084],
+  [0.132, 0.403, 0.192, 0.307, 0.089],
+  [0.15, 0.412, 0.178, 0.32, 0.096],
   [0.172, 0.44, 0.168, 0.345, 0.105],
   [0.205, 0.493, 0.162, 0.375, 0.118],
   [0.238, 0.533, 0.162, 0.4, 0.126],
@@ -120,13 +121,8 @@ const PLUME = [
   [0.645, 0.378, 0.345, 0.36, 0.016],
 ];
 const PLUME_TIP = [0.66, 0.342]; // …and its very end: how far behind the root, how high
-// Its locks: a point of fur under the lobe, two small ones on the hump.
-// [from: how far behind the root, how high, how far to its left; to: the same; how thick; on the ridge?]
-const PLUME_LOCKS = [
-  [0.19, 0.2, 0, 0.222, 0.128, 0, 0.03, false],
-  [0.335, 0.572, 0.008, 0.392, 0.61, 0.01, 0.02, true],
-  [0.44, 0.556, -0.008, 0.515, 0.594, -0.01, 0.024, true],
-];
+// (Nothing sticks out of it: the points of fur her picture has on the hump and under the lobe were taken off at his
+// asking — the plume is one smooth piece.)
 const PLUME_SEGS = 32;
 // Its fur is swept back and down, round from the ridge, in folds: [how far behind the root a fold leaves the ridge, how
 // deep it is (of the plume's thickness there)] — and how fast they go round (radians for every unit behind the root).
@@ -302,29 +298,30 @@ export const ANIMUD = {
     torso(kit) {
       const { V, coat, col, C, J, smooth, yB, zH, zS, zC } = kit;
       const plain = () => col.copy(C.coat);
-      // the trunk: small and smooth, from the rump to the chest
+      // the trunk: small, from the rump to the chest — in a coat about as deep as a red fox's (her picture is smooth, but
+      // in the foxes' world, seen from above, a bare trunk looked like lumps)
       coat.loft(
         [
-          { c: V(0, yB + 0.004, zH - 0.092), rx: 0.022, ry: 0.022, w: { hips: 1 }, fur: 0.4 },
-          { c: V(0, yB + 0.004, zH - 0.072), rx: 0.068, ry: 0.06, ryB: 0.064, w: { hips: 1 }, fur: 0.45 },
-          { c: V(0, yB + 0.002, zH - 0.02), rx: 0.1, ry: 0.086, ryB: 0.108, w: { hips: 1 }, fur: 0.5 },
-          { c: V(0, yB, zH + 0.06), rx: 0.107, ry: 0.092, ryB: 0.122, w: { hips: 0.7, spine: 0.3 }, fur: 0.5 },
-          { c: V(0, yB + 0.002, zS), rx: 0.106, ry: 0.092, ryB: 0.124, w: { hips: 0.2, spine: 0.8 }, fur: 0.5 },
-          { c: V(0, yB + 0.004, zS + 0.08), rx: 0.107, ry: 0.094, ryB: 0.126, w: { spine: 0.6, chest: 0.4 }, fur: 0.5 },
-          { c: V(0, yB + 0.006, zC), rx: 0.108, ry: 0.096, ryB: 0.124, w: { chest: 1 }, fur: 0.5 },
-          { c: V(0, yB + 0.012, zC + 0.06), rx: 0.094, ry: 0.092, ryB: 0.098, w: { chest: 1 }, fur: 0.5 },
-          { c: V(0, yB + 0.016, zC + 0.095), rx: 0.05, ry: 0.05, w: { chest: 1 }, fur: 0.5 },
+          { c: V(0, yB + 0.004, zH - 0.092), rx: 0.022, ry: 0.022, w: { hips: 1 }, fur: 0.55 },
+          { c: V(0, yB + 0.004, zH - 0.072), rx: 0.068, ry: 0.06, ryB: 0.064, w: { hips: 1 }, fur: 0.7 },
+          { c: V(0, yB + 0.002, zH - 0.02), rx: 0.1, ry: 0.086, ryB: 0.108, w: { hips: 1 }, fur: 0.85 },
+          { c: V(0, yB, zH + 0.06), rx: 0.107, ry: 0.092, ryB: 0.122, w: { hips: 0.7, spine: 0.3 }, fur: 0.9 },
+          { c: V(0, yB + 0.002, zS), rx: 0.106, ry: 0.092, ryB: 0.124, w: { hips: 0.2, spine: 0.8 }, fur: 0.9 },
+          { c: V(0, yB + 0.004, zS + 0.08), rx: 0.107, ry: 0.094, ryB: 0.126, w: { spine: 0.6, chest: 0.4 }, fur: 0.9 },
+          { c: V(0, yB + 0.006, zC), rx: 0.108, ry: 0.096, ryB: 0.124, w: { chest: 1 }, fur: 0.9 },
+          { c: V(0, yB + 0.012, zC + 0.06), rx: 0.094, ry: 0.092, ryB: 0.098, w: { chest: 1 }, fur: 0.85 },
+          { c: V(0, yB + 0.016, zC + 0.095), rx: 0.05, ry: 0.05, w: { chest: 1 }, fur: 0.75 },
         ],
         { segs: 16, sub: 3, comb: -1, droop: 0.3, color: plain }
       );
       // the neck: up out of the shoulders into the head (the ruff is in front of it)
       coat.loft(
         [
-          { c: V(0, yB + 0.02, zC + 0.02), rx: 0.084, ry: 0.084, w: { chest: 1 }, fur: 0.5 },
-          { c: V(0, yB + 0.08, zC + 0.03), rx: 0.086, ry: 0.086, w: { chest: 0.6, neck: 0.4 }, fur: 0.5 },
-          { c: V(0, J.neck.y + 0.02, J.neck.z), rx: 0.084, ry: 0.084, w: { neck: 1 }, fur: 0.5 },
-          { c: V(0, J.head.y - 0.07, J.head.z - 0.01), rx: 0.08, ry: 0.08, w: { neck: 0.5, head: 0.5 }, fur: 0.5 },
-          { c: V(0, J.head.y - 0.02, J.head.z), rx: 0.06, ry: 0.06, w: { head: 1 }, fur: 0.4 },
+          { c: V(0, yB + 0.02, zC + 0.02), rx: 0.084, ry: 0.084, w: { chest: 1 }, fur: 0.85 },
+          { c: V(0, yB + 0.08, zC + 0.03), rx: 0.086, ry: 0.086, w: { chest: 0.6, neck: 0.4 }, fur: 0.85 },
+          { c: V(0, J.neck.y + 0.02, J.neck.z), rx: 0.084, ry: 0.084, w: { neck: 1 }, fur: 0.8 },
+          { c: V(0, J.head.y - 0.07, J.head.z - 0.01), rx: 0.08, ry: 0.08, w: { neck: 0.5, head: 0.5 }, fur: 0.7 },
+          { c: V(0, J.head.y - 0.02, J.head.z), rx: 0.06, ry: 0.06, w: { head: 1 }, fur: 0.5 },
         ],
         { segs: 12, sub: 2, comb: -1, color: plain }
       );
@@ -406,13 +403,13 @@ export const ANIMUD = {
         coat.loft(
           [
             // (the shoulder: broad where it comes out from under the ruff, beside its point)
-            { c: V(x, 0.47, zC), rx: 0.046, ry: 0.05, w: { chest: 1 }, fur: 0.4 },
-            { c: V(x * 1.08, 0.42, zC + 0.012), rx: 0.06, ry: 0.062, w: { chest: 1 }, fur: 0.4 },
-            { c: V(x * 1.1, 0.37, zC + 0.02), rx: 0.062, ry: 0.066, w: { chest: 0.85, [U]: 0.15 }, fur: 0.4 },
-            { c: V(x * 1.085, sY, zC + 0.024), rx: 0.057, ry: 0.062, w: { chest: 0.5, [U]: 0.5 }, fur: 0.4 },
-            { c: V(x * 1.05, 0.292, zC + 0.026), rx: 0.052, ry: 0.056, w: { chest: 0.2, [U]: 0.8 }, fur: 0.4 },
-            { c: V(x, lerp(sY, eY, 0.5), zC + 0.02), rx: 0.042, ry: 0.044, w: { [U]: 1 }, fur: 0.35 },
-            { c: V(x, eY, zC + 0.008), rx: 0.033, ry: 0.035, w: { [U]: 0.5, [Lo]: 0.5 }, fur: 0.3 },
+            { c: V(x, 0.47, zC), rx: 0.046, ry: 0.05, w: { chest: 1 }, fur: 0.7 },
+            { c: V(x * 1.08, 0.42, zC + 0.012), rx: 0.06, ry: 0.062, w: { chest: 1 }, fur: 0.7 },
+            { c: V(x * 1.1, 0.37, zC + 0.02), rx: 0.062, ry: 0.066, w: { chest: 0.85, [U]: 0.15 }, fur: 0.7 },
+            { c: V(x * 1.085, sY, zC + 0.024), rx: 0.057, ry: 0.062, w: { chest: 0.5, [U]: 0.5 }, fur: 0.65 },
+            { c: V(x * 1.05, 0.292, zC + 0.026), rx: 0.052, ry: 0.056, w: { chest: 0.2, [U]: 0.8 }, fur: 0.6 },
+            { c: V(x, lerp(sY, eY, 0.5), zC + 0.02), rx: 0.042, ry: 0.044, w: { [U]: 1 }, fur: 0.45 },
+            { c: V(x, eY, zC + 0.008), rx: 0.033, ry: 0.035, w: { [U]: 0.5, [Lo]: 0.5 }, fur: 0.35 },
             { c: V(x, lerp(eY, j.fP.y, 0.5), zC + 0.02), rx: 0.029, ry: 0.031, w: { [Lo]: 1 }, fur: 0.25 },
             { c: V(x, 0.06, zC + 0.03), rx: 0.027, ry: 0.029, w: { [Lo]: 0.5, [Pw]: 0.5 }, fur: 0.22 },
             { c: V(x, 0.03, zC + 0.038), rx: 0.034, ry: 0.042, ryB: 0.03, w: { [Pw]: 1 }, fur: 0.2 },
@@ -432,10 +429,10 @@ export const ANIMUD = {
         const oY = j.hF.y;
         coat.loft(
           [
-            { c: V(hx * 0.92, hY + 0.05, zH - 0.005), rx: 0.044, ry: 0.062, w: { hips: 0.7, [T]: 0.3 }, fur: 0.4 },
-            { c: V(hx, hY - 0.01, zH + 0.004), rx: 0.048, ry: 0.062, ryB: 0.058, w: { hips: 0.35, [T]: 0.65 }, fur: 0.4 },
-            { c: V(hx, lerp(hY, kY, 0.55), zH + 0.03), rx: 0.042, ry: 0.05, w: { [T]: 1 }, fur: 0.35 },
-            { c: V(hx, kY, zH + 0.05), rx: 0.035, ry: 0.037, ryB: 0.039, w: { [T]: 0.5, [Sh]: 0.5 }, fur: 0.3 },
+            { c: V(hx * 0.92, hY + 0.05, zH - 0.005), rx: 0.044, ry: 0.062, w: { hips: 0.7, [T]: 0.3 }, fur: 0.7 },
+            { c: V(hx, hY - 0.01, zH + 0.004), rx: 0.048, ry: 0.062, ryB: 0.058, w: { hips: 0.35, [T]: 0.65 }, fur: 0.65 },
+            { c: V(hx, lerp(hY, kY, 0.55), zH + 0.03), rx: 0.042, ry: 0.05, w: { [T]: 1 }, fur: 0.5 },
+            { c: V(hx, kY, zH + 0.05), rx: 0.035, ry: 0.037, ryB: 0.039, w: { [T]: 0.5, [Sh]: 0.5 }, fur: 0.35 },
             { c: V(hx, lerp(kY, oY, 0.5), zH + 0.006), rx: 0.03, ry: 0.032, ryB: 0.033, w: { [Sh]: 1 }, fur: 0.25 },
             { c: V(hx, oY, zH - 0.04), rx: 0.028, ry: 0.029, ryB: 0.03, w: { [Sh]: 0.5, [F]: 0.5 }, fur: 0.22 },
             { c: V(hx, lerp(oY, j.hP.y, 0.55), zH - 0.032), rx: 0.027, ry: 0.028, w: { [F]: 1 }, fur: 0.22 },
@@ -562,14 +559,6 @@ export const ANIMUD = {
       for (let k = 0; k < PLUME_SEGS; k++) {
         const m = (k + 1) % PLUME_SEGS;
         coat.idx.push(front, base + m, base + k, end, last + k, last + m);
-      }
-
-      // …and its locks (PLUME_LOCKS): those on the ridge stand like fins, thin from side to side
-      for (const [d0, y0, x0, d1, y1, x1, r, ridge] of PLUME_LOCKS) {
-        const w = weights((d0 + d1) / 2);
-        const from = rest(middle(d0, y0).add(V(x0, 0, 0)), w);
-        const to = rest(middle(d1, y1).add(V(x1, 0, 0)), w);
-        lock(kit, from, to, r, { w, fur: 0.45, flat: ridge ? 0.4 : 0.55, side: ridge ? V(0, 1, 0) : V(1, 0, 0), color: ridge ? () => col.copy(C.pink).lerp(C.rose, 0.15) : () => col.copy(C.coat) });
       }
     },
 
