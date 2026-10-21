@@ -2,7 +2,7 @@
 // the accessories it wears. Ids match the shop in js/pet.js. (What she buys for the yard is in
 // decor.js.)
 import * as THREE from '../vendor/three.module.min.js';
-import { Batch, V, TAU, softDotTexture, paintTexture } from './kit.js';
+import { Batch, V, TAU, lerp, rng, softDotTexture, paintTexture } from './kit.js';
 
 const Z = new THREE.Vector3(0, 0, 1);
 const _c = new THREE.Color();
@@ -224,24 +224,30 @@ export function makeGift(rig) {
 
 /**
  * A present, wrapped and tied with a bow: what Lorelei has for her on a day of theirs (world.js: present). It is
- * hers to carry, so it is made in the world's own measure. `lid` comes off when it opens.
+ * hers to carry, so it is made in the world's own measure. `lid` comes off when it opens. `wrap`: its paper, its lid
+ * and its ribbon — pink and white, or (PAPER.christmas) red, green and gold.
  */
-export function makePresent() {
+export const PAPER = {
+  day: { box: ['#ff8fbd', '#ffb9d6'], lid: ['#ff6fa8', '#ff8fbd'], ribbon: '#fffaf1', knot: '#ffe3ee' },
+  christmas: { box: ['#c8243a', '#e23d50'], lid: ['#2f8a4e', '#3fa262'], ribbon: '#ffd35a', knot: '#ffe48a' },
+};
+
+export function makePresent(wrap = PAPER.day) {
   const group = new THREE.Group();
   const W = 0.2;
   const H = 0.15;
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55 });
   const box = new Batch();
-  box.add(new THREE.BoxGeometry(W, H, W), { at: [0, H / 2, 0], color: ['#ff8fbd', '#ffb9d6'] });
-  box.add(new THREE.BoxGeometry(W + 0.006, H + 0.002, W * 0.2), { at: [0, H / 2, 0], color: '#fffaf1' }); // the ribbon, round it both ways
-  box.add(new THREE.BoxGeometry(W * 0.2, H + 0.002, W + 0.006), { at: [0, H / 2, 0], color: '#fffaf1' });
+  box.add(new THREE.BoxGeometry(W, H, W), { at: [0, H / 2, 0], color: wrap.box });
+  box.add(new THREE.BoxGeometry(W + 0.006, H + 0.002, W * 0.2), { at: [0, H / 2, 0], color: wrap.ribbon }); // the ribbon, round it both ways
+  box.add(new THREE.BoxGeometry(W * 0.2, H + 0.002, W + 0.006), { at: [0, H / 2, 0], color: wrap.ribbon });
   const body = box.mesh(mat);
   const top = new Batch();
-  top.add(new THREE.BoxGeometry(W + 0.024, 0.04, W + 0.024), { at: [0, 0.02, 0], color: ['#ff6fa8', '#ff8fbd'] });
-  top.add(new THREE.BoxGeometry(W + 0.03, 0.042, W * 0.2), { at: [0, 0.02, 0], color: '#fffaf1' });
-  top.add(new THREE.BoxGeometry(W * 0.2, 0.042, W + 0.03), { at: [0, 0.02, 0], color: '#fffaf1' });
-  for (const s of [1, -1]) top.add(new THREE.SphereGeometry(1, 12, 8), { at: [0.045 * s, 0.064, 0], rot: [0, 0, 0.5 * s], scale: [0.05, 0.028, 0.03], color: '#fffaf1' }); // …and the bow
-  top.add(new THREE.SphereGeometry(1, 10, 8), { at: [0, 0.058, 0], scale: [0.02, 0.02, 0.022], color: '#ffe3ee' });
+  top.add(new THREE.BoxGeometry(W + 0.024, 0.04, W + 0.024), { at: [0, 0.02, 0], color: wrap.lid });
+  top.add(new THREE.BoxGeometry(W + 0.03, 0.042, W * 0.2), { at: [0, 0.02, 0], color: wrap.ribbon });
+  top.add(new THREE.BoxGeometry(W * 0.2, 0.042, W + 0.03), { at: [0, 0.02, 0], color: wrap.ribbon });
+  for (const s of [1, -1]) top.add(new THREE.SphereGeometry(1, 12, 8), { at: [0.045 * s, 0.064, 0], rot: [0, 0, 0.5 * s], scale: [0.05, 0.028, 0.03], color: wrap.ribbon }); // …and the bow
+  top.add(new THREE.SphereGeometry(1, 10, 8), { at: [0, 0.058, 0], scale: [0.02, 0.02, 0.022], color: wrap.knot });
   const lid = new THREE.Group();
   lid.add(top.mesh(mat));
   lid.position.y = H;
@@ -438,6 +444,86 @@ export function makeOwnerHat(rig) {
   return hat;
 }
 
+/**
+ * What Lorelei puts on for the seasons and the days, beside her witch's hat (world.js: dressOwner) — each { object,
+ * bone } (her head bone, unless it says), with `more`: [bone, object] that goes with it:
+ *   santa   at Christmas: a Santa hat, its point flopping over to her right and back
+ *   straw   in summer: a straw hat with a pink ribbon
+ *   beret   in autumn: a wine-red beret, tipped to her right
+ *   pin     in spring: cherry blossom in her hair, over her right temple
+ *   scarf   in winter: a knitted scarf round her neck (her neck bone), its ends down her front (her chest bone)
+ * The hats sit where her witch's hat does: over the dome of her hair, clear of the tie of her tail (at the back, on her
+ * left). The scarf goes round her neck inside the locks before her ears and her tail of hair, which hang 9.6 cm and
+ * more from the middle of it; its ends lie over her top, a little off it. (Measured off her model: in her own measure,
+ * 1 = her height.)
+ */
+export function makeOwnerClothes(rig) {
+  const at = rig.dims.crown.clone().add(V(-0.012, -0.0225, 0.004)); // (where her witch's hat sits)
+  const hat = (object, rx, rz, lift = 0) => {
+    object.position.copy(at);
+    object.position.y += lift;
+    object.rotation.set(rx, 0, rz);
+    object.traverse((o) => (o.castShadow = true));
+    return { object, bone: 'head' };
+  };
+  const out = {
+    santa: hat(makeSantaHat(0.112, 0.2, { flop: [-0.8, -0.6], droop: 0.34 }), -0.14, 0.12, -0.01),
+    straw: hat(makeStrawHat(0.19, 0.112, 0.08), -0.12, 0.1),
+    beret: hat(makeBeret(0.135, 0.07), -0.1, 0.3, -0.004),
+  };
+
+  // cherry blossom over her right temple: three flowers and two leaves, on her hair
+  const n = V(-0.85, 0.42, 0.31).normalize(); // (straight out of her hair there)
+  const P = V(-0.104, 0.205, 0.037).addScaledVector(n, 0.004);
+  const u = V().crossVectors(n, V(0, 1, 0)).normalize();
+  const v = V().crossVectors(u, n).normalize();
+  const flowers = new Batch();
+  const spot = (a, b) => P.clone().addScaledVector(u, a).addScaledVector(v, b);
+  for (const [a, b, l, w] of [[0.028, -0.016, 0.034, 0.6], [-0.024, -0.025, 0.032, -0.7]]) {
+    const q = new THREE.Quaternion().setFromUnitVectors(Z, n).multiply(new THREE.Quaternion().setFromAxisAngle(Z, w));
+    flowers.add(new THREE.SphereGeometry(1, 8, 6), { matrix: new THREE.Matrix4().compose(spot(a, b), q, V(l * 0.5, l * 0.2, 0.004)), color: '#62b06a' });
+  }
+  blossom(flowers, spot(0, 0), n, 0.046, '#ff9ec4', 0.3);
+  blossom(flowers, spot(0.03, 0.015), n.clone().add(u.clone().multiplyScalar(0.3)), 0.036, '#ffc6dc', 1.1);
+  blossom(flowers, spot(-0.026, 0.02), n.clone().add(u.clone().multiplyScalar(-0.3)), 0.034, '#ffb3d1', 2.2);
+  out.pin = { object: flowers.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 })), bone: 'head' };
+
+  // the scarf: knitted, cream with red stripes
+  const knit = (a) => _c.set('#f7ede2').lerp(_c2.set('#e9dccc'), 0.5 + 0.5 * Math.sin(a * 46)); // (cream, in ribs round it)
+  const wool = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+  const ring = new Batch();
+  ring.add(lumpy(new THREE.TorusGeometry(0.046, 0.021, 12, 40), 0.08, 7), { rot: [Math.PI / 2, 0, 0], scale: [1, 1, 0.94], color: (q) => knit(Math.atan2(q.z, q.x)) });
+  ring.add(lumpy(new THREE.TorusGeometry(0.047, 0.014, 10, 36), 0.1, 9), { at: [0.002, 0.016, -0.002], rot: [Math.PI / 2 - 0.12, 0.1, 0], color: (q) => knit(Math.atan2(q.z, q.x) + 0.3) }); // (wound round twice)
+  const collar = ring.mesh(wool);
+  collar.position.set(0, 0.029, 0.003); // (round her neck, resting on her shoulders: 72.7 cm up her, the front a little lower)
+  collar.rotation.x = 0.16;
+  // its ends: two flat strips from the front of it, on her left, down over her top — and a fringe at the bottom of each
+  const ends = new Batch();
+  const strip = (top, bottom, w, yaw, tint) => {
+    const len = top.distanceTo(bottom);
+    const q = new THREE.Quaternion().setFromUnitVectors(V(0, -1, 0), bottom.clone().sub(top).normalize()).multiply(new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), yaw));
+    const mid = top.clone().add(bottom).multiplyScalar(0.5);
+    ends.add(lumpy(new THREE.BoxGeometry(w, len, 0.009, 2, 8, 1), 0.04, 11), {
+      matrix: new THREE.Matrix4().compose(mid, q, V(1, 1, 1)),
+      byFace: true,
+      color: (p) => _c.set(Math.floor(((p.y - bottom.y) / len) * 9) % 3 === 1 && p.y < bottom.y + len * 0.55 ? '#d8394a' : tint),
+    });
+    for (let i = 0; i < 5; i++) {
+      const x = (i / 4 - 0.5) * w * 0.85;
+      const f = bottom.clone().add(V(x, 0, 0).applyQuaternion(q));
+      ends.add(new THREE.CylinderGeometry(0.0022, 0.0018, 0.016, 5), { at: [f.x, f.y - 0.008, f.z], color: tint });
+    }
+  };
+  const chest = V(0, 0.585, 0); // (her chest bone: the ends go with it)
+  strip(V(0.03, 0.716, 0.05).sub(chest), V(0.04, 0.628, 0.064).sub(chest), 0.036, 0.12, '#f7ede2');
+  strip(V(0.012, 0.712, 0.056).sub(chest), V(0.004, 0.642, 0.07).sub(chest), 0.032, -0.2, '#f3e6d8');
+  const tails = ends.mesh(wool);
+  out.scarf = { object: collar, bone: 'neck', more: [['chest', tails]] };
+  for (const k of ['pin', 'scarf']) out[k].object.traverse((o) => (o.castShadow = true));
+  tails.castShadow = true;
+  return out;
+}
+
 /** 1 on a rib of a pumpkin, 0 in the groove between two (one rib looks straight ahead, to +Z). */
 const ribCrest = (x, z, ribs = 8) => Math.pow(Math.abs(Math.cos(((Math.atan2(z, x) - Math.PI / 2) * ribs) / 2)), 0.6);
 
@@ -541,6 +627,292 @@ export function makeLantern(r = 0.085) {
   };
 }
 
+// ------------------------------------------------------------------ Christmas, and clothes for the seasons
+
+/** Knitted and furry things are not perfectly round: each point of `geo` (about its own middle) a little in or out. */
+function lumpy(geo, amount, seed = 1) {
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i);
+    const y = p.getY(i);
+    const z = p.getZ(i);
+    const k = 1 + amount * Math.sin(x * 91.7 + seed) * Math.sin(y * 73.3 + seed * 2.1) * Math.sin(z * 67.1 + seed * 3.7);
+    p.setXYZ(i, x * k, y * k, z * k);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/** Stripes going round a piece (`n` of each colour from bottom to top, by height `y` from `y0` over `h`). */
+const stripes = (a, b, n, y0, h) => (p) => _c.set(Math.floor(((p.y - y0) / h) * n * 2) % 2 ? b : a);
+
+/**
+ * A Santa hat: a soft red cone over a thick band of white fur, its point flopping over — `flop` = which way, [x, z] in
+ * the hat's own measure, and `droop` how far down it hangs — with a white bobble on the end. The middle of the band is
+ * at the origin, `R` round; the cone is `tall` high before its point gives. (Lorelei's at Christmas — and the foxes'.)
+ */
+export function makeSantaHat(R, tall, { flop = [0, -1], droop = 0.3 } = {}) {
+  const f = Math.hypot(flop[0], flop[1]) || 1;
+  const fx = flop[0] / f;
+  const fz = flop[1] / f;
+  const b = new Batch();
+  const rows = 16;
+  const prof = [];
+  for (let i = 0; i <= rows; i++) {
+    const t = i / rows;
+    prof.push(new THREE.Vector2(R * 0.9 * Math.pow(1 - t, 0.85) + 0.004 * R, tall * t));
+  }
+  const cone = new THREE.LatheGeometry(prof, 26);
+  const p = cone.attributes.position;
+  const bend = (t) => Math.pow(Math.max(0, t - 0.3) / 0.7, 1.6); // (the lower part stands; above, it gives more and more)
+  for (let i = 0; i < p.count; i++) {
+    const k = bend(p.getY(i) / tall);
+    p.setXYZ(i, p.getX(i) + fx * 0.62 * tall * k, p.getY(i) - droop * tall * k * k, p.getZ(i) + fz * 0.62 * tall * k);
+  }
+  cone.computeVertexNormals();
+  b.add(cone, { color: ['#c41a30', '#e8384c'] });
+  b.add(lumpy(new THREE.TorusGeometry(R, R * 0.22, 10, 32), 0.05), { rot: [Math.PI / 2, 0, 0], color: '#fbf6f2' }); // the band of fur
+  b.add(lumpy(new THREE.IcosahedronGeometry(R * 0.34, 2), 0.08, 3), { at: [fx * 0.62 * tall, tall * (1 - droop), fz * 0.62 * tall], color: '#ffffff' }); // …and the bobble
+  const g = new THREE.Group();
+  g.add(b.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, side: THREE.DoubleSide })));
+  return g;
+}
+
+/** A knitted bobble hat for the winter: a ribbed cuff `R` round, a striped dome over it, a bobble on top. Its foot at the origin. */
+function makeBeanie(R, tall) {
+  const b = new Batch();
+  const cuff = 0.3 * tall;
+  b.add(new THREE.CylinderGeometry(R * 1.04, R * 1.07, cuff, 28, 1, true), { at: [0, cuff / 2, 0], byFace: true, color: (q) => _c.set(Math.floor(((Math.atan2(q.z, q.x) / TAU + 0.5) * 28)) % 2 ? '#fff3f6' : '#ffe1ea') }); // (its ribs)
+  const dome = new THREE.SphereGeometry(R, 28, 12, 0, TAU, 0, Math.PI / 2);
+  b.add(dome, { at: [0, cuff, 0], scale: [1, (tall - cuff) / R, 1], byFace: true, color: stripes('#ff8fb5', '#fff3f6', 2, cuff, tall - cuff) });
+  b.add(lumpy(new THREE.IcosahedronGeometry(R * 0.42, 2), 0.1, 5), { at: [0, tall + R * 0.26, 0], color: '#fff6f8' });
+  const g = new THREE.Group();
+  g.add(b.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, side: THREE.DoubleSide })));
+  return g;
+}
+
+/** A straw hat for the summer: a wide brim `Rb` round, its edge turned down a little; a crown `Rc` round and `Hc` high with a pink ribbon and a bow. Its foot at the origin. */
+export function makeStrawHat(Rb, Rc, Hc, ribbon = '#ff7fae') {
+  const b = new Batch();
+  const th = 0.035 * Rb;
+  const droop = 0.06 * Rb;
+  const weave = (q) => {
+    const r = Math.hypot(q.x, q.z);
+    const ring = Math.floor(r / (Rb * 0.08)) + Math.floor(q.y / (Hc * 0.2));
+    const spoke = Math.floor(((Math.atan2(q.z, q.x) / TAU + 0.5) * 40));
+    return _c.set((ring + spoke) % 2 ? '#ecc985' : '#f4d898');
+  };
+  const brim = [[Rc * 0.97, th], [Rb * 0.6, th * 0.7], [Rb * 0.94, th * 0.3 - droop * 0.6], [Rb, -droop], [Rb * 0.94, -droop * 0.6 - th * 0.5], [Rb * 0.6, -th * 0.3], [Rc * 0.97, 0]];
+  b.add(new THREE.LatheGeometry(brim.map(([x, y]) => new THREE.Vector2(x, y)), 48), { byFace: true, color: weave });
+  const crown = [[Rc, 0], [Rc * 0.97, Hc * 0.7], [Rc * 0.86, Hc * 0.95], [Rc * 0.5, Hc * 1.05], [0.001, Hc * 1.07]];
+  b.add(new THREE.LatheGeometry(crown.map(([x, y]) => new THREE.Vector2(x, y)), 40), { byFace: true, color: weave });
+  b.add(new THREE.CylinderGeometry(Rc * 1.015, Rc * 1.025, Hc * 0.32, 32, 1, true), { at: [0, Hc * 0.17, 0], color: ribbon }); // the ribbon, round the crown
+  for (const s of [1, -1]) b.add(new THREE.SphereGeometry(1, 12, 8), { at: [Rc * 1.02, Hc * 0.2, 0.18 * Rc * s], rot: [0.5 * s, 0, 0], scale: [Rc * 0.08, Rc * 0.16, Rc * 0.26], color: ribbon }); // …and its bow, at the side
+  b.add(new THREE.SphereGeometry(1, 10, 8), { at: [Rc * 1.04, Hc * 0.2, 0], scale: [Rc * 0.07, Rc * 0.1, Rc * 0.09], color: '#ff5f98' });
+  const g = new THREE.Group();
+  g.add(b.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide })));
+  return g;
+}
+
+/** A beret for the autumn: a soft wine-red disc `R` across and `H` high, puffed out over a band, a little stalk on top. Its foot at the origin. */
+export function makeBeret(R, H) {
+  const b = new Batch();
+  const top = [[R * 0.72, H * 0.16], [R * 0.97, H * 0.4], [R, H * 0.55], [R * 0.9, H * 0.8], [R * 0.55, H * 0.98], [0.001, H * 1.02]];
+  // (darker round its edge, where the felt turns under; lighter where it is puffed up in the middle)
+  b.add(new THREE.LatheGeometry(top.map(([x, y]) => new THREE.Vector2(x, y)), 40), { color: (q) => _c.set('#7f2633').lerp(_c2.set('#bd5263'), clamp01(1 - Math.hypot(q.x, q.z) / R) * 0.9 + clamp01((q.y - H * 0.4) / H) * 0.25) });
+  b.add(new THREE.CylinderGeometry(R * 0.73, R * 0.71, H * 0.2, 36, 1, true), { at: [0, H * 0.08, 0], color: '#7a2532' }); // the band
+  b.add(new THREE.CylinderGeometry(R * 0.04, R * 0.06, H * 0.22, 8), { at: [0, H * 1.08, 0], color: '#8a2c39' }); //            …and the stalk
+  const g = new THREE.Group();
+  g.add(b.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide })));
+  return g;
+}
+
+/**
+ * A blossom of five petals, `size` across, at `at` facing `normal` — into a batch. (`turn`: how far round its petals
+ * are; `color`: theirs, paler towards the middle.)
+ */
+function blossom(b, at, normal, size, color, turn = 0, middle = '#ffd23f') {
+  const q = new THREE.Quaternion().setFromUnitVectors(Z, normal.clone().normalize());
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * TAU + turn;
+    const spin = new THREE.Quaternion().setFromAxisAngle(Z, a);
+    const off = V(Math.cos(a) * size * 0.3, Math.sin(a) * size * 0.3, 0).applyQuaternion(q);
+    b.add(new THREE.SphereGeometry(1, 8, 6), { matrix: new THREE.Matrix4().compose(at.clone().add(off), q.clone().multiply(spin), V(size * 0.3, size * 0.21, size * 0.07)), color: (p) => _c.set('#ffffff').lerp(_c2.set(color), clamp01(p.distanceTo(at) / (size * 0.45))) });
+  }
+  b.add(new THREE.SphereGeometry(size * 0.12, 8, 6), { at: [at.x + normal.x * size * 0.04, at.y + normal.y * size * 0.04, at.z + normal.z * size * 0.04], color: middle });
+}
+
+/** A crown of flowers for the spring: blossoms and leaves round a ring (where a fox wears its crown). */
+function wreath(k) {
+  const b = new Batch();
+  const R = 0.037;
+  const N = 9;
+  for (let i = 0; i < N * 2; i++) {
+    const a = ((i + 0.5) / (N * 2)) * TAU;
+    b.add(new THREE.SphereGeometry(1, 8, 6), { at: [Math.cos(a) * R, -0.002, Math.sin(a) * R], rot: [0, -a + Math.PI / 2, 0.25], scale: [0.012, 0.004, 0.006], color: '#5fb36a' });
+  }
+  const colors = ['#ff9ecb', '#ffffff', '#ffc4dc', '#ffb0a8'];
+  for (let i = 0; i < N; i++) {
+    const a = (i / N) * TAU;
+    const at = V(Math.cos(a) * R, 0.004, Math.sin(a) * R);
+    blossom(b, at, V(Math.cos(a) * 0.55, 1, Math.sin(a) * 0.55), 0.024, colors[i % colors.length], i * 0.7);
+  }
+  const g = new THREE.Group();
+  g.add(b.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 })));
+  g.scale.setScalar(k);
+  return g;
+}
+
+/**
+ * Reindeer antlers for Christmas, one in front of each ear: a beam up and back that branches twice, with a little red
+ * bow where they stand on its head. (In the head bone's space, at the fox's size.)
+ */
+function antlers(rig) {
+  const k = rig.headScale;
+  const b = new Batch();
+  const brown = ['#7a4e30', '#b78456'];
+  const beam = (a, c, r0, r1) => {
+    const q = new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), c.clone().sub(a).normalize());
+    b.add(new THREE.CylinderGeometry(r1, r0, a.distanceTo(c), 7), { matrix: new THREE.Matrix4().compose(a.clone().add(c).multiplyScalar(0.5), q, V(1, 1, 1)), color: brown });
+    b.add(new THREE.SphereGeometry(r1, 7, 5), { at: [c.x, c.y, c.z], color: brown[1] });
+  };
+  const ear = rig.dims.earBase;
+  const x0 = Math.max(0.016, Math.abs(ear.x) * 0.5); // (between its ears, in front of them)
+  for (const s of [1, -1]) {
+    const p0 = V(x0 * s, -0.006, 0);
+    const p1 = V((x0 + 0.008) * s, 0.034, -0.006);
+    const p2 = V((x0 + 0.02) * s, 0.064, -0.016);
+    const p3 = V((x0 + 0.016) * s, 0.088, -0.03);
+    beam(p0, p1, 0.009, 0.0075);
+    beam(p1, p2, 0.0075, 0.006);
+    beam(p2, p3, 0.006, 0.0042);
+    beam(p1, V((x0 + 0.004) * s, 0.058, 0.014), 0.0055, 0.004); // (a tine forward)
+    beam(p2, V((x0 + 0.042) * s, 0.084, -0.006), 0.0052, 0.0038); // (…and one out to the side)
+  }
+  for (const s of [1, -1]) b.add(new THREE.SphereGeometry(1, 10, 8), { at: [0.012 * s, -0.002, 0.006], rot: [0, 0, -0.5 * s], scale: [0.012, 0.007, 0.005], color: '#e8344a' }); // the bow
+  b.add(new THREE.SphereGeometry(0.005, 8, 6), { at: [0, -0.002, 0.008], color: '#ffd35a' });
+  const g = new THREE.Group();
+  g.add(b.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 })));
+  g.scale.setScalar(k * 1.1);
+  g.position.set(0, rig.dims.crown.y - 0.006 * k, rig.dims.crown.z + 0.006 * k);
+  return g;
+}
+
+/**
+ * A Christmas tree for the yard: a fir in four tiers like the ones in the woods (scenes.js: tree), hung with baubles,
+ * wound round with a string of lights, a star on top, presents at its foot (to +Z, towards you). `s` = its size;
+ * `snowy`: snow lying on its tiers. Its lights twinkle and glow as it gets dark — update(time, glow): 0 by day … 1 in
+ * the dark.
+ */
+export function makeTree(s = 0.7, snowy = false) {
+  const group = new THREE.Group();
+  const rnd = rng(2512);
+  const b = new Batch();
+  b.add(new THREE.CylinderGeometry(0.05 * s, 0.085 * s, 0.6 * s, 7), { at: [0, 0.3 * s, 0], color: ['#6b4631', '#8f6247'], flat: true });
+  const tiers = [];
+  for (let i = 0; i < 4; i++) {
+    const k = i / 3;
+    const y = 0.42 * s + i * 0.25 * s;
+    const r = lerp(0.42, 0.15, k) * s;
+    b.add(new THREE.ConeGeometry(r, 0.44 * s, 8), { at: [0, y, 0], rot: [0, i * 0.7, 0], color: ['#2c7a47', '#58b06a'], flat: true });
+    if (snowy) b.add(new THREE.ConeGeometry(lerp(0.3, 0.1, k) * s, 0.2 * s, 8), { at: [0, y + 0.13 * s, 0], rot: [0, i * 0.7 + 0.4, 0], color: ['#e4eefb', '#ffffff'], flat: true });
+    tiers.push({ lo: y - 0.22 * s, top: y + 0.22 * s, r });
+  }
+  const top = tiers[3].top;
+  /** How far out the tree is at the height y (the outermost of the tiers there). */
+  const out = (y) => tiers.reduce((m, t) => (y >= t.lo && y <= t.top ? Math.max(m, (t.r * (t.top - y)) / (t.top - t.lo)) : m), 0);
+  // its presents, at its foot on the side towards you
+  const presents = [
+    [0.2, 0.24, 0.11, 0.08, '#e23d50', '#ffd35a', 0.3],
+    [-0.23, 0.19, 0.12, 0.1, '#3fa262', '#ff5a6a', -0.4],
+    [0.0, 0.36, 0.09, 0.07, '#ff8fbd', '#fffaf1', 0.9],
+  ];
+  for (const [x, z, w, h, paper, ribbon, yaw] of presents) {
+    const at = [x * s, (h * s) / 2, z * s];
+    b.add(new THREE.BoxGeometry(w * s, h * s, w * s), { at, rot: [0, yaw, 0], color: paper });
+    b.add(new THREE.BoxGeometry(w * s * 1.02, h * s * 1.02, w * s * 0.2), { at, rot: [0, yaw, 0], color: ribbon });
+    b.add(new THREE.BoxGeometry(w * s * 0.2, h * s * 1.02, w * s * 1.02), { at, rot: [0, yaw, 0], color: ribbon });
+    b.add(new THREE.SphereGeometry(1, 8, 6), { at: [x * s, h * s + 0.012 * s, z * s], rot: [0, yaw, 0], scale: [0.028 * s, 0.014 * s, 0.018 * s], color: ribbon });
+  }
+  group.add(b.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 })));
+  // the baubles: shiny, hanging all round it
+  const balls = new Batch();
+  const shades = ['#e8344a', '#ffcf4a', '#ff8fc0', '#dfe4f0', '#5aa7ff'];
+  for (let i = 0; i < 20; i++) {
+    const t = tiers[i % 4];
+    const y = lerp(t.lo + 0.03 * s, lerp(t.lo, t.top, 0.55), rnd());
+    const a = rnd() * TAU;
+    const r = out(y) * 0.93 + 0.012 * s;
+    balls.add(new THREE.SphereGeometry(0.024 * s, 12, 8), { at: [Math.sin(a) * r, y - 0.012 * s, Math.cos(a) * r], color: shades[i % shades.length] });
+  }
+  group.add(balls.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.22, metalness: 0.35 })));
+  // the string of lights: wound round it from the bottom to the top, in four colours that twinkle each in its own time
+  const LIGHTS = ['#fff1c4', '#ff6070', '#ffcf4a', '#7ab8ff'];
+  const bulbs = LIGHTS.map(() => new Batch());
+  const spots = LIGHTS.map(() => []); // (…and where each is, for the glow round it)
+  const N = 40;
+  for (let i = 0; i < N; i++) {
+    const t = i / (N - 1);
+    const y = lerp(tiers[0].lo + 0.06 * s, top - 0.08 * s, t);
+    const a = t * TAU * 4.5;
+    const r = out(y) * 0.95 + 0.01 * s;
+    bulbs[i % LIGHTS.length].add(new THREE.SphereGeometry(0.019 * s, 8, 6), { at: [Math.sin(a) * r, y, Math.cos(a) * r] });
+    spots[i % LIGHTS.length].push(Math.sin(a) * (r + 0.01 * s), y, Math.cos(a) * (r + 0.01 * s));
+  }
+  const lamps = bulbs.map((bb, i) => {
+    const mat = new THREE.MeshStandardMaterial({ color: LIGHTS[i], emissive: LIGHTS[i], emissiveIntensity: 0.6, roughness: 0.4 });
+    const mesh = bb.mesh(mat);
+    mesh.castShadow = false;
+    group.add(mesh);
+    // a soft glow round each bulb, as it gets dark
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(spots[i], 3));
+    const halo = new THREE.PointsMaterial({ map: softDotTexture(), color: LIGHTS[i], size: 0.22 * s, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+    const glow = new THREE.Points(geo, halo);
+    glow.renderOrder = 6;
+    group.add(glow);
+    return { mat, halo };
+  });
+  // the star on top
+  const shape = new THREE.Shape();
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * TAU + Math.PI / 2;
+    const r = (i % 2 ? 0.032 : 0.075) * s;
+    shape[i ? 'lineTo' : 'moveTo'](Math.cos(a) * r, Math.sin(a) * r);
+  }
+  const starGeo = new THREE.ExtrudeGeometry(shape, { depth: 0.018 * s, bevelEnabled: true, bevelThickness: 0.006 * s, bevelSize: 0.005 * s, bevelSegments: 1 });
+  starGeo.translate(0, 0, -0.009 * s);
+  const starMat = new THREE.MeshStandardMaterial({ color: '#ffd34a', emissive: '#ffbf2a', emissiveIntensity: 0.4, metalness: 0.4, roughness: 0.3 });
+  const star = new THREE.Mesh(starGeo, starMat);
+  star.position.y = top + 0.04 * s;
+  star.castShadow = true;
+  group.add(star);
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDotTexture(), color: '#ffd96a', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+  halo.position.copy(star.position);
+  halo.scale.setScalar(0.42 * s);
+  halo.renderOrder = 6;
+  group.add(halo);
+  group.traverse((o) => {
+    if (o.isMesh) o.receiveShadow = true;
+  });
+  return {
+    object: group,
+    radius: 0.42 * s,
+    height: top + 0.12 * s,
+    star,
+    update(time, glow) {
+      lamps.forEach(({ mat, halo }, i) => {
+        const twinkle = 0.62 + 0.38 * Math.sin(time * (1.7 + 0.37 * i) + i * 1.9);
+        mat.emissiveIntensity = (0.45 + 2.6 * glow) * twinkle;
+        halo.opacity = glow * twinkle;
+      });
+      starMat.emissiveIntensity = 0.4 + 1.5 * glow;
+      halo.material.opacity = 0.75 * glow * (0.9 + 0.1 * Math.sin(time * 2.6));
+      halo.visible = glow > 0.02;
+    },
+  };
+}
+
 // ------------------------------------------------------------------ a hat between a fox's ears
 
 // The foxes' Halloween hats, at the red fox's size: how wide each is at a height `h` above its foot — and how far
@@ -548,6 +920,20 @@ export function makeLantern(r = 0.085) {
 const HATS = {
   witch: { brim: 0.052, head: 0.028, tall: 0.1, width: (h) => (h < 0.006 ? 0.052 : 0.028 * Math.pow(Math.max(0, 1 - h / 0.1), 1.15)), back: (h) => 0.0414 * Math.pow(Math.max(0, h / 0.1 - 0.35) / 0.65, 2) }, // (makeWitchHat: taller than most, so that it shows from afar)
   pumpkin: { r: 0.046, tall: 0.046 * 1.7, width: (h) => 0.046 * Math.sqrt(Math.max(0, 1 - Math.pow((h - 0.036) / 0.037, 2))) + (h > 0.06 ? 0.007 : 0), back: () => 0 }, // (pumpkin: its body, then the stalk)
+  // …Christmas (makeSantaHat: its point flops over backwards, away from you) and the seasons
+  santa: { R: 0.03, tall: 0.072, width: (h) => (h < 0.007 ? 0.037 : 0.027 * Math.pow(Math.max(0, 1 - h / 0.072), 0.85)), back: (h) => 0.0446 * Math.pow(Math.max(0, h / 0.072 - 0.3) / 0.7, 1.6) },
+  beanie: { R: 0.032, tall: 0.046, width: (h) => (h < 0.014 ? 0.034 : h < 0.046 ? 0.032 * Math.sqrt(Math.max(0, 1 - ((h - 0.014) / 0.032) ** 2)) + 0.002 : 0.014), back: () => 0 },
+  straw: { Rb: 0.058, Rc: 0.03, Hc: 0.03, tall: 0.033, width: () => 0.031, back: () => 0 }, // (only its crown has to be clear of the ears: they come up through the brim)
+  beret: { R: 0.037, H: 0.027, tall: 0.03, width: (h) => (h < 0.004 ? 0.028 : 0.038), back: () => 0 },
+};
+// …and how each is made, at that size
+const HAT_MAKERS = {
+  witch: (h) => makeWitchHat(h.brim, h.head, h.tall),
+  pumpkin: (h) => pumpkin(h.r, 'carved'),
+  santa: (h) => makeSantaHat(h.R, h.tall, { flop: [0, -1], droop: 0.3 }),
+  beanie: (h) => makeBeanie(h.R, h.tall),
+  straw: (h) => makeStrawHat(h.Rb, h.Rc, h.Hc),
+  beret: (h) => makeBeret(h.R, h.H),
 };
 const HAT_TILT = 0.2; // (tipped forward a little, the way one wears a hat)
 const restHeads = new WeakMap(); // fox → its head and its ears at rest (headAndEars)
@@ -613,13 +999,14 @@ function seatHat(rig, hat) {
   return { at: at || crown.clone(), scale: k * 0.5 };
 }
 
-/** A Halloween hat for a fox (HATS), set between its ears. */
+/** A hat for a fox (HATS), set between its ears. (A beret is worn tipped to one side.) */
 function foxHat(id, rig) {
   const hat = HATS[id];
-  const g = id === 'witch' ? makeWitchHat(hat.brim, hat.head, hat.tall) : pumpkin(hat.r, 'carved');
+  const g = HAT_MAKERS[id](hat);
   const { at, scale } = seatHat(rig, hat);
   g.position.copy(at);
   g.rotation.x = HAT_TILT;
+  if (id === 'beret') g.rotation.z = -0.3;
   g.scale.setScalar(scale);
   return g;
 }
@@ -653,8 +1040,14 @@ export function makeAccessory(id, rig) {
   } else if (id === 'scarf') {
     bone = 'neck';
     object = scarf(rig);
-  } else if (id === 'witch' || id === 'pumpkin') {
+  } else if (HATS[id]) {
     object = foxHat(id, rig);
+  } else if (id === 'wreath') {
+    object = wreath(k * 1.25); // (where its crown would be)
+    object.position.set(0, top + 0.006 * k, 0.03 * k);
+    object.rotation.x = 0.22;
+  } else if (id === 'antlers') {
+    object = antlers(rig);
   } else return null;
   object.traverse((o) => {
     if (o.isMesh) o.castShadow = true;

@@ -25,8 +25,7 @@
    ================================================================== */
 
 const HALLOWEEN = { day: '10-31', until: 5, dusk: 17, coins: 100 }; // the day; how late into the next one it lasts; from when it is evening; what she is given
-const COSTUMES = ['witch', 'pumpkin']; //                              what the foxes wear, in turn (js/fox/props.js)
-const HEADWEAR = new Set(['bow', 'flower', 'crown', 'headphones', 'witch', 'pumpkin']); // what sits on a fox's head: it keeps that on instead
+const COSTUMES = ['witch', 'pumpkin']; //                              what the foxes wear, in turn (js/fox/props.js) — not a fox with something on its head already (HEADWEAR, js/pet.js)
 
 /*
    What Lorelei says. `halloweenLines` in js/config.js replaces any of these, part by part. {nick} = what she is called.
@@ -180,7 +179,7 @@ const Halloween = {
   /* She has come into the foxes' world: if Lorelei has her game still to play, she calls before long. */
   arrive() {
     clearTimeout(this.timer);
-    if (!this.waiting() || this.rehearsing || Present.rehearsing || Meet.rehearsing || Chat.rehearsing) return; // (he is looking at how something will be: the real one keeps)
+    if (!this.waiting() || this.rehearsing || Present.rehearsing || Meet.rehearsing || Chat.rehearsing || Christmas.rehearsing) return; // (he is looking at how something will be: the real one keeps)
     const ov = FoxRoom.ov;
     const tryIt = () => {
       if (FoxRoom.ov !== ov || !this.waiting()) return;

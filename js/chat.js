@@ -15,7 +15,7 @@
    same thing. She does not speak up before she has said her first
    hello (js/meet.js), nor while she has a present to give
    (js/present.js) or, on Halloween, her game still to play
-   (js/halloween.js).
+   (js/halloween.js) — at Christmas, her present (js/christmas.js).
    ================================================================== */
 
 const CHAT_REST = 90 * 60000; //  at least this long between two chats
@@ -289,7 +289,8 @@ const Chat = {
       gap: this.gap,
       birthday: on.find(mine) || null,
       ourDay: on.find((e) => e.kind === 'ours' && e.name !== hundred && !/열리는 날|시작한 날/.test(e.name)) || null,
-      holiday: on.find((e) => e.kind === 'year' || (e.kind === 'own' && !mine(e))) || null,
+      // (Halloween and Christmas the foxes' world keeps itself — js/halloween.js, js/christmas.js: she does not speak of them as of any other day)
+      holiday: on.find((e) => (e.kind === 'year' && !(Halloween.on() && /핼러윈/.test(e.name)) && !(Christmas.on() && /크리스마스/.test(e.name))) || (e.kind === 'own' && !mine(e))) || null,
       soon: next && daysBetween(today, next.key) <= 7 ? { name: mine(next) ? '네 생일' : next.name, n: daysBetween(today, next.key) } : null, // ("내 생일" is hers: from Lorelei's mouth it is "네 생일")
       days: Days.count() || 0,
       fullness: p.fullness,
@@ -310,7 +311,7 @@ const Chat = {
   /** May she speak up at all on this visit? */
   may() {
     const log = this.log;
-    if (!State.onboarded || !State.pet.introduced || Present.waiting() || Halloween.waiting() || !FoxHost.api || FoxHost.failed) return false;
+    if (!State.onboarded || !State.pet.introduced || Present.waiting() || Halloween.waiting() || Christmas.waiting() || !FoxHost.api || FoxHost.failed) return false;
     if (this.notHers()) return false;
     if (Pet.mood() === 'sleepy') return false; // (late at night she lets the foxes sleep)
     if (Date.now() - log.at < CHAT_REST) return false;
@@ -319,13 +320,13 @@ const Chat = {
 
   /** Is this not a visit of hers? (The foxes' world has not opened for her yet — js/opening.js — or he is looking at how something will be.) */
   notHers() {
-    return Opening.shut() || this.rehearsing || Meet.rehearsing || Present.rehearsing || Halloween.rehearsing;
+    return Opening.shut() || this.rehearsing || Meet.rehearsing || Present.rehearsing || Halloween.rehearsing || Christmas.rehearsing;
   },
 
   /** Is the foxes' world hers to speak up in just now? (Not over the shop, the camera, a song that is playing.) */
   clear() {
     const ov = FoxRoom.ov;
-    return !!ov && UI.top() === ov && !FoxRoom.tab && !FoxRoom.photoOn && !OwnerSays.on && !Talk.on && !Meet.playing && !Present.playing && !Halloween.playing && !CoverHost.tune();
+    return !!ov && UI.top() === ov && !FoxRoom.tab && !FoxRoom.photoOn && !OwnerSays.on && !Talk.on && !Meet.playing && !Present.playing && !Halloween.playing && !Christmas.playing && !CoverHost.tune();
   },
 
   /** One of the things that fit — the ones that are said first before the rest, none that she spoke of lately. */

@@ -288,7 +288,7 @@ const Present = {
   arrive() {
     FoxRoom.presentChip();
     clearTimeout(this.timer);
-    if (!this.waiting() || this.rehearsing || Meet.rehearsing || Chat.rehearsing || Halloween.rehearsing) return; // (he is looking at how something will be: the real one keeps)
+    if (!this.waiting() || this.rehearsing || Meet.rehearsing || Chat.rehearsing || Halloween.rehearsing || Christmas.rehearsing) return; // (he is looking at how something will be: the real one keeps)
     const ov = FoxRoom.ov;
     const tryIt = () => {
       if (FoxRoom.ov !== ov || !this.waiting()) return;
@@ -345,7 +345,7 @@ const Present = {
 };
 
 Object.assign(Actions, {
-  'fox-present': () => (Present.waiting() ? Present.begin() : Halloween.begin()), // (the chip is for either: FoxRoom.presentChip)
+  'fox-present': () => (Present.waiting() ? Present.begin() : Halloween.waiting() ? Halloween.begin() : Christmas.begin()), // (the chip is for any of them: FoxRoom.presentChip)
   'present-rehearse': async () => {
     await Router.go('#/home');
     Present.test();

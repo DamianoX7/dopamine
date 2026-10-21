@@ -10,7 +10,9 @@
    leaves, the desert hot and dry, the arctic deep in snow.
 
    The weather changes every few minutes: clear, clouded over, rain —
-   snow in winter and in the arctic, blowing sand in the desert.
+   snow in winter and in the arctic, blowing sand in the desert. At
+   Christmas, where it is winter, it snows more often than not
+   (js/christmas.js).
    Nothing of it is saved. It is worked out from the clock, so her
    phone and her computer have the same sky.
 
@@ -56,6 +58,7 @@ const ODDS = {
   winter: { clear: 46, cloudy: 20, snow: 34 },
   dry: { clear: 70, wind: 24, rain: 6 },
   polar: { clear: 40, cloudy: 16, snow: 44 },
+  white: { clear: 24, cloudy: 12, snow: 64 }, // (a winter's Christmas Eve and Christmas Day)
 };
 
 const SPELL = 10 * 60000; // the sky is thrown afresh this often (two throws alike: it simply stays as it is)
@@ -105,7 +108,7 @@ const Weather = {
   now(scene = State.pet.scene) {
     const t = this.time();
     const season = this.seasonIn(scene);
-    const odds = ODDS[(CLIMATES[scene] || {}).odds || season];
+    const odds = ODDS[(CLIMATES[scene] || {}).odds || (season === 'winter' && Christmas.year(new Date(t)) ? 'white' : season)];
     const n = Math.floor(t / SPELL);
     const kind = this.roll(n, odds);
     let from = n;

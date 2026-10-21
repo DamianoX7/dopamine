@@ -674,6 +674,25 @@ export class Keeper extends Brain {
           a.setPose('stand', 5);
           this.lookAtYou(1);
         }
+      } else if (g.step === 'tree') {
+        // "…and the tree": a hand towards it, a look at it — then back to whoever she is talking to
+        const tree = w.tree && w.tree.object.position;
+        if (g.t < 2.4) {
+          a.setPose('show', 7);
+          if (tree && g.t < 1.5) {
+            a.look = V(tree.x, 0.8 * this.tall, tree.z);
+            a.lookW = 0.6;
+          } else this.lookAtYou(1);
+          a.mood.eyes = g.t > 0.5 && g.t < 1.9 ? 'happy' : 'open';
+        } else {
+          a.setPose('stand', 5);
+          this.lookAtYou(1);
+        }
+      } else if (g.step === 'wish') {
+        // her hands together and her eyes shut: a wish
+        a.setPose(g.t < 2.6 ? 'clap' : 'stand', 6);
+        a.mood.eyes = g.t > 0.3 && g.t < 2.4 ? 'happy' : 'open';
+        this.lookAtYou(1);
       } else if (g.step === 'hat' || g.step === 'treat' || g.step === 'trick') {
         // her hat — or sweets for everyone, or the trick: she claps and laughs
         a.setPose(g.step === 'treat' && g.t < 0.9 ? 'offer' : g.t < 2.2 ? 'clap' : 'stand', 8);

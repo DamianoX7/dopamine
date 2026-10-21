@@ -15,7 +15,10 @@
 // strokes them, it is she who fills the bowl and throws the ball, and she is in their picture.
 // On a day of theirs she has a present: a parcel she puts down before her, and a fox comes out of it.
 // And on Halloween the yard dresses up: jack-o'-lanterns round it, bats over the woods, the foxes in costume, Lorelei
-// in a witch's hat — and on the evening of it, the light of a late autumn sunset.
+// in a witch's hat — and on the evening of it, the light of a late autumn sunset. At Christmas a tree stands at the back
+// of the yard, its lights twinkling; the foxes wear Santa hats and antlers, Lorelei a Santa hat and her scarf — and in
+// the evening the light goes blue. Through the year she dresses for the season of the place: cherry blossom in her
+// hair in spring, a straw hat in summer, a beret in autumn, a scarf in winter.
 import * as THREE from '../vendor/three.module.min.js';
 import { buildFox, FUR_SUN } from './rig.js';
 import { FoxAnimator } from './animator.js';
@@ -24,7 +27,7 @@ import { buildLorelei, LoreleiAnimator } from './lorelei.js';
 import { Keeper } from './keeper.js';
 import { buildHabitat } from './scenes.js';
 import { speciesOf } from './species.js';
-import { makeBowl, makeBall, makeBed, makeMic, makeMailbox, makeLetter, makeGift, makeAccessory, makeRadio, makePresent, makeOwnerHat, makeLantern } from './props.js';
+import { makeBowl, makeBall, makeBed, makeMic, makeMailbox, makeLetter, makeGift, makeAccessory, makeRadio, makePresent, PAPER, makeOwnerHat, makeOwnerClothes, makeLantern, makeTree } from './props.js';
 import { makeDecor } from './decor.js';
 import { Sky } from './sky.js';
 import { beatAt, curveAt, pickMove } from './dance.js';
@@ -47,6 +50,9 @@ const PRINTS = 160;
 // Halloween: where the jack-o'-lanterns stand, round the edge of the yard (0 = the front, towards you; π = the back)
 const LANTERNS = [2.5, -2.45, 1.5, -1.42, 0.66];
 const LANTERN_R = 0.085;
+// Christmas: the tree's size, and where it may stand along the back of the yard (the best place first; as for LANTERNS)
+const TREE_S = 0.86;
+const TREE_AT = [Math.PI + 0.42, Math.PI - 0.42, Math.PI, Math.PI + 0.8, Math.PI - 0.8, Math.PI + 1.15, Math.PI - 1.15];
 // where the family stands when the world is first shown (offsets from the middle of the yard, and which way they face)
 const HOMES = [[-0.5, -0.2, 0.6], [0.5, 0.05, -0.5], [-0.05, -0.6, 0.2], [0.95, -0.4, -0.9], [-1.0, 0.15, 0.9], [0.1, 0.4, 0]];
 // A fox can always walk between any two things in the yard: they stand a fox's width apart
@@ -225,6 +231,7 @@ export class World {
     // Lorelei's present (see present): the parcel; its story while it is told — { step, t, ready, speaking, shown, down, at, lid, fox };
     // and where the fox that is new with the next apply() is to appear — out of it, not in from the side: { id, x, z, yaw }
     this.parcel = makePresent();
+    this.parcel.paper = 'day'; // (at Christmas it is wrapped in red and green: see wrapParcel)
     scene.add(this.parcel.object);
     this.gifting = null;
     this.spawn = null;
@@ -236,6 +243,14 @@ export class World {
     this.lanternsIn = null;
     this.glow = 0;
     this.batsIn = 3;
+    // Christmas (see setChristmas): { dusk } while it is on; its tree, { object, update, star, bx, bz } — and the place it
+    // was put up in; how bright its lights are; a moment when they flare up (world.present: 'tree'); the next sparkle
+    this.festive = null;
+    this.tree = null;
+    this.treeIn = null;
+    this.twinkle = 0;
+    this.treeFlash = 0;
+    this.sparkIn = 3;
 
     // where you tapped
     this.marker = new THREE.Mesh(new THREE.RingGeometry(0.1, 0.135, 40), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0, depthWrite: false }));
@@ -316,10 +331,35 @@ export class World {
     me.brain = new Keeper(this, me);
     anim.onStep = (p) => this.footfall(p, me);
     this.scene.add(rig.group);
-    // her witch's hat, for Halloween (props.js)
+    // her witch's hat, for Halloween — and what she wears for the seasons and at Christmas (props.js; see dressOwner)
     const hat = (me.hat = makeOwnerHat(rig));
     hat.visible = false;
     rig.bones.head.add(hat);
+    me.clothes = makeOwnerClothes(rig);
+    for (const id in me.clothes) {
+      const it = me.clothes[id];
+      it.object.visible = false;
+      rig.bones[it.bone].add(it.object);
+      for (const [bone, o] of it.more || []) rig.bones[bone].add(o);
+    }
+  }
+
+  /**
+   * What Lorelei has on: for the season of the place — cherry blossom in her hair in spring, a straw hat in summer, a
+   * beret in autumn, a scarf in winter — and on Halloween her witch's hat, at Christmas a Santa hat (and her scarf), in
+   * place of any other. (A hat over her hair: no blossom.)
+   */
+  dressOwner() {
+    const me = this.owner;
+    const c = me.clothes;
+    const season = this.state.season;
+    const hat = this.spooky ? 'witch' : this.festive ? 'santa' : season === 'summer' ? 'straw' : season === 'autumn' ? 'beret' : null;
+    me.hat.visible = hat === 'witch';
+    for (const id of ['santa', 'straw', 'beret']) c[id].object.visible = hat === id;
+    c.pin.object.visible = season === 'spring' && !hat;
+    const scarf = season === 'winter' || !!this.festive;
+    c.scarf.object.visible = scarf;
+    for (const [, o] of c.scarf.more) o.visible = scarf;
   }
 
   /** A tiny lit room to reflect in the shiny things (eyes, crown, sunglasses, the bowl). */
@@ -602,14 +642,16 @@ export class World {
       this.fitView();
     }
     this.setTune(next.tune);
-    const dusk = this.setHalloween(next.halloween || null);
+    const spooky = this.setHalloween(next.halloween || null);
+    const festive = this.setChristmas(next.christmas || null);
+    this.dressOwner();
     // a fox that is back from an expedition has a parcel for her
     const bringer = this.byId(next.gift);
     const had = this.gift && this.gift.fox;
     this.setGift(bringer);
     if (bringer && bringer !== had) this.homecoming(bringer);
     this.foxes.forEach((f) => (f.fresh = false));
-    if (nightChanged || dusk) this.setLight();
+    if (nightChanged || spooky || festive) this.setLight();
     // the weather: as it is, at once, while nobody is looking (or in another place) — else it turns before her eyes
     const turned = this.sky.set(next.sky, !this.stage || sceneChanged);
     if (turned && this.stage && !sceneChanged) this.weatherTurned();
@@ -631,6 +673,7 @@ export class World {
     this.grace();
     same = same && !!this.env;
     this.clearLanterns(false); // (they are placed afresh in the new place: see setHalloween)
+    this.clearTree(false); //     (…and so is the tree: setChristmas)
     const env = (this.env = buildHabitat(id, season));
     // as it was built, for one fox; scaleYard() makes room for more
     env.base = {
@@ -705,6 +748,7 @@ export class World {
     // the radio stands at the front, where the foxes come to meet her
     this.things.radio.object.position.set(env.spots.front.x, 0, env.spots.front.z + 0.12);
     for (const l of this.lanterns) l.object.position.set(l.bx * k, 0, l.bz * k);
+    if (this.tree) this.tree.object.position.set(this.tree.bx * k, 0, this.tree.bz * k);
     this.placeDecor();
   }
 
@@ -911,6 +955,15 @@ export class World {
       lit.sky.lerp(_c.set('#9d80dc'), 0.55);
       lit.ground.lerp(_c.set('#3d2c4c'), 0.45);
       lit.bg.lerp(_c.set('#4d3b62'), 0.5);
+    } else if (this.festive && this.festive.dusk && !this.night) {
+      // Christmas evening: the light going blue, the sun low and warm, the ground in shadow — the tree's lights the brighter for it
+      const lit = this.lit;
+      lit.sunI *= 0.58;
+      lit.hemi *= 0.72;
+      lit.sun.lerp(_c.set('#ffb070'), 0.5);
+      lit.sky.lerp(_c.set('#7f92d8'), 0.55);
+      lit.ground.lerp(_c.set('#344060'), 0.45);
+      lit.bg.lerp(_c.set('#475683'), 0.5);
     }
     this.sunOff.set(L.pos[0], L.pos[1], L.pos[2]).multiplyScalar(2.3);
     this.placeSun();
@@ -955,6 +1008,7 @@ export class World {
     lit.uSun.value = Math.min(1, (this.sun.intensity * (this.sun.color.r + this.sun.color.g + this.sun.color.b)) / 3 / 0.3); // (how much of a sun there is: under heavy cloud or the moon, less of a light side to her)
     me.anim.update(dt);
     if (this.spooky) me.hat.scale.y = 1 - 0.32 * me.anim.umb; // (under her umbrella, her hat's soft point gives)
+    if (this.festive) me.clothes.santa.object.scale.y = 1 - 0.3 * me.anim.umb;
     // (one that has run off through the bushes is out of the picture — or, should it never get there, after a while)
     if (this.leaving.some((f) => f.gone || this.time > f.leftAt + 25)) {
       this.leaving.filter((f) => f.gone || this.time > f.leftAt + 25).forEach((f) => this.forget(f));
@@ -965,6 +1019,7 @@ export class World {
     this.updateMail(dt);
     this.updatePresent(dt);
     this.updateHalloween(dt);
+    this.updateChristmas(dt);
     this.fx.update(dt);
     this.updatePrints(dt);
 
@@ -2481,6 +2536,10 @@ export class World {
    *   'hat'      "…and me": her witch's hat
    *   'treat'    she has been given sweets: she shares them out, and the foxes jump for them
    *   'trick'    …or the trick: the foxes spring up round her, and ghosts and bats with them
+   * …and at Christmas (js/christmas.js) 'costume' and 'hat' as well, then 'show', 'give' and 'open' with nobody in it,
+   * and:
+   *   'tree'     "…and the tree": a hand towards it, and its lights flare up
+   *   'wish'     a wish: her hands together, stars falling round everyone
    *   'end'    that was it
    */
   present(step, arg) {
@@ -2503,9 +2562,23 @@ export class World {
       if (step === 'open') {
         if (!g.down) g.at.copy(this.parcel.object.position).setY(0); // (opened in her hands, should it come to that)
         const cam = this.camera.position;
-        this.spawn = { id: arg, x: g.at.x, z: g.at.z, yaw: Math.atan2(cam.x - g.at.x, cam.z - g.at.z) };
+        this.spawn = arg ? { id: arg, x: g.at.x, z: g.at.z, yaw: Math.atan2(cam.x - g.at.x, cam.z - g.at.z) } : null; // (at Christmas, nobody is in it)
         this.fx.emit('✨', V(g.at.x, 0.24, g.at.z), { n: 12, spread: 0.24, rise: 0.75, life: 1.2, size: 0.14 });
         this.fx.emit('💗', V(g.at.x, 0.3, g.at.z), { n: 5, spread: 0.2, rise: 0.6, life: 1.4, size: 0.13 });
+        if (!arg) {
+          this.fx.emit('🎅', V(g.at.x - 0.08, 0.3, g.at.z), { n: 1, spread: 0.1, rise: 0.7, life: 1.8, size: 0.16 });
+          this.fx.emit('🦌', V(g.at.x + 0.08, 0.3, g.at.z), { n: 1, spread: 0.1, rise: 0.7, life: 1.8, size: 0.16 });
+          g.hops++; // (and the foxes jump for joy)
+        }
+      } else if (step === 'tree') {
+        // her hand towards the tree, and its lights flare up, a shower of sparkles off its star
+        this.treeFlash = 1;
+        if (this.tree) this.fx.emit('✨', this.tree.star.getWorldPosition(V()), { n: 10, spread: 0.3, rise: 0.4, life: 1.4, size: 0.13, drift: 0.3 });
+      } else if (step === 'wish') {
+        // a wish: stars falling all round — over her, and over every fox that is looking on
+        g.hops++;
+        this.fx.emit('⭐', this.owner.anim.headPoint(V()).add(V(0, 0.3, 0)), { n: 6, spread: 0.45, rise: 0.15, life: 2, size: 0.13, drift: 0.3 });
+        for (const f of this.foxes) if (f.brain.doing === 'lookOn') this.fx.emit('✨', f.anim.headPoint(V()), { n: 3, spread: 0.18, rise: 0.4, life: 1.3, size: 0.11 });
       } else if (step === 'costume' || step === 'treat' || step === 'trick') {
         // the foxes that are looking on hop where they sit (brain.js: lookOn) — under a shower of sweets, or of ghosts
         g.hops++;
@@ -2514,7 +2587,7 @@ export class World {
         if (step === 'treat') this.fx.emit('🍬', me.headPoint(V()), { n: 5, spread: 0.25, rise: 0.7, life: 1.4, size: 0.13, drift: 0.4 });
         watching.forEach((f, i) => {
           const top = f.anim.headPoint(V());
-          if (step === 'costume') this.fx.emit('✨', top, { n: 4, spread: 0.2, rise: 0.5, life: 1, size: 0.11 });
+          if (step === 'costume') this.fx.emit(this.festive ? '❄️' : '✨', top, { n: 4, spread: 0.2, rise: 0.5, life: 1, size: 0.11 });
           else if (step === 'treat') this.fx.emit(['🍭', '🍬', '🍫'][i % 3], top, { n: 2, spread: 0.12, rise: 0.45, life: 1.2, size: 0.12 });
           else this.fx.emit(i % 2 ? '🦇' : '👻', top, { n: 2, spread: 0.25, rise: 0.6, life: 1.5, size: 0.15, drift: 0.3 });
         });
@@ -2657,6 +2730,100 @@ export class World {
     const at = V(x, 0.5, b.cz - b.rz * (0.8 + 0.3 * Math.random()));
     const ghost = (h.dusk || this.night) && Math.random() < 0.3;
     this.fx.emit(ghost ? '👻' : '🦇', at, { n: ghost ? 1 : 1 + Math.floor(Math.random() * 3), spread: 0.3, rise: 0.32, life: 3.2, size: ghost ? 0.2 : 0.16, drift: 0.35 });
+  }
+
+  // ---------------------------------------------------------------- Christmas
+
+  /**
+   * Christmas, as the app says (js/christmas.js): `c` = { dusk } while it is on, else null. A tree stands at the back of
+   * the yard, Lorelei puts her Santa hat on (dressOwner), her present is wrapped in red and green; `dusk` is the evening,
+   * with the light gone blue (setLight). (The foxes' hats and antlers come with what they wear: props.js.)
+   * → true if the light has to change.
+   */
+  setChristmas(c) {
+    const was = this.festive;
+    this.festive = c ? { dusk: !!c.dusk } : null;
+    if (!c) this.clearTree();
+    else if (this.treeIn !== this.env) this.placeTree();
+    if (!this.gifting) this.wrapParcel(c ? 'christmas' : 'day');
+    return !!was !== !!c || (!!was && !!c && was.dusk !== !!c.dusk);
+  }
+
+  /** Lorelei's present, wrapped for the day: 'day' (pink) or 'christmas' (red and green). (Not while it is being given.) */
+  wrapParcel(paper) {
+    if (this.parcel.paper === paper) return;
+    this.scene.remove(this.parcel.object);
+    disposeTree(this.parcel.object);
+    this.parcel = makePresent(PAPER[paper]);
+    this.parcel.paper = paper;
+    this.scene.add(this.parcel.object);
+  }
+
+  /**
+   * The tree: along the back of the yard, where nothing else stands and a fox can get round it (TREE_AT, the best place
+   * first) — and from then on part of the scenery, which the foxes step round and she cannot put anything on. Its
+   * presents look out towards you. With snow on it, in a place where it is winter.
+   */
+  placeTree() {
+    this.clearTree(false);
+    const env = this.env;
+    if (!env) return;
+    this.treeIn = env;
+    const b = env.bounds;
+    const k = this.yard;
+    const tree = makeTree(TREE_S, this.state.season === 'winter');
+    const R = tree.radius;
+    const taken = this.keepOut().concat(this.decorSolids.map((o) => ({ x: o.x, z: o.z, r: o.r, gap: GAP })));
+    const free = (x, z) => !taken.some((o) => Math.hypot(x - o.x, z - o.z) < o.r + R + Math.max(0.1, o.gap * 0.5));
+    for (const a0 of TREE_AT) {
+      for (let n = 0; n < 7; n++) {
+        const a = a0 + (n % 2 ? 1 : -1) * Math.ceil(n / 2) * 0.07;
+        const x = b.cx + Math.sin(a) * b.rx * 0.86;
+        const z = b.cz + Math.cos(a) * b.rz * 0.86;
+        if (!free(x, z)) continue;
+        tree.bx = x / k;
+        tree.bz = z / k;
+        tree.object.position.set(x, 0, z);
+        tree.object.rotation.y = Math.atan2(b.cx - x, b.cz + 4 * b.rz - z);
+        tree.object.traverse((o) => {
+          if (o.isMesh) o.castShadow = true;
+        });
+        this.scene.add(tree.object);
+        this.tree = tree;
+        env.base.obstacles.push({ x: tree.bx, z: tree.bz, r: R / k, tree: true });
+        env.base.wilds.push({ x: tree.bx, z: tree.bz, r: R / k, tree: true });
+        this.scaleYard();
+        return;
+      }
+    }
+    disposeTree(tree.object); // (no room for it anywhere along the back: no tree this time)
+  }
+
+  /** …and away with it (`rescale`: the yard is set out again without it). */
+  clearTree(rescale = true) {
+    this.treeIn = null;
+    if (!this.tree) return;
+    this.scene.remove(this.tree.object);
+    disposeTree(this.tree.object);
+    this.tree = null;
+    const B = this.env && this.env.base;
+    if (!B) return;
+    B.obstacles = B.obstacles.filter((o) => !o.tree);
+    B.wilds = B.wilds.filter((o) => !o.tree);
+    if (rescale) this.scaleYard();
+  }
+
+  /** Every frame: the tree's lights twinkle (a little by day, brightly in the evening and at night), and now and then a sparkle comes up off its star. */
+  updateChristmas(dt) {
+    const c = this.festive;
+    if (!c || !this.tree) return;
+    this.twinkle = damp(this.twinkle, this.night ? 1 : c.dusk ? 0.85 : 0.15, 2, dt);
+    this.treeFlash = Math.max(0, this.treeFlash - dt * 0.7);
+    this.tree.update(this.time, Math.min(1, this.twinkle + this.treeFlash));
+    this.sparkIn -= dt;
+    if (this.sparkIn > 0 || !this.stage) return;
+    this.sparkIn = (this.state.reduce ? 7 : 2.5) + Math.random() * 3;
+    this.fx.emit(Math.random() < 0.5 ? '✨' : '⭐', this.tree.star.getWorldPosition(V()), { n: 1, spread: 0.14, rise: 0.25, life: 1.6, size: 0.1, drift: 0.2 });
   }
 
   // ---------------------------------------------------------------- his letters

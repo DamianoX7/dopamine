@@ -100,6 +100,7 @@ function defaultState() {
     },
     mallang: { mode: 'soft', soft: 'fox', wax: 'cotton' }, // 말랑 놀이터: the toy she had out last (js/mallang.js)
     halloween: { year: 0 }, // the last Halloween she played trick or treat with Lorelei (js/halloween.js)
+    christmas: { year: 0 }, // …and the last Christmas Lorelei gave her a present (js/christmas.js)
     opening: { seen: false, greeted: false }, //           the rooms that open on a day of their own (js/opening.js): has she stood before them shut — and been told that they opened?
     // season: 'auto' = the foxes' world follows the calendar; or 'spring', 'summer', 'autumn', 'winter' (js/weather.js)
     settings: { soundEnabled: true, theme: 'pink', lateNight: 'auto', reduceMotion: false, foxFullscreen: true, season: 'auto' },
