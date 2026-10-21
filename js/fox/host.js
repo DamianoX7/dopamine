@@ -42,6 +42,9 @@ host.register({
   hush: () => world && world.hush(),
   /** Lorelei turns to whoever is looking on, waves and says `line`. */
   owner: (line) => world && world.ownerHello(line),
+  /** Lorelei would like a word: she comes forward, calls `line` and waits to be tapped (`bye`: what she says if she is not; `now`: whatever she is doing). → false if she cannot just now. */
+  hail: (line, bye, now) => !!(world && world.hail(line, bye, now)),
+  unhail: () => world && world.unhail(),
   /** Lorelei's present, a step of its story at a time: 'call', 'speak', 'show', 'give', 'open', 'end' — see World.present. */
   present: (step, arg) => world && world.present(step, arg),
   /** She slid the view away over the country: back to her fox. */

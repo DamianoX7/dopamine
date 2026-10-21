@@ -130,6 +130,7 @@ const Halloween = {
     const ov = FoxRoom.ov;
     if (this.playing || OwnerSays.on || Talk.on || !ov || UI.top() !== ov) return false;
     if (!rehearsal && !this.waiting()) return false;
+    if (Chat.calling) Chat.heard('off'); // (she was waiting to say something else: that can wait)
     this.playing = true;
     clearTimeout(this.timer);
     FoxRoom.presentChip();
@@ -179,12 +180,12 @@ const Halloween = {
   /* She has come into the foxes' world: if Lorelei has her game still to play, she calls before long. */
   arrive() {
     clearTimeout(this.timer);
-    if (!this.waiting() || this.rehearsing || Present.rehearsing || Meet.rehearsing) return; // (he is looking at how something will be: the real one keeps)
+    if (!this.waiting() || this.rehearsing || Present.rehearsing || Meet.rehearsing || Chat.rehearsing) return; // (he is looking at how something will be: the real one keeps)
     const ov = FoxRoom.ov;
     const tryIt = () => {
       if (FoxRoom.ov !== ov || !this.waiting()) return;
       // (not over a letter she is reading, the shop, the camera — nor while the hundredth day's present is still to come)
-      if (!this.playing && !OwnerSays.on && !Present.waiting() && UI.top() === ov && !FoxRoom.tab && !FoxRoom.photoOn) return void this.begin();
+      if (!this.playing && !OwnerSays.on && !Present.waiting() && !Chat.calling && !Chat.playing && UI.top() === ov && !FoxRoom.tab && !FoxRoom.photoOn) return void this.begin();
       this.timer = setTimeout(tryIt, 2000);
     };
     this.timer = setTimeout(tryIt, 2600);

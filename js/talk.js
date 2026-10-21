@@ -7,7 +7,8 @@
 
    The speech bubbles over the foxes' heads are another thing, and
    stay what they were: a word in passing. This is for when somebody
-   has something to say to her.
+   has something to say to her: Lorelei's present (js/present.js), her
+   first hello (js/meet.js), the chats she strikes up (js/chat.js).
 
      const said = await Talk.run([
        '안녕!',                                            // a page

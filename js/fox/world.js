@@ -38,6 +38,8 @@ const PITCH_PHOTO = (40 * Math.PI) / 180; // …and when she starts taking pictu
 // each fox its own pose, for the "all different" picture
 const MIXED = ['sit', 'smile', 'lie', 'proud', 'bow'];
 const ZOOM_MIN = 0.55;
+/** Has this fox left the yard for cover (under a tree, in the barn)? The view stands back for it. */
+const HIDING = (f) => f.brain.stray && (f.brain.doing === 'takeCover' || f.brain.doing === 'sleep');
 const SHADE = 10; //                      how far round where she is looking things throw shadows
 const NEAR = 0.18; //                     how near the middle of a fox comes to what stands out in the country, on its way round it
 const ZOOM_MAX = 2.4;
@@ -226,6 +228,7 @@ export class World {
     scene.add(this.parcel.object);
     this.gifting = null;
     this.spawn = null;
+    this.hailing = null; // Lorelei would like a word (see hail): { bye, now } while she waits to be tapped
     // Halloween (see setHalloween): { dusk } while it is on; the jack-o'-lanterns round the yard, { object, update, bx, bz }
     // (where they stand, in the measure of a lone fox's yard); how much they glow; when the next bats fly over
     this.spooky = null;
@@ -400,6 +403,7 @@ export class World {
     this.setMode(null);
     this.photo(false);
     this.endPresent();
+    this.unhail();
     this.leaving.splice(0).forEach((f) => this.forget(f)); // (one that was on its way out is gone by the time she looks again)
     cancelAnimationFrame(this.raf);
     this.raf = 0;
@@ -931,6 +935,11 @@ export class World {
     this.leaving.forEach((f) => f.brain.update(dt));
     const me = this.owner;
     me.brain.update(dt);
+    if (this.hailing && me.brain.doing !== 'hailYou') {
+      // (called away while she waited to be heard — the shop was opened, a picture is being taken: the app tries again)
+      this.hailing = null;
+      this.host.onHail('off');
+    }
     // (should she never get to the bowl, or never let the ball go: the foxes are not kept waiting for ever)
     if (this.serving && this.time - this.serving > 9) this.fillBowl();
     if (this.pitching && this.time - this.pitching > 4) this.throwBall();
@@ -1005,8 +1014,7 @@ export class World {
     const h = this.stage.clientHeight;
     const chat = this.gifting && !close && !edit ? me : null; // Lorelei has something to say: the view is on her
     const roam = !close && !edit && !chat && !!this.free;
-    const hiding = (f) => f.brain.stray && (f.brain.doing === 'takeCover' || f.brain.doing === 'sleep');
-    const away = !close && !edit && !roam && !chat && this.foxes.some(hiding) ? this.spread() : null;
+    const away = !close && !edit && !roam && !chat && this.foxes.some(HIDING) ? this.spread(this.hailing ? me : null) : null; // (…Lorelei too, while she waits to be heard)
     let fit = Infinity;
     if (away) {
       const x = b.cx + (away.x - b.cx) * 0.6;
@@ -1025,7 +1033,7 @@ export class World {
     // (…and while Lorelei talks, above the window her words are in)
     this.offset.y = damp(this.offset.y, chat ? Math.min(90, 0.11 * h) : this.inset.bottom / 2 - (close || edit ? 0 : tall * 0.09 * h), 7, dt);
     // (a fox that has left the yard for the country takes the view along, all the way)
-    const out = who ? clamp((Math.hypot((who.anim.pos.x - b.cx) / b.rx, (who.anim.pos.z - b.cz) / b.rz) - 0.9) / 0.45, 0, 1) : 0;
+    const out = this.outside(who);
     const follow = !who ? 0 : close || away ? 1 : edit ? 0 : clamp((this.state.reduce ? 0 : 0.3) + (this.yard - 1) * 0.6 + (this.zoomNow - 1) * 0.85 + out, 0, 1);
     const aimX = away ? away.x : who ? who.anim.pos.x : b.cx;
     const aimZ = away ? away.z : who ? who.anim.pos.z : b.cz;
@@ -1048,8 +1056,22 @@ export class World {
       this.camTarget.x = damp(this.camTarget.x, to.x, 22, dt);
       this.camTarget.z = damp(this.camTarget.z, to.z, 22, dt);
     } else {
-      this.camTarget.x = damp(this.camTarget.x, b.cx + (aimX - b.cx) * follow, 2.8, dt);
-      this.camTarget.z = damp(this.camTarget.z, b.cz + (aimZ - b.cz) * follow, 2.8, dt);
+      let toX = b.cx + (aimX - b.cx) * follow;
+      let toZ = b.cz + (aimZ - b.cz) * follow;
+      if (this.hailing && !close && !edit && !away) {
+        // Lorelei would like a word: the view leans her way, as far as it takes for her to be seen — between the card
+        // at the top and the buttons at the bottom (a fox that goes out into the country takes it along all the same)
+        const k = (this.ppu || this.basePpu) * this.zoomNow;
+        const deep = k * Math.sin(this.pitch);
+        const mid = h / 2 - this.offset.y; // (where the middle of the view is on the screen)
+        const side = Math.max(0.2, (this.stage.clientWidth / 2 - 70) / k);
+        const at = me.anim.pos;
+        const keep = this.hailing.now ? 1 : 1 - out;
+        toX += (clamp(toX, at.x - side, at.x + side) - toX) * keep;
+        toZ += (clamp(toZ, at.z - Math.max(0, 0.7 * h - mid) / deep, at.z + Math.max(0, mid - 0.38 * h) / deep) - toZ) * keep;
+      }
+      this.camTarget.x = damp(this.camTarget.x, toX, 2.8, dt);
+      this.camTarget.z = damp(this.camTarget.z, toZ, 2.8, dt);
     }
     this.camTarget.y = damp(this.camTarget.y, close ? 0.3 * S : chat ? 0.5 : 0.15, 4, dt);
     this.placeCamera();
@@ -1237,6 +1259,12 @@ export class World {
 
   // ---------------------------------------------------------------- looking about the country
 
+  /** How far out of the yard a fox is: 0 in it … 1 well out in the country (the view goes all the way along with it). */
+  outside(fox) {
+    const b = this.env.bounds;
+    return fox ? clamp((Math.hypot((fox.anim.pos.x - b.cx) / b.rx, (fox.anim.pos.z - b.cz) / b.rz) - 0.9) / 0.45, 0, 1) : 0;
+  }
+
   /** As far as the view may be slid: over the country the foxes roam. */
   keepLook(p) {
     const R = this.env.range;
@@ -1293,13 +1321,13 @@ export class World {
     this.wake();
   }
 
-  /** Where the family is, all of them: the middle of the ground they are spread over, and how wide and deep that is. */
-  spread() {
+  /** Where the family is, all of them (and `also`): the middle of the ground they are spread over, and how wide and deep that is. */
+  spread(also = null) {
     let x0 = Infinity;
     let x1 = -Infinity;
     let z0 = Infinity;
     let z1 = -Infinity;
-    for (const f of this.foxes) {
+    for (const f of also ? this.foxes.concat(also) : this.foxes) {
       x0 = Math.min(x0, f.anim.pos.x);
       x1 = Math.max(x1, f.anim.pos.x);
       z0 = Math.min(z0, f.anim.pos.z);
@@ -2406,11 +2434,42 @@ export class World {
     this.wake();
   }
 
+  // ---------------------------------------------------------------- Lorelei would like a word
+
+  /**
+   * Now and then she has something to say (js/chat.js): she comes to the front, waves and calls — `line`, in a bubble
+   * over her head — and waits there to be tapped, a speech mark over her head from time to time. The app begins the
+   * conversation then (present: 'call'); if nobody taps her she says `bye` and lets it be.
+   * → false if she cannot just now: asleep, busy with the foxes, a picture being taken… — or would not be seen: the
+   * view slid away over the country, gone along with a fox that is out in it, or close up on one.
+   * (`now`: he has asked to be shown — she leaves off what she is doing, and the view comes to her.)
+   */
+  hail(line, bye, now = false) {
+    const b = this.owner.brain;
+    if (this.gifting || this.hailing || this.photoOn || this.editOn || this.showcaseOn || this.state.mood === 'sleepy' || this.serving || this.pitching) return false;
+    if (now) this.lookBack();
+    else if (!b.idle || this.free || this.zoom > 1.6 || (this.outside(this.lead) > 0 && !this.foxes.some(HIDING))) return false; // (under cover out there, the view shows them all: her too)
+    this.hailing = { bye, now };
+    b.do('hailYou', line);
+    this.wake();
+    return true;
+  }
+
+  /** …she need not wait any longer (it was called off, or the foxes' world is being left). */
+  unhail() {
+    if (!this.hailing) return;
+    this.hailing = null;
+    const b = this.owner.brain;
+    if (b.doing === 'hailYou') b.script = null;
+  }
+
   // ---------------------------------------------------------------- Lorelei's present
 
   /**
-   * Lorelei has the word. The app tells it (her present: js/present.js — her first hello: js/meet.js), a step at a time:
-   *   'call'   she comes to the front of the yard and waves, `arg` in a bubble over her head; the view goes to her
+   * Lorelei has the word. The app tells it (her present: js/present.js — her first hello: js/meet.js — a chat she
+   * struck up: js/chat.js), a step at a time:
+   *   'call'   she comes to the front of the yard and waves, `arg` in a bubble over her head (none: she has called
+   *            already, see hail); the view goes to her
    *   'speak'  she is speaking (`arg`) — or has stopped
    *   'show'   the parcel is in her hands
    *   'give'   …she holds it out, and puts it down before her
@@ -2427,6 +2486,7 @@ export class World {
   present(step, arg) {
     if (step === 'call') {
       this.endPresent();
+      this.hailing = null; // (she was waiting to be heard: now she is)
       this.gifting = { step, t: 0, ready: false, speaking: false, shown: 0, down: false, at: V(), lid: 0, fox: null, hops: 0 };
       this.lookBack();
       this.owner.brain.do('presentIt', arg);

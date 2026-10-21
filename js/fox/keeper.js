@@ -17,6 +17,7 @@ import { wrapAngle } from './animator.js';
 const rand = (lo, hi) => lo + Math.random() * (hi - lo);
 // what she can be called away from by a fox that wants something of her
 const IDLE = new Set(['linger', 'amble', 'sitAwhile', 'stretchUp']);
+const HAIL_WAIT = 40; // seconds she waits to be tapped when she has something to say (hailYou)
 // which of her poses goes with each way the family can pose for a picture (js/pet.js: PHOTO_POSES)
 const PICTURE = { sit: 'peace', smile: 'cheer', lie: 'sit', bow: 'peace', proud: 'proud', mix: 'peace' };
 
@@ -50,8 +51,11 @@ export class Keeper extends Brain {
   }
 
   update(dt) {
-    // her umbrella goes up with the first drops, and down when it is over
-    this.a.umbrella = this.w.sky.rain > 0.2 && this.doing !== 'presentIt'; // (her hands are full)
+    // her umbrella goes up with the first drops, and down when it is over — or while her hands are full (world.present:
+    // the parcel, a fox she is showing)
+    const g = this.doing === 'presentIt' ? this.w.gifting : null;
+    const full = !!g && (g.step === 'show' || g.step === 'give' || g.step === 'open' || (g.step === 'meet' && g.t < 2.8));
+    this.a.umbrella = this.w.sky.rain > 0.2 && !full;
     super.update(dt);
   }
 
@@ -463,6 +467,74 @@ export class Keeper extends Brain {
   }
 
   /**
+   * She would like a word with whoever is looking on (world.hail): to the front of the yard, a wave and a call — and
+   * there she waits to be tapped, a speech mark over her head now and then. If nobody does, never mind: another time.
+   */
+  *hailYou(line) {
+    const a = this.a;
+    const w = this.w;
+    const h = w.hailing;
+    if (!h) return;
+    this.close = true;
+    const front = w.env.spots.front;
+    const at = w.clearOf(this.clampPoint(front.x + 0.12, front.z - 0.55, 0.92), 0.3);
+    if (Math.hypot(at.x - a.pos.x, at.z - a.pos.z) > 0.35) yield* this.goTo(at.x, at.z, { speed: 'trot', stop: 0.1, timeout: 6 });
+    if (w.hailing !== h) return;
+    yield* this.turnTo(this.toCamera(), 8);
+    this.lookAtYou(1);
+    a.setPose('wave', 8);
+    a.mood.smile = 1;
+    if (line) {
+      a.mood.mouth = 0.7;
+      this.say(line, 3200);
+    }
+    w.host.onHail('call');
+    for (let t = 0; t < 1.5 && w.hailing === h; ) {
+      t += yield;
+      a.add.eR = Math.sin(t * 11) * 0.36;
+      if (t > 0.9) a.mood.mouth = 0;
+    }
+    a.still();
+    a.mood.mouth = 0;
+    a.setPose('stand', 5);
+    const mark = V();
+    for (let t = 0, next = 0.5, again = 11; t < HAIL_WAIT && w.hailing === h; ) {
+      const dt = yield;
+      t += dt;
+      // she keeps facing whoever she is waiting for
+      const off = wrapAngle(this.toCamera() - a.yaw);
+      if (Math.abs(off) > 0.45) a.yaw += clamp(off, -2 * dt, 2 * dt);
+      a.mood.smile = 1;
+      if (t > again) {
+        // (…and waves again now and then, in case she was not seen)
+        a.setPose('wave', 8);
+        a.add.eR = Math.sin(t * 11) * 0.3;
+        if (t > again + 1.2) {
+          a.still();
+          a.setPose('stand', 5);
+          again += 12;
+        }
+      }
+      if (t < next) continue;
+      next = t + 2.6;
+      a.headPoint(mark).y += 0.1 * this.tall;
+      w.fx.emit('💬', mark, { n: 1, spread: 0.02, rise: 0.22, life: 1.9, size: 0.24 * this.tall, drift: 0.02 });
+    }
+    if (w.hailing !== h) return; // (she was tapped — the conversation begins — or it was called off)
+    w.hailing = null;
+    w.host.onHail('gone');
+    if (h.bye) this.say(h.bye, 2400);
+    a.setPose('wave', 8);
+    for (let t = 0; t < 1.1; ) {
+      t += yield;
+      a.add.eR = Math.sin(t * 11) * 0.3;
+    }
+    a.still();
+    a.setPose('stand', 5);
+    yield* this.wait(0.6);
+  }
+
+  /**
    * She has a present for whoever is looking on (world.present — the app tells the story, a step at a time). To the
    * front of the yard, a wave and a call; she says what she has to say; at its turn the parcel is in her hands, then
    * held out and put down before her, where it opens. She stays by it until the story is over.
@@ -481,20 +553,21 @@ export class Keeper extends Brain {
     if (w.gifting !== g) return;
     yield* this.turnTo(this.toCamera(), 8);
     this.lookAtYou(1);
-    a.setPose('wave', 8);
     a.mood.smile = 1;
     if (line) {
+      // (without one she has called already — hailYou — and was tapped: no second wave)
+      a.setPose('wave', 8);
       a.mood.mouth = 0.7;
       this.say(line, 2600);
+      for (let t = 0; t < 1.25 && w.gifting === g; ) {
+        t += yield;
+        a.add.eR = Math.sin(t * 11) * 0.36;
+        if (t > 0.8) a.mood.mouth = 0;
+      }
+      a.still();
+      a.mood.mouth = 0;
+      a.setPose('stand', 5);
     }
-    for (let t = 0; t < 1.25 && w.gifting === g; ) {
-      t += yield;
-      a.add.eR = Math.sin(t * 11) * 0.36;
-      if (t > 0.8) a.mood.mouth = 0;
-    }
-    a.still();
-    a.mood.mouth = 0;
-    a.setPose('stand', 5);
     g.ready = true;
     w.host.onPresent('ready');
 

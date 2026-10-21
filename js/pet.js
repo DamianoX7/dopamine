@@ -398,6 +398,7 @@ const FoxHost = {
   onLetter: (id) => Pet.takeLetter(id), // she tapped the fox that has it
   onGift: () => Pet.takeGift(), //         …or the one that is back from an expedition with a gift
   onPresent: (what) => OwnerSays.heard(what), // Lorelei has come forward with what she has to say (js/present.js)
+  onHail: (what) => Chat.heard(what), //         …or calls to be heard, and has waited in vain (js/chat.js)
   moodLine: () => Pet.moodLine(),
   line: (kind) => Pet.line(kind),
   onDecor: (id, at) => Pet.placed(id, at), //   she has moved or turned a thing in the yard: that is its place from now on
@@ -468,6 +469,7 @@ const Pet = {
   owner() {
     this.learned();
     if (Present.waiting() && !Present.playing) return void Present.begin(); // she has something for her: that first
+    if (Chat.calling) return void Chat.begin(); // …or something to say: she is heard out (js/chat.js)
     if (Halloween.waiting() && !Halloween.playing) return void Halloween.begin(); // …or it is Halloween: trick or treat
     const sky = Weather.now(FoxHost.scene()).kind;
     const trip = this.trip();
@@ -1631,6 +1633,7 @@ const FoxRoom = {
           <button class="fox-mail is-trip" data-action="fox-trip" data-fox-trip hidden></button>
           <button class="fox-mail" data-action="fox-letter" data-fox-mail hidden></button>
           <button class="fox-mail is-present" data-action="fox-present" data-fox-present hidden></button>
+          <button class="fox-mail is-chat" data-action="fox-chat" data-fox-chat hidden></button>
           ${p.taught ? '' : '<p class="fox-tip" data-fox-tip>👆 바닥을 누르면 달려와요 · 여우를 쓰다듬어 보세요</p>'}
           <button class="fox-back" data-action="fox-back" data-fox-back hidden><span aria-hidden="true">🦊</span> 여우에게 돌아가기</button>
         </div>
@@ -1731,15 +1734,18 @@ const FoxRoom = {
     setTimeout(() => splash.remove(), 520);
     if (!ok) FoxHost.say(Pet.line('greet'), 3000);
     if (!Pet.portrait()) Pet.drawPortrait();
+    let met = false;
     if (Meet.due()) {
       // her first time here: Lorelei says hello and shows her round (js/meet.js)
       await sleep(700);
       if (this.ov !== ov) return;
-      if (UI.top() === ov) await Meet.begin();
+      if (UI.top() === ov) met = await Meet.begin();
       if (this.ov !== ov) return;
     }
     Present.arrive(); // (if Lorelei has something for her, she calls before long)
     Halloween.arrive(); // (…or, on Halloween, to play trick or treat)
+    Chat.arrive({ quiet: met }); // …and now and then she has something to say (js/chat.js)
+    if (early) return; // (he is looking at how something will be: what follows is for her own visits)
     await sleep(900);
     if (this.ov !== ov || UI.top() !== ov) return;
     // the country round the yard is new: say once how to look about in it
@@ -1786,6 +1792,7 @@ const FoxRoom = {
     clearInterval(this.skyTimer);
     clearTimeout(this.skyDue);
     Present.left();
+    Chat.left();
     Halloween.left();
     FoxHost.unmount();
     this.leaveFullscreen();
@@ -2000,6 +2007,14 @@ const FoxRoom = {
     const root = $('[data-fox-room]', this.ov.panel);
     if (what) root.dataset.point = what;
     else delete root.dataset.point;
+  },
+
+  /* "Lorelei would like a word": there while she waits to be tapped (js/chat.js) — a tap on it does as well. */
+  chatChip() {
+    if (!this.ov) return;
+    const el = $('[data-fox-chat]', this.ov.panel);
+    el.hidden = !Chat.calling;
+    if (Chat.calling) el.innerHTML = `<span aria-hidden="true">💬</span><b>${esc(josa(OWNER_NAME, '이/가'))} 할 말이 있대요</b><small>눌러서 듣기</small>`;
   },
 
   /* "Lorelei has something for you" (or, on Halloween, a game to play): there for as long as she has — a tap, and she gives it. */

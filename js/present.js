@@ -44,7 +44,8 @@ const PRESENT_LINES = {
 /*
    Lorelei has the floor. In the foxes' world the buttons make way; she comes to the front and calls — a bubble over
    her head, as ever — and what she has to say comes in the window along the bottom (js/talk.js). It is how she gives
-   her present (below) and how she says her first hello (js/meet.js).
+   her present (below), how she says her first hello (js/meet.js), and how she has her say when she has struck up a
+   conversation (js/chat.js: there she has called already, and is not made to call again).
 */
 const OwnerSays = {
   on: false, //    she has the floor right now
@@ -57,7 +58,7 @@ const OwnerSays = {
     return !!this.ov && FoxRoom.ov === this.ov;
   },
 
-  /* She steps forward and calls `line`. → false if the foxes' world was left meanwhile. */
+  /* She steps forward and calls `line` (none: she has called already). → false if the foxes' world was left meanwhile. */
   async enter(line) {
     this.ov = FoxRoom.ov;
     this.on = true;
@@ -287,7 +288,7 @@ const Present = {
   arrive() {
     FoxRoom.presentChip();
     clearTimeout(this.timer);
-    if (!this.waiting() || this.rehearsing || Halloween.rehearsing) return; // (he is looking at how it will be: the real one keeps)
+    if (!this.waiting() || this.rehearsing || Meet.rehearsing || Chat.rehearsing || Halloween.rehearsing) return; // (he is looking at how something will be: the real one keeps)
     const ov = FoxRoom.ov;
     const tryIt = () => {
       if (FoxRoom.ov !== ov || !this.waiting()) return;

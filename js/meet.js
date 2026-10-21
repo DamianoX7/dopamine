@@ -49,7 +49,7 @@ const Meet = {
 
   /* Is it still to be told? */
   due() {
-    return State.onboarded && !State.pet.introduced && !this.playing && !this.rehearsing && !Present.rehearsing && !Halloween.rehearsing;
+    return State.onboarded && !State.pet.introduced && !this.playing && !this.rehearsing && !Present.rehearsing && !Chat.rehearsing && !Halloween.rehearsing;
   },
 
   lines(key) {

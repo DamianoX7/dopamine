@@ -250,6 +250,31 @@ body.reduce-motion .fox-room.talk-on[data-point] .fox-cam {
     animation: none;
   }
 }
+/* "Lorelei would like a word" (js/chat.js): the chip over the view while she waits to be tapped */
+.fox-mail.is-chat {
+  background: #fffbe8;
+  color: #776650;
+  animation: chatNudge 2.6s ease-in-out infinite;
+}
+.fox-mail.is-chat small {
+  color: #a08f73;
+}
+@keyframes chatNudge {
+  8% {
+    transform: translateY(-4px);
+  }
+  16% {
+    transform: none;
+  }
+}
+body.reduce-motion .fox-mail.is-chat {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fox-mail.is-chat {
+    animation: none;
+  }
+}
 /* "Lorelei has something for you": the chip over the view */
 .fox-mail.is-present {
   background: linear-gradient(135deg, #ff7aa8, #ffb21d);

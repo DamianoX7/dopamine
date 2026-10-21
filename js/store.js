@@ -94,6 +94,9 @@ function defaultState() {
       toured: false, //      …and been told that the view slides over the country round the yard?
       metOwner: false, //    …and that the foxes have an owner now, who lives in the yard with them?
       introduced: false, //  …and has that owner said her first hello, and shown her round? (js/meet.js)
+      // the chats she strikes up now and then (js/chat.js): when the last one was, how many on which day, what about,
+      // the day she last gave something — and when the foxes' world was last visited
+      chat: { at: 0, day: '', today: 0, last: [], gift: '', seen: 0 },
     },
     mallang: { mode: 'soft', soft: 'fox', wax: 'cotton' }, // 말랑 놀이터: the toy she had out last (js/mallang.js)
     halloween: { year: 0 }, // the last Halloween she played trick or treat with Lorelei (js/halloween.js)

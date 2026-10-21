@@ -687,6 +687,12 @@ Views.me = {
         <button class="btn soft" data-action="meet-rehearse">👀 미리 보기</button>
       </div>
       <div class="card">
+        <h2 class="card-title">💬 ${esc(OWNER_NAME)}의 수다</h2>
+        <p class="hint">${Chat.note()}</p>
+        <p class="hint">미리 보기는 볼 때마다 다른 이야기를 보여 주고, 아무것도 저장되지 않아요. 직접 넣고 싶은 이야기는 <code>js/config.js</code>의 <code>ownerChats</code>에 적으면 돼요.</p>
+        <button class="btn soft" data-action="chat-rehearse">👀 미리 보기</button>
+      </div>
+      <div class="card">
         <h2 class="card-title">🎁 100일 선물</h2>
         <p class="hint">${Present.note()}</p>
         <p class="hint">미리 보기는 여우 세상에서 처음부터 끝까지 그대로 보여 주지만, 아무것도 저장되지 않아요. 로렐라이가 하는 말은 <code>js/config.js</code>의 <code>presentLines</code>로 바꿀 수 있어요.</p>

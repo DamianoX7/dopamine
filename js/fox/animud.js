@@ -499,7 +499,7 @@ export const ANIMUD = {
         const at = (k) => PLUME[clamp(k, 0, PLUME.length - 1)];
         return [1, 2, 3, 4].map((c) => clamp(catmull(at(i - 1)[c], at(i)[c], at(i + 1)[c], at(i + 2)[c], t), Math.min(at(i)[c], at(i + 1)[c]), Math.max(at(i)[c], at(i + 1)[c])));
       };
-      const sweep = (d) => 0.045 * smooth(0.48, PLUME_TIP[0], d) ** 2; // (its end turns a little to the fox's left)
+      const sweep = (d) => 0.075 * smooth(0.4, PLUME_TIP[0], d) ** 2; // (its end curls away to the fox's left: from behind, a lobe low on that side)
       const middle = (d, y) => V(sweep(d), y, root.z - d);
       // (round a tail, which points backwards, s = 1 is underneath)
       const tone = (d, y, s) => {
