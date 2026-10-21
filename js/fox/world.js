@@ -14,6 +14,8 @@
 // And the foxes have somebody: Lorelei lives in the yard with them (lorelei.js, keeper.js) — she
 // strokes them, it is she who fills the bowl and throws the ball, and she is in their picture.
 // On a day of theirs she has a present: a parcel she puts down before her, and a fox comes out of it.
+// And on Halloween the yard dresses up: jack-o'-lanterns round it, bats over the woods, the foxes in costume, Lorelei
+// in a witch's hat — and on the evening of it, the light of a late autumn sunset.
 import * as THREE from '../vendor/three.module.min.js';
 import { buildFox, FUR_SUN } from './rig.js';
 import { FoxAnimator } from './animator.js';
@@ -22,7 +24,7 @@ import { buildLorelei, LoreleiAnimator } from './lorelei.js';
 import { Keeper } from './keeper.js';
 import { buildHabitat } from './scenes.js';
 import { speciesOf } from './species.js';
-import { makeBowl, makeBall, makeBed, makeMic, makeMailbox, makeLetter, makeGift, makeAccessory, makeRadio, makePresent } from './props.js';
+import { makeBowl, makeBall, makeBed, makeMic, makeMailbox, makeLetter, makeGift, makeAccessory, makeRadio, makePresent, makeOwnerHat, makeLantern } from './props.js';
 import { makeDecor } from './decor.js';
 import { Sky } from './sky.js';
 import { beatAt, curveAt, pickMove } from './dance.js';
@@ -40,6 +42,9 @@ const SHADE = 10; //                      how far round where she is looking thi
 const NEAR = 0.18; //                     how near the middle of a fox comes to what stands out in the country, on its way round it
 const ZOOM_MAX = 2.4;
 const PRINTS = 160;
+// Halloween: where the jack-o'-lanterns stand, round the edge of the yard (0 = the front, towards you; π = the back)
+const LANTERNS = [2.5, -2.45, 1.5, -1.42, 0.66];
+const LANTERN_R = 0.085;
 // where the family stands when the world is first shown (offsets from the middle of the yard, and which way they face)
 const HOMES = [[-0.5, -0.2, 0.6], [0.5, 0.05, -0.5], [-0.05, -0.6, 0.2], [0.95, -0.4, -0.9], [-1.0, 0.15, 0.9], [0.1, 0.4, 0]];
 // A fox can always walk between any two things in the yard: they stand a fox's width apart
@@ -221,6 +226,13 @@ export class World {
     scene.add(this.parcel.object);
     this.gifting = null;
     this.spawn = null;
+    // Halloween (see setHalloween): { dusk } while it is on; the jack-o'-lanterns round the yard, { object, update, bx, bz }
+    // (where they stand, in the measure of a lone fox's yard); how much they glow; when the next bats fly over
+    this.spooky = null;
+    this.lanterns = [];
+    this.lanternsIn = null;
+    this.glow = 0;
+    this.batsIn = 3;
 
     // where you tapped
     this.marker = new THREE.Mesh(new THREE.RingGeometry(0.1, 0.135, 40), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0, depthWrite: false }));
@@ -301,6 +313,10 @@ export class World {
     me.brain = new Keeper(this, me);
     anim.onStep = (p) => this.footfall(p, me);
     this.scene.add(rig.group);
+    // her witch's hat, for Halloween (props.js)
+    const hat = (me.hat = makeOwnerHat(rig));
+    hat.visible = false;
+    rig.bones.head.add(hat);
   }
 
   /** A tiny lit room to reflect in the shiny things (eyes, crown, sunglasses, the bowl). */
@@ -546,11 +562,12 @@ export class World {
   /**
    * Bring the world in line with the game: `next` = { foxes: [{ id, worn, grown, guest }], away:
    * [{ id, grown }], gift, lead, focus, things, decor: [{ id, x, z, r, trial }], held, tune:
-   * { id, on }, mail, scene, season, sky: { kind, level, wet }, night, mood, reduce } — who is in
+   * { id, on }, mail, scene, season, sky: { kind, level, wet }, night, mood, reduce, halloween } — who is in
    * the yard wearing what (and how far a kit has grown), who is out exploring, which fox has
    * come back with a parcel, which one she is with, what stands in the yard and where (and
    * which of it she is moving), which cover is playing, whether a letter is waiting, where, at
-   * what time of year and in what weather, day or night, in what mood.
+   * what time of year and in what weather, day or night, in what mood — and whether it is Halloween
+   * (halloween: { dusk } or null).
    */
   apply(next) {
     const s = this.state;
@@ -581,13 +598,14 @@ export class World {
       this.fitView();
     }
     this.setTune(next.tune);
+    const dusk = this.setHalloween(next.halloween || null);
     // a fox that is back from an expedition has a parcel for her
     const bringer = this.byId(next.gift);
     const had = this.gift && this.gift.fox;
     this.setGift(bringer);
     if (bringer && bringer !== had) this.homecoming(bringer);
     this.foxes.forEach((f) => (f.fresh = false));
-    if (nightChanged) this.setLight();
+    if (nightChanged || dusk) this.setLight();
     // the weather: as it is, at once, while nobody is looking (or in another place) — else it turns before her eyes
     const turned = this.sky.set(next.sky, !this.stage || sceneChanged);
     if (turned && this.stage && !sceneChanged) this.weatherTurned();
@@ -608,6 +626,7 @@ export class World {
     this.clearPrints();
     this.grace();
     same = same && !!this.env;
+    this.clearLanterns(false); // (they are placed afresh in the new place: see setHalloween)
     const env = (this.env = buildHabitat(id, season));
     // as it was built, for one fox; scaleYard() makes room for more
     env.base = {
@@ -681,6 +700,7 @@ export class World {
     }
     // the radio stands at the front, where the foxes come to meet her
     this.things.radio.object.position.set(env.spots.front.x, 0, env.spots.front.z + 0.12);
+    for (const l of this.lanterns) l.object.position.set(l.bx * k, 0, l.bz * k);
     this.placeDecor();
   }
 
@@ -878,6 +898,16 @@ export class World {
     const L = this.night ? { ...env.day, ...env.night } : env.day;
     // (the light as the habitat has it; the sky dims and tints it for the weather, every frame)
     this.lit = { sunI: L.sunI, hemi: L.hemi, sun: new THREE.Color(L.sun), sky: new THREE.Color(L.sky), ground: new THREE.Color(L.ground), bg: new THREE.Color(L.bg) };
+    if (this.spooky && this.spooky.dusk && !this.night) {
+      // Halloween evening: the sun low and red, the sky gone violet, the ground in shadow — and the lanterns lit
+      const lit = this.lit;
+      lit.sunI *= 0.62;
+      lit.hemi *= 0.66;
+      lit.sun.lerp(_c.set('#ff8a4a'), 0.6);
+      lit.sky.lerp(_c.set('#9d80dc'), 0.55);
+      lit.ground.lerp(_c.set('#3d2c4c'), 0.45);
+      lit.bg.lerp(_c.set('#4d3b62'), 0.5);
+    }
     this.sunOff.set(L.pos[0], L.pos[1], L.pos[2]).multiplyScalar(2.3);
     this.placeSun();
     this.sky.light();
@@ -915,6 +945,7 @@ export class World {
     lit.uLight.value.lerp(_c.setScalar(Math.max(grey, 0.62)), 0.45); // (by night not as blue as the night is, nor as dark: she is still herself)
     lit.uSun.value = Math.min(1, (this.sun.intensity * (this.sun.color.r + this.sun.color.g + this.sun.color.b)) / 3 / 0.3); // (how much of a sun there is: under heavy cloud or the moon, less of a light side to her)
     me.anim.update(dt);
+    if (this.spooky) me.hat.scale.y = 1 - 0.32 * me.anim.umb; // (under her umbrella, her hat's soft point gives)
     // (one that has run off through the bushes is out of the picture — or, should it never get there, after a while)
     if (this.leaving.some((f) => f.gone || this.time > f.leftAt + 25)) {
       this.leaving.filter((f) => f.gone || this.time > f.leftAt + 25).forEach((f) => this.forget(f));
@@ -924,6 +955,7 @@ export class World {
     this.updateBall(dt);
     this.updateMail(dt);
     this.updatePresent(dt);
+    this.updateHalloween(dt);
     this.fx.update(dt);
     this.updatePrints(dt);
 
@@ -2385,12 +2417,17 @@ export class World {
    *   'open'   it opens: the fox `arg` was in it (it comes out with the app's next sync)
    *   'meet'   "…and this is the one": the fox `arg` steps up beside her
    *   'wave'   a wave, to end with
+   * …and on Halloween (js/halloween.js), trick or treat:
+   *   'costume'  "look at them": a hand towards the foxes, who hop in their costumes
+   *   'hat'      "…and me": her witch's hat
+   *   'treat'    she has been given sweets: she shares them out, and the foxes jump for them
+   *   'trick'    …or the trick: the foxes spring up round her, and ghosts and bats with them
    *   'end'    that was it
    */
   present(step, arg) {
     if (step === 'call') {
       this.endPresent();
-      this.gifting = { step, t: 0, ready: false, speaking: false, shown: 0, down: false, at: V(), lid: 0, fox: null };
+      this.gifting = { step, t: 0, ready: false, speaking: false, shown: 0, down: false, at: V(), lid: 0, fox: null, hops: 0 };
       this.lookBack();
       this.owner.brain.do('presentIt', arg);
       // (whoever is awake comes to look on, from either side of her)
@@ -2409,6 +2446,20 @@ export class World {
         this.spawn = { id: arg, x: g.at.x, z: g.at.z, yaw: Math.atan2(cam.x - g.at.x, cam.z - g.at.z) };
         this.fx.emit('✨', V(g.at.x, 0.24, g.at.z), { n: 12, spread: 0.24, rise: 0.75, life: 1.2, size: 0.14 });
         this.fx.emit('💗', V(g.at.x, 0.3, g.at.z), { n: 5, spread: 0.2, rise: 0.6, life: 1.4, size: 0.13 });
+      } else if (step === 'costume' || step === 'treat' || step === 'trick') {
+        // the foxes that are looking on hop where they sit (brain.js: lookOn) — under a shower of sweets, or of ghosts
+        g.hops++;
+        const me = this.owner.anim;
+        const watching = this.foxes.filter((f) => f.brain.doing === 'lookOn');
+        if (step === 'treat') this.fx.emit('🍬', me.headPoint(V()), { n: 5, spread: 0.25, rise: 0.7, life: 1.4, size: 0.13, drift: 0.4 });
+        watching.forEach((f, i) => {
+          const top = f.anim.headPoint(V());
+          if (step === 'costume') this.fx.emit('✨', top, { n: 4, spread: 0.2, rise: 0.5, life: 1, size: 0.11 });
+          else if (step === 'treat') this.fx.emit(['🍭', '🍬', '🍫'][i % 3], top, { n: 2, spread: 0.12, rise: 0.45, life: 1.2, size: 0.12 });
+          else this.fx.emit(i % 2 ? '🦇' : '👻', top, { n: 2, spread: 0.25, rise: 0.6, life: 1.5, size: 0.15, drift: 0.3 });
+        });
+      } else if (step === 'hat') {
+        this.fx.emit('✨', this.owner.anim.headPoint(V()).add(V(0, 0.18, 0)), { n: 7, spread: 0.2, rise: 0.4, life: 1.1, size: 0.12 });
       } else if (step === 'meet') {
         // (one that is asleep is spoken of where it lies)
         const fox = this.byId(arg) || this.lead;
@@ -2458,6 +2509,94 @@ export class World {
       object.scale.setScalar(1 - gone * gone);
       if (gone >= 1) object.visible = false;
     }
+  }
+
+  // ---------------------------------------------------------------- Halloween
+
+  /**
+   * Halloween, as the app says (js/halloween.js): `h` = { dusk } while it is on, else null. Lorelei puts her witch's hat
+   * on, jack-o'-lanterns stand round the yard, bats fly over the woods; `dusk` is the evening of it, with the light of a
+   * sunset (setLight). (The foxes' costumes come with what they wear: props.js, witch and pumpkin.)
+   * → true if the light has to change.
+   */
+  setHalloween(h) {
+    const was = this.spooky;
+    this.spooky = h ? { dusk: !!h.dusk } : null;
+    this.owner.hat.visible = !!h;
+    if (!h) this.clearLanterns();
+    else if (this.lanternsIn !== this.env) this.placeLanterns();
+    return !!was !== !!h || (!!was && !!h && was.dusk !== !!h.dusk);
+  }
+
+  /**
+   * The jack-o'-lanterns: round the edge of the yard, each where nothing else stands and a fox can get round it — and
+   * from then on part of the scenery, which the foxes step round and she cannot put anything on. They look out
+   * towards you, a little in towards the yard.
+   */
+  placeLanterns() {
+    this.clearLanterns(false);
+    const env = this.env;
+    if (!env) return;
+    this.lanternsIn = env;
+    const b = env.bounds;
+    const k = this.yard;
+    const R = LANTERN_R * 1.2;
+    const taken = this.keepOut().concat(this.decorSolids.map((o) => ({ x: o.x, z: o.z, r: o.r, gap: GAP })));
+    const free = (x, z) => !taken.some((o) => Math.hypot(x - o.x, z - o.z) < o.r + R + Math.max(0.1, o.gap * 0.5));
+    for (const a0 of LANTERNS) {
+      // (where it is meant to stand, or the nearest place along the edge to it that is free)
+      for (let n = 0; n < 11; n++) {
+        const a = a0 + (n % 2 ? 1 : -1) * Math.ceil(n / 2) * 0.08;
+        const x = b.cx + Math.sin(a) * b.rx * 0.94;
+        const z = b.cz + Math.cos(a) * b.rz * 0.94;
+        if (!free(x, z)) continue;
+        const it = makeLantern(LANTERN_R);
+        it.bx = x / k;
+        it.bz = z / k;
+        it.object.position.set(x, 0, z);
+        it.object.rotation.y = Math.atan2(b.cx - x, b.cz + 4 * b.rz - z);
+        this.scene.add(it.object);
+        this.lanterns.push(it);
+        taken.push({ x, z, r: R, gap: GAP });
+        env.base.obstacles.push({ x: it.bx, z: it.bz, r: R / k, lantern: true });
+        env.base.wilds.push({ x: it.bx, z: it.bz, r: R / k, lantern: true });
+        break;
+      }
+    }
+    this.scaleYard();
+  }
+
+  /** …and away with them (`rescale`: the yard is set out again without them). */
+  clearLanterns(rescale = true) {
+    this.lanternsIn = null;
+    if (!this.lanterns.length) return;
+    this.lanterns.forEach((it) => {
+      this.scene.remove(it.object);
+      disposeTree(it.object);
+    });
+    this.lanterns = [];
+    const B = this.env && this.env.base;
+    if (!B) return;
+    B.obstacles = B.obstacles.filter((o) => !o.lantern);
+    B.wilds = B.wilds.filter((o) => !o.lantern);
+    if (rescale) this.scaleYard();
+  }
+
+  /** Every frame: the lanterns flicker (and glow, as it gets dark), and now and then bats flit up out of the woods. */
+  updateHalloween(dt) {
+    const h = this.spooky;
+    if (!h) return;
+    this.glow = damp(this.glow, this.night ? 1 : h.dusk ? 0.8 : 0, 2, dt);
+    for (const it of this.lanterns) it.update(this.time, this.glow);
+    this.batsIn -= dt;
+    if (this.batsIn > 0 || !this.stage) return;
+    const calm = this.state.reduce;
+    this.batsIn = (calm ? 9 : 3) + Math.random() * (calm ? 8 : 4);
+    const b = this.env.bounds;
+    const x = this.camTarget.x + (Math.random() - 0.5) * 1.6 * b.rx;
+    const at = V(x, 0.5, b.cz - b.rz * (0.8 + 0.3 * Math.random()));
+    const ghost = (h.dusk || this.night) && Math.random() < 0.3;
+    this.fx.emit(ghost ? '👻' : '🦇', at, { n: ghost ? 1 : 1 + Math.floor(Math.random() * 3), spread: 0.3, rise: 0.32, life: 3.2, size: ghost ? 0.2 : 0.16, drift: 0.35 });
   }
 
   // ---------------------------------------------------------------- his letters

@@ -16,6 +16,7 @@ const YEARLY_DAYS = [
   { date: '03-14', name: '화이트데이', emoji: '🍬' },
   { date: '05-14', name: '로즈데이', emoji: '🌹' },
   { date: '06-14', name: '키스데이', emoji: '💋' },
+  { date: '10-31', name: '핼러윈', emoji: '🎃' },
   { date: '11-11', name: '빼빼로데이', emoji: '🥢' },
   { date: '12-24', name: '크리스마스이브', emoji: '🎄' },
   { date: '12-25', name: '크리스마스', emoji: '🎅' },

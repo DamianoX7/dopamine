@@ -2,10 +2,12 @@
 // the accessories it wears. Ids match the shop in js/pet.js. (What she buys for the yard is in
 // decor.js.)
 import * as THREE from '../vendor/three.module.min.js';
-import { Batch, V, TAU } from './kit.js';
+import { Batch, V, TAU, softDotTexture, paintTexture } from './kit.js';
 
 const Z = new THREE.Vector3(0, 0, 1);
 const _c = new THREE.Color();
+const _c2 = new THREE.Color();
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.5, ...o });
 const shadowed = (mesh) => {
   mesh.castShadow = true;
@@ -384,6 +386,244 @@ function scarf(rig) {
   return g;
 }
 
+// ------------------------------------------------------------------ Halloween
+
+/**
+ * A pointed witch's hat, its brim `R` across from the middle, the foot of its cone `head` across (what it fits over)
+ * and `tall` high: a dark violet cone that bends back at its tip, an orange band round its foot with a gold buckle.
+ * Its foot is at the origin, the buckle to +Z. (Lorelei's on Halloween — and the foxes' in miniature.)
+ */
+export function makeWitchHat(R = 0.2, head = 0.44 * R, tall = 1.45 * R) {
+  const k = R / 0.2;
+  const T = tall / 0.29; // (how far its tip bends goes with how tall it is)
+  const b = new Batch();
+  const brim = [[0.07, 0.004], [0.15, -0.004], [0.192, 0.004], [0.2, 0.018], [0.196, 0.022], [0.184, 0.012], [0.15, 0.006], [0.07, 0.012]];
+  b.add(new THREE.LatheGeometry(brim.map(([x, y]) => new THREE.Vector2(x * k, y * k)), 40), { color: (p) => _c.set('#33204a').lerp(_c2.set('#4a2f69'), clamp01(Math.hypot(p.x, p.z) / (0.2 * k))) });
+  // the cone: up from the brim, and over towards the back as it narrows (the higher, the further)
+  const rows = 14;
+  const cone = [];
+  for (let i = 0; i <= rows; i++) {
+    const t = i / rows;
+    cone.push(new THREE.Vector2(head * Math.pow(1 - t, 1.15) + 0.0015 * k, tall * t));
+  }
+  const spire = new THREE.LatheGeometry(cone, 28);
+  const pos = spire.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const t = pos.getY(i) / tall;
+    const bend = Math.pow(Math.max(0, t - 0.35) / 0.65, 2);
+    pos.setZ(i, pos.getZ(i) - 0.12 * T * bend);
+    pos.setY(i, pos.getY(i) - 0.05 * T * bend);
+  }
+  spire.computeVertexNormals();
+  b.add(spire, { color: ['#3a2553', '#5b3a80'] });
+  b.add(new THREE.CylinderGeometry(head * 0.9, head * 1.035, 0.034 * k, 28, 1, true), { at: [0, 0.017 * k, 0], color: '#ff8a2a' }); // the band, round the cone
+  b.add(new THREE.BoxGeometry(0.044 * k, 0.034 * k, 0.008 * k), { at: [0, 0.017 * k, head * 1.04], color: '#ffd24a' }); //       …its buckle
+  b.add(new THREE.BoxGeometry(0.026 * k, 0.018 * k, 0.009 * k), { at: [0, 0.017 * k, head * 1.05], color: '#3a2553' });
+  const mesh = b.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, side: THREE.DoubleSide }));
+  const g = new THREE.Group();
+  g.add(mesh);
+  return g;
+}
+
+/**
+ * Lorelei's witch's hat (in her head bone's space), tipped a little to her right, away from the tie of her tail. Her
+ * hair stands up from her head in a dome, its fringe forward: the cone is wide enough at its foot to go over all of it,
+ * and the brim stays clear of the tie below. (Measured off her model: nothing of the hair within 6 mm of the hat.)
+ */
+export function makeOwnerHat(rig) {
+  const hat = makeWitchHat(0.18, 0.11);
+  hat.position.copy(rig.dims.crown).add(V(-0.012, -0.0225, 0.004));
+  hat.rotation.set(-0.08, 0, 0.14);
+  hat.traverse((o) => (o.castShadow = true));
+  return hat;
+}
+
+/** 1 on a rib of a pumpkin, 0 in the groove between two (one rib looks straight ahead, to +Z). */
+const ribCrest = (x, z, ribs = 8) => Math.pow(Math.abs(Math.cos(((Math.atan2(z, x) - Math.PI / 2) * ribs) / 2)), 0.6);
+
+// A jack-o'-lantern's face — two eyes, a nose and a grin with two teeth — as it looks from in front of a pumpkin one
+// unit round (x to the right, y up; it is painted round the ball, see faceTextures).
+const FACE = [
+  [[-0.46, 0.08], [-0.12, 0.08], [-0.28, 0.4]],
+  [[0.12, 0.08], [0.46, 0.08], [0.28, 0.4]],
+  [[-0.08, -0.06], [0.08, -0.06], [0, 0.06]],
+  [[-0.6, -0.12], [-0.3, -0.2], [-0.21, -0.34], [-0.13, -0.2], [0.13, -0.2], [0.21, -0.34], [0.3, -0.2], [0.6, -0.12], [0.46, -0.38], [0.17, -0.54], [-0.17, -0.54], [-0.46, -0.38]],
+];
+const faces = {};
+
+/**
+ * The face, painted where it falls on a sphere's own texture (three.js: u once round from behind, v from the bottom up):
+ * `map` — the colour of the pumpkin, with the face cut out of it dark — and `glow`, where the light inside shows.
+ */
+function faceTextures(kind) {
+  if (faces[kind]) return faces[kind];
+  const draw = (cut, rest) =>
+    paintTexture(512, (g, s) => {
+      g.fillStyle = rest;
+      g.fillRect(0, 0, s, s);
+      g.fillStyle = cut;
+      for (const pts of FACE) {
+        g.beginPath();
+        pts.forEach(([x, y], i) => {
+          const u = 0.25 + Math.asin(clamp01(Math.abs(x) / Math.sqrt(1 - y * y))) * Math.sign(x) / TAU; // (straight ahead, +Z, is a quarter of the way round)
+          const v = Math.acos(y) / Math.PI;
+          g[i ? 'lineTo' : 'moveTo'](u * s, v * s);
+        });
+        g.closePath();
+        g.fill();
+      }
+    });
+  const lit = kind === 'lit';
+  const out = { map: draw(lit ? '#ffcf6a' : '#3a1a08', '#ffffff'), glow: lit ? draw('#ffffff', '#000000') : null };
+  for (const t of [out.map, out.glow]) if (t) t.userData.shared = true;
+  return (faces[kind] = out);
+}
+
+/**
+ * A pumpkin, `r` round and not as tall, sitting on the origin: pressed in between its ribs and at the top, with its
+ * stalk and a leaf; `face` = 'lit' (a jack-o'-lantern), 'carved', or none. Its face is to +Z.
+ */
+function pumpkin(r, face = null) {
+  const g = new THREE.Group();
+  const geo = new THREE.SphereGeometry(1, 40, 20);
+  const p = geo.attributes.position;
+  const col = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i);
+    const y = p.getY(i);
+    const z = p.getZ(i);
+    const crest = ribCrest(x, z);
+    const k = r * (0.88 + 0.12 * crest);
+    p.setXYZ(i, x * k, y * r * 0.8 * (1 - 0.2 * Math.pow(Math.abs(y), 8)), z * k);
+    _c.set('#cf4a14').lerp(_c2.set('#ff9a2e'), crest);
+    col.set([_c.r, _c.g, _c.b], i * 3);
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.computeVertexNormals();
+  const tex = face ? faceTextures(face) : null;
+  const skin = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, map: tex ? tex.map : null });
+  if (tex && tex.glow) Object.assign(skin, { emissive: new THREE.Color('#ffa83a'), emissiveMap: tex.glow, emissiveIntensity: 1 });
+  const body = new THREE.Mesh(geo, skin);
+  body.position.y = r * 0.78;
+  const b = new Batch();
+  b.add(new THREE.CylinderGeometry(r * 0.09, r * 0.14, r * 0.36, 7), { at: [r * 0.03, r * 1.52, 0], rot: [0, 0, -0.28], color: ['#5c7a2c', '#7a5a2c'] }); // the stalk
+  b.add(new THREE.SphereGeometry(1, 8, 6), { at: [-r * 0.2, r * 1.44, r * 0.06], rot: [0.3, 0, 0.4], scale: [r * 0.26, r * 0.03, r * 0.14], color: '#4f9a3a' }); // …and a leaf
+  g.add(body, b.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 })));
+  g.userData.skin = skin;
+  return g;
+}
+
+/**
+ * A jack-o'-lantern for the yard on Halloween: its face looks out of the candle-light inside it, which glows round it
+ * as night falls (`glow`: 0 by day … 1 in the dark) and flickers. Its face is to +Z.
+ */
+export function makeLantern(r = 0.085) {
+  const group = pumpkin(r, 'lit');
+  const skin = group.userData.skin;
+  group.traverse((o) => {
+    if (o.isMesh) o.castShadow = o.receiveShadow = true;
+  });
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: softDotTexture(), color: '#ff9a3c', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+  halo.position.set(0, r * 0.8, r * 0.7);
+  halo.scale.setScalar(r * 5.5);
+  halo.renderOrder = 6;
+  group.add(halo);
+  const seed = Math.random() * 100;
+  return {
+    object: group,
+    radius: r,
+    update(time, glow) {
+      const flicker = 0.86 + 0.08 * Math.sin(time * 9.1 + seed) + 0.06 * Math.sin(time * 23.7 + seed * 2);
+      skin.emissiveIntensity = (0.5 + 2.2 * glow) * flicker; // (by day, a yellow face; in the dark, candle-light)
+      halo.material.opacity = 0.5 * glow * flicker;
+      halo.visible = glow > 0.02;
+    },
+  };
+}
+
+// ------------------------------------------------------------------ a hat between a fox's ears
+
+// The foxes' Halloween hats, at the red fox's size: how wide each is at a height `h` above its foot — and how far
+// back its middle is there (the witch's hat bends back at its tip) — up to how tall it is.
+const HATS = {
+  witch: { brim: 0.052, head: 0.028, tall: 0.1, width: (h) => (h < 0.006 ? 0.052 : 0.028 * Math.pow(Math.max(0, 1 - h / 0.1), 1.15)), back: (h) => 0.0414 * Math.pow(Math.max(0, h / 0.1 - 0.35) / 0.65, 2) }, // (makeWitchHat: taller than most, so that it shows from afar)
+  pumpkin: { r: 0.046, tall: 0.046 * 1.7, width: (h) => 0.046 * Math.sqrt(Math.max(0, 1 - Math.pow((h - 0.036) / 0.037, 2))) + (h > 0.06 ? 0.007 : 0), back: () => 0 }, // (pumpkin: its body, then the stalk)
+};
+const HAT_TILT = 0.2; // (tipped forward a little, the way one wears a hat)
+const restHeads = new WeakMap(); // fox → its head and its ears at rest (headAndEars)
+
+/** The points of a fox's coat that go with its head, and with its ears, as they are at rest — in the head bone's space. */
+function headAndEars(rig) {
+  let out = restHeads.get(rig);
+  if (out) return out;
+  const geo = rig.shells[0].geometry;
+  const P = geo.attributes.position;
+  const I = geo.attributes.skinIndex;
+  const W = geo.attributes.skinWeight;
+  const bones = rig.skeleton.bones;
+  const iH = bones.indexOf(rig.bones.head);
+  const iE = [bones.indexOf(rig.bones.earL), bones.indexOf(rig.bones.earR)];
+  const toHead = rig.skeleton.boneInverses[iH];
+  out = { head: [], ears: [] };
+  for (let i = 0; i < P.count; i++) {
+    let h = 0;
+    let e = 0;
+    for (let j = 0; j < 4; j++) {
+      const b = I.getComponent(i, j);
+      if (b === iH) h += W.getComponent(i, j);
+      else if (iE.includes(b)) e += W.getComponent(i, j);
+    }
+    if (e >= 0.5) out.ears.push(V().fromBufferAttribute(P, i).applyMatrix4(toHead));
+    else if (h >= 0.5) out.head.push(V().fromBufferAttribute(P, i).applyMatrix4(toHead));
+  }
+  restHeads.set(rig, out);
+  return out;
+}
+
+/**
+ * Where a hat (HATS) can sit on this fox's head without its ears coming through it — fur and all: on top of the head,
+ * as large as it is meant to be if there is room between the ears; else a little further forward, in front of them; else
+ * a little smaller. → { at, scale }: its foot in the head bone's space, and its size (the head's, or less).
+ */
+function seatHat(rig, hat) {
+  const k = rig.headScale;
+  const { head, ears } = headAndEars(rig);
+  const fur = 0.03 * rig.species.fur;
+  const crown = rig.dims.crown;
+  const turn = new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), -HAT_TILT);
+  const l = V();
+  let at = null;
+  for (let s = 1; s > 0.5; s -= 0.05) {
+    const K = k * s;
+    const gap = (fur * 0.6 + 0.004) / K; // (between the hat and the ears' bare skin: their fur, and a little)
+    for (let dz = 0; dz <= 0.05 * k; dz += 0.005 * k) {
+      // the top of the head there, under the middle of the hat — in its fur a little
+      const z = crown.z + dz;
+      let y = -Infinity;
+      for (const p of head) if (Math.abs(p.x) < 0.01 * k && Math.abs(p.z - z) < 0.01 * k) y = Math.max(y, p.y);
+      if (y === -Infinity) continue;
+      at = V(0, y + fur * 0.3, z);
+      const clear = ears.every((p) => {
+        l.copy(p).sub(at).applyQuaternion(turn).divideScalar(K);
+        return l.y < -0.012 || l.y > hat.tall || Math.hypot(l.x, l.z + hat.back(l.y)) > hat.width(l.y) + gap;
+      });
+      if (clear) return { at, scale: K };
+    }
+  }
+  return { at: at || crown.clone(), scale: k * 0.5 };
+}
+
+/** A Halloween hat for a fox (HATS), set between its ears. */
+function foxHat(id, rig) {
+  const hat = HATS[id];
+  const g = id === 'witch' ? makeWitchHat(hat.brim, hat.head, hat.tall) : pumpkin(hat.r, 'carved');
+  const { at, scale } = seatHat(rig, hat);
+  g.position.copy(at);
+  g.rotation.x = HAT_TILT;
+  g.scale.setScalar(scale);
+  return g;
+}
+
 /** Where each accessory sits: [bone, position in that bone's space, direction its +Z should face (or null)]. */
 export function makeAccessory(id, rig) {
   const k = rig.headScale;
@@ -413,6 +653,8 @@ export function makeAccessory(id, rig) {
   } else if (id === 'scarf') {
     bone = 'neck';
     object = scarf(rig);
+  } else if (id === 'witch' || id === 'pumpkin') {
+    object = foxHat(id, rig);
   } else return null;
   object.traverse((o) => {
     if (o.isMesh) o.castShadow = true;

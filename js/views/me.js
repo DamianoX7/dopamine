@@ -693,6 +693,12 @@ Views.me = {
         <button class="btn soft" data-action="present-rehearse">👀 미리 보기</button>
       </div>
       <div class="card">
+        <h2 class="card-title">🎃 핼러윈</h2>
+        <p class="hint">${Halloween.note()}</p>
+        <p class="hint">미리 보기는 마당이 핼러윈으로 꾸며진 채 처음부터 끝까지 보여 주지만, 아무것도 저장되지 않아요. ${esc(josa(OWNER_NAME, '이/가'))} 하는 말은 <code>js/config.js</code>의 <code>halloweenLines</code>로 바꿀 수 있어요.</p>
+        <button class="btn soft" data-action="halloween-rehearse">👀 미리 보기</button>
+      </div>
+      <div class="card">
         <h2 class="card-title">＋ 새 메시지</h2>
         <textarea class="msg-new" data-msg-new rows="2" maxlength="280" placeholder="다정한 한마디를 적어 보세요…"></textarea>
         <button class="btn primary" data-action="msg-add">메시지 추가</button>

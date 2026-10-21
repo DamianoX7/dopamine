@@ -79,6 +79,9 @@ const PET_SHOP = [
   { id: 'glasses', emoji: '🕶️', name: '선글라스', price: 90 },
   { id: 'headphones', emoji: '🎧', name: '헤드폰', price: 120 },
   { id: 'crown', emoji: '👑', name: '왕관', price: 200 },
+  // (not for sale: Lorelei gives them on Halloween, after trick or treat — js/halloween.js)
+  { id: 'witch', emoji: '🧙', name: '마녀 모자', desc: '🎃 핼러윈 선물', gift: true },
+  { id: 'pumpkin', emoji: '🎃', name: '호박 모자', desc: '🎃 핼러윈 선물', gift: true },
 ];
 
 /* (The meadow and the farm follow the year — js/weather.js; the others are one season always.) */
@@ -188,7 +191,7 @@ const SHOP_KINDS = {
 
 /* The girl the foxes belong to (js/fox/lorelei.js, keeper.js). Her name can be changed in js/config.js: ownerName. */
 const OWNER_NAME = CFG.ownerName || '로렐라이';
-/* What she says: when she is tapped (hello — or what fits the hour and the weather), calling a fox over, feeding, throwing the ball.
+/* What she says: when she is tapped (hello — or what fits the hour, the weather and the day), calling a fox over, feeding, throwing the ball.
    {fox} = the fox it is about (the one she is with, otherwise); {fox!} = the same, called out to; {me} = her name. */
 const OWNER_LINES = {
   hello: ['안녕! 오늘도 왔구나 💗', '여우들이 기다리고 있었어!', '{fox} 오늘 기분 좋아 보이지?', '오늘은 뭐 하고 놀까?', '나는 {me}. 여우들이랑 같이 살아!', '여우들 쓰다듬어 주면 좋아해!'],
@@ -199,6 +202,7 @@ const OWNER_LINES = {
   wind: ['으, 모래바람…!', '눈에 모래 들어가겠어!'],
   alone: ['{fox} 금방 돌아올 거야 🧭', '탐험 간 {fox} 뭘 가져올까?'],
   call: ['{fox!}, 이리 와!', '{fox!}~ 쓰다듬어 줄게!', '{fox!}, 여기야 여기!'],
+  halloween: ['해피 핼러윈! 🎃', '마녀 모자 어때? 잘 어울리지?', '사탕 하나 더 먹을래? 🍬', '여우들 변장한 거 너무 귀엽지?', '박쥐다! 🦇 …아, 놀랐어?'], // (on Halloween, js/halloween.js)
   feed: ['밥 먹자~!', '맛있는 거 가져왔어!', '많이 먹어 🍖'],
   play: ['간다~!', '잡아 봐!', '공 간다!'],
 };
@@ -339,7 +343,7 @@ const FoxHost = {
     };
     // (Lorelei's present, shown beforehand: the fox is there to be looked at, not hers)
     if (Present.guest && !look.foxes.some((f) => f.id === Present.guest)) look.foxes.push({ id: Present.guest, worn: [], grown: 0, guest: true });
-    if (!pv) return look;
+    if (!pv) return Halloween.dress(look); // (on Halloween, in costume)
     if (pv.kind === 'fox') {
       // a fox she doesn't have yet comes to visit
       look.foxes.push({ id: pv.id, worn: [], grown: 0, guest: true });
@@ -357,7 +361,7 @@ const FoxHost = {
       const who = look.foxes.find((f) => f.id === p.species) || look.foxes[0];
       if (who) who.worn.push(pv.id);
     }
-    return look;
+    return Halloween.dress(look);
   },
 
   sync() {
@@ -464,10 +468,11 @@ const Pet = {
   owner() {
     this.learned();
     if (Present.waiting() && !Present.playing) return void Present.begin(); // she has something for her: that first
+    if (Halloween.waiting() && !Halloween.playing) return void Halloween.begin(); // …or it is Halloween: trick or treat
     const sky = Weather.now(FoxHost.scene()).kind;
     const trip = this.trip();
     const kind =
-      this.mood() === 'sleepy' ? 'night' : !this.home().length && trip ? 'alone' : sky === 'rain' ? 'rain' : sky === 'snow' ? 'snow' : sky === 'wind' ? 'wind' : this.mood() === 'hungry' && Math.random() < 0.6 ? 'hungry' : 'hello';
+      this.mood() === 'sleepy' ? 'night' : !this.home().length && trip ? 'alone' : sky === 'rain' ? 'rain' : sky === 'snow' ? 'snow' : sky === 'wind' ? 'wind' : this.mood() === 'hungry' && Math.random() < 0.6 ? 'hungry' : Halloween.on() ? 'halloween' : 'hello';
     if (FoxHost.api && !FoxHost.failed) FoxHost.api.owner(this.ownerLine(kind, kind === 'alone' ? trip.fox : State.pet.species));
   },
 
@@ -964,7 +969,8 @@ const Pet = {
     const gift = phase === 'back';
     const empty = !this.home().length; // the only fox is out exploring
     const present = Present.waiting(); // Lorelei has something for her
-    const says = present ? `${josa(OWNER_NAME, '이/가')} 줄 게 있대요! 🎁` : mail ? '우편함에 편지가 왔어!' : gift ? `${josa(this.nameOf(trip.fox), '이/가')} 선물을 물고 돌아왔어!` : empty ? `탐험을 떠났어요 · ${this.tripLeft()} 뒤에 돌아와요` : this.moodLine();
+    const spooky = !present && Halloween.waiting(); // …or a game to play: trick or treat
+    const says = present ? `${josa(OWNER_NAME, '이/가')} 줄 게 있대요! 🎁` : spooky ? `${josa(OWNER_NAME, '이/가')} 트릭 오어 트릿 하재요! 🎃` : mail ? '우편함에 편지가 왔어!' : gift ? `${josa(this.nameOf(trip.fox), '이/가')} 선물을 물고 돌아왔어!` : empty ? `탐험을 떠났어요 · ${this.tripLeft()} 뒤에 돌아와요` : this.moodLine();
     return `
       <button class="pet-face" data-action="fox-open" aria-label="${esc(p.name)} 만나러 가기">${this.avatarHtml('is-big')}</button>
       <div class="pet-side">
@@ -974,7 +980,7 @@ const Pet = {
         <p class="pet-says">${esc(says)}</p>
         ${this.barsHtml()}
       </div>
-      <button class="btn primary wide pet-go" data-action="fox-open">${present ? `🎁 ${esc(OWNER_NAME)} 만나러 가기` : mail ? '💌 편지 받으러 가기' : gift ? '🎁 선물 받으러 가기' : empty ? '🏡 마당 보러 가기' : `🦊 ${esc(p.name)} 만나러 가기`}</button>`;
+      <button class="btn primary wide pet-go" data-action="fox-open">${present ? `🎁 ${esc(OWNER_NAME)} 만나러 가기` : spooky ? `🎃 ${esc(OWNER_NAME)} 만나러 가기` : mail ? '💌 편지 받으러 가기' : gift ? '🎁 선물 받으러 가기' : empty ? '🏡 마당 보러 가기' : `🦊 ${esc(p.name)} 만나러 가기`}</button>`;
   },
 
   barsHtml() {
@@ -1497,7 +1503,8 @@ const Pet = {
             })
             .join('')}</div>`
         : '';
-      return `${who}<p class="hint">${several ? `${esc(josa(p.name, '이/가'))} 걸칠 것을 골라요. ` : ''}가진 장식은 누를 때마다 쓰고 벗어요. 여러 개를 함께 걸쳐도 돼요.</p>${grid(PET_SHOP.map((it) => this.itemHtml(kind, it)).join(''))}`;
+      const items = PET_SHOP.filter((it) => !it.gift || this.owns(kind, it.id)); // (a present shows once it is hers)
+      return `${who}<p class="hint">${several ? `${esc(josa(p.name, '이/가'))} 걸칠 것을 골라요. ` : ''}가진 장식은 누를 때마다 쓰고 벗어요. 여러 개를 함께 걸쳐도 돼요.</p>${grid(items.map((it) => this.itemHtml(kind, it)).join(''))}`;
     }
     if (kind === 'yard') {
       return `<p class="shop-count"><span>마당에 놓은 물건</span><b>${p.yard.length}개</b></p>
@@ -1732,6 +1739,7 @@ const FoxRoom = {
       if (this.ov !== ov) return;
     }
     Present.arrive(); // (if Lorelei has something for her, she calls before long)
+    Halloween.arrive(); // (…or, on Halloween, to play trick or treat)
     await sleep(900);
     if (this.ov !== ov || UI.top() !== ov) return;
     // the country round the yard is new: say once how to look about in it
@@ -1778,6 +1786,7 @@ const FoxRoom = {
     clearInterval(this.skyTimer);
     clearTimeout(this.skyDue);
     Present.left();
+    Halloween.left();
     FoxHost.unmount();
     this.leaveFullscreen();
     Pet.refresh();
@@ -1993,13 +2002,15 @@ const FoxRoom = {
     else delete root.dataset.point;
   },
 
-  /* "Lorelei has something for you": there for as long as she has — a tap, and she gives it. */
+  /* "Lorelei has something for you" (or, on Halloween, a game to play): there for as long as she has — a tap, and she gives it. */
   presentChip() {
     if (!this.ov) return;
     const el = $('[data-fox-present]', this.ov.panel);
-    const on = Present.waiting() && !Present.playing;
-    el.hidden = !on;
-    if (on) el.innerHTML = `<span aria-hidden="true">🎁</span><b>${esc(josa(OWNER_NAME, '이/가'))} 줄 게 있대요!</b><small>눌러서 받기</small>`;
+    const gift = Present.waiting() && !Present.playing;
+    const game = !gift && !Present.playing && Halloween.waiting() && !Halloween.playing;
+    el.hidden = !gift && !game;
+    if (gift) el.innerHTML = `<span aria-hidden="true">🎁</span><b>${esc(josa(OWNER_NAME, '이/가'))} 줄 게 있대요!</b><small>눌러서 받기</small>`;
+    else if (game) el.innerHTML = `<span aria-hidden="true">🎃</span><b>${esc(josa(OWNER_NAME, '이/가'))} 부르고 있어요!</b><small>트릭 오어 트릿</small>`;
   },
 
   /* Start or stop taking pictures: the shop and the buttons make way, the family poses. */

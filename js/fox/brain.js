@@ -1476,9 +1476,21 @@ export class Brain {
     yield* this.goTo(0, 0, { speed: 'trot', stop: 0.12, timeout: 7, moving: spot });
     yield* this.turnTo(this.toCamera() - side * 0.5, 6);
     a.setPose('sit', 5);
+    let hops = w.gifting ? w.gifting.hops : 0;
     for (let t = 0, next = 0; w.gifting && t < 120; ) {
       t += yield;
       a.mood.wag = 0.45 + 0.25 * Math.sin(t * 2.2);
+      if (w.gifting && w.gifting.hops !== hops) {
+        // (something to jump for — trick or treat: world.present)
+        hops = w.gifting.hops;
+        yield* this.wait(0.08 * place);
+        a.mood.eyes = 'happy';
+        this.lookAtYou(0.9);
+        yield* this.hop(0.2);
+        yield* this.hop(0.14);
+        a.mood.eyes = 'open';
+        a.setPose('sit', 5);
+      }
       if (t < next) continue;
       next = t + rand(1.4, 2.8);
       const born = w.gifting && w.gifting.fox;

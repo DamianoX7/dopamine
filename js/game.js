@@ -62,6 +62,7 @@ const ACHIEVEMENTS = [
   { id: 'first_snow', emoji: '⛄', name: '첫눈', desc: '눈 오는 날 여우들을 만나러 가요.', test: (s) => s.statistics.snowy >= 1 },
   // (this one comes with a present: on that day Lorelei has a fox for her that no shop sells — js/present.js)
   { id: 'hundred_days', emoji: '💯', name: '백일', desc: '우리가 만난 지 100일째 되는 날을 함께 맞아요.', gift: true, test: () => Present.due() },
+  { id: 'halloween', emoji: '🎃', name: '트릭 오어 트릿', desc: '핼러윈에 로렐라이와 사탕 놀이를 해요.', test: (s) => s.halloween.year > 0 },
   { id: 'wrapped', emoji: '🎁', name: '결산 완료', desc: '커버 결산을 봐요.', test: (s) => s.statistics.wrappedViewed >= 1 },
   { id: 'night_owl', emoji: '🦉', name: '올빼미', desc: '심야 스튜디오에 들러요.', test: (s) => !!s.statistics.lateNightVisit },
   { id: 'secret', emoji: '🔮', name: '비밀 발견', desc: '비밀을 찾아요.', test: (s) => s.statistics.secretEvents >= 1 },
