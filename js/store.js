@@ -44,6 +44,7 @@ function defaultState() {
       rainy: 0, //      days she looked in on the foxes while it rained
       snowy: 0, //      …and while it snowed
       puddles: 0, //    times a fox jumped into a puddle while she watched
+      radio: 0, //      songs the fox radio played her (js/radio.js)
     },
     daily: {
       date: null,
@@ -99,6 +100,10 @@ function defaultState() {
       chat: { at: 0, day: '', today: 0, last: [], gift: '', seen: 0 },
     },
     mallang: { mode: 'soft', soft: 'fox', wax: 'cotton' }, // 말랑 놀이터: the toy she had out last (js/mallang.js)
+    // her diary (js/diary.js): what she did, a day at a time ('YYYY-MM-DD' → counts; kept for some weeks), the pages she
+    // wrote (day → { mood, note, stickers, lines, photo, sum, at }), the months whose album she was given, the day she was told the page was ready
+    diary: { log: {}, pages: {}, albums: {}, hailed: '' },
+    lp: {}, // her albums pressed into records (js/lp.js): album id → { color, at }
     halloween: { year: 0 }, // the last Halloween she played trick or treat with Lorelei (js/halloween.js)
     christmas: { year: 0 }, // …and the last Christmas Lorelei gave her a present (js/christmas.js)
     opening: { seen: false, greeted: false }, //           the rooms that open on a day of their own (js/opening.js): has she stood before them shut — and been told that they opened?

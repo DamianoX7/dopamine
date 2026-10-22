@@ -126,6 +126,47 @@ const Art = {
     });
   },
 
+  /* Handwriting (Gaegu) has small letters in wide boxes: on a canvas it is written a letter at a time, a little closer
+     together (the diary's pages, the stickers' labels). */
+  advs: new Map(),
+  adv(ctx, ch) {
+    const key = ctx.font + ch;
+    let w = this.advs.get(key);
+    if (w == null) {
+      w = ctx.measureText(ch).width;
+      if (/[가-힣]/.test(ch)) w *= 0.84;
+      else if (ch === ' ') w *= 0.75;
+      this.advs.set(key, w);
+    }
+    return w;
+  },
+  handW(ctx, text) {
+    let w = 0;
+    for (const ch of Array.from(text)) w += this.adv(ctx, ch);
+    return w;
+  },
+  /** `text` in the current font, from `x` (or centred on it), on the baseline `y`. */
+  hand(ctx, text, x, y, align = 'left') {
+    let cx = align === 'center' ? x - this.handW(ctx, text) / 2 : x;
+    const keep = ctx.textAlign;
+    ctx.textAlign = 'left';
+    for (const ch of Array.from(text)) {
+      ctx.fillText(ch, cx, y);
+      cx += this.adv(ctx, ch);
+    }
+    ctx.textAlign = keep;
+  },
+  /** …at the largest size (font = size → font string) at which it is no wider than `maxW`; the font is set to it. */
+  fitHand(ctx, text, font, maxW, size, min) {
+    let s = size;
+    ctx.font = font(s);
+    while (s > min && this.handW(ctx, text) > maxW) {
+      s -= 2;
+      ctx.font = font(s);
+    }
+    return s;
+  },
+
   fitText(ctx, text, font, maxW, size, min) {
     let s = size;
     ctx.font = font(s);

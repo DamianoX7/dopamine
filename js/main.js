@@ -277,9 +277,17 @@ async function boot() {
   Opening.watch(); // the rooms that open on a day of their own: how their doors stand, and the moment they open
   Post.start(); // letters he sent her that have come since she was last here
   Present.wake(); // …and a day of theirs on which Lorelei has something for her
+  Diary.wake(); // …and a month that is over, whose diary has become an album (js/diary.js)
   if (!State.onboarded && !Cloud.writer) Onboarding.show();
 
+  let evening = Diary.isOpen();
   const newDay = () => {
+    // (the evening's page is ready from 22:00: Home shows its card from then on)
+    if (Diary.isOpen() !== evening) {
+      evening = !evening;
+      if (Router.is('home')) Router.refresh();
+    }
+    Diary.wake();
     if (!Game.ensureDaily()) return;
     Present.wake();
     if (Router.is('home')) Router.refresh();

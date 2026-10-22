@@ -64,6 +64,12 @@ const ACHIEVEMENTS = [
   { id: 'hundred_days', emoji: '💯', name: '백일', desc: '우리가 만난 지 100일째 되는 날을 함께 맞아요.', gift: true, test: () => Present.due() },
   { id: 'halloween', emoji: '🎃', name: '트릭 오어 트릿', desc: '핼러윈에 로렐라이와 사탕 놀이를 해요.', test: (s) => s.halloween.year > 0 },
   { id: 'christmas', emoji: '🎄', name: '메리 크리스마스', desc: '크리스마스에 로렐라이와 소원을 빌어요.', test: (s) => s.christmas.year > 0 },
+  { id: 'radio_fm', emoji: '📻', name: '도파민 FM', desc: '여우 라디오로 내 노래를 세 곡 들어요.', test: (s) => (s.statistics.radio || 0) >= 3 },
+  { id: 'four_cut', emoji: '🎞️', name: '인생네컷', desc: '여우들과 네 컷 사진을 찍어요.', test: (s) => (s.statistics.fourCuts || 0) >= 1 },
+  { id: 'lp_press', emoji: '💿', name: '레코드 프레스', desc: '앨범을 LP로 구워요.', test: (s) => Object.keys(s.lp).length >= 1 },
+  { id: 'diary_first', emoji: '📔', name: '오늘의 한 장', desc: '하루 끝 한 장을 처음 완성해요.', test: (s) => Object.keys(s.diary.pages).length >= 1 },
+  { id: 'diary_week', emoji: '🗓️', name: '일주일 일기', desc: '일기를 일곱 장 써요.', test: (s) => Object.keys(s.diary.pages).length >= 7 },
+  { id: 'month_album', emoji: '📖', name: '한 달의 우리', desc: '한 달 동안 쓴 일기가 앨범이 돼요.', test: (s) => Object.keys(s.diary.albums).length >= 1 },
   { id: 'wrapped', emoji: '🎁', name: '결산 완료', desc: '커버 결산을 봐요.', test: (s) => s.statistics.wrappedViewed >= 1 },
   { id: 'night_owl', emoji: '🦉', name: '올빼미', desc: '심야 스튜디오에 들러요.', test: (s) => !!s.statistics.lateNightVisit },
   { id: 'secret', emoji: '🔮', name: '비밀 발견', desc: '비밀을 찾아요.', test: (s) => s.statistics.secretEvents >= 1 },
@@ -117,6 +123,7 @@ const Game = {
       d.level += 1;
       d.coins += 50;
       levelUps.push(d.level);
+      Diary.add('levels', d.level);
     }
     if (this.batch) {
       this.batch.dopamine += dopamine;
@@ -230,6 +237,7 @@ const Game = {
   ensureDaily() {
     const today = dateKey();
     if (State.daily.date === today) return false;
+    Diary.prune(); // (what she did weeks ago is not kept: the pages she wrote are)
     const rnd = mulberry32(hashStr(today + State.createdAt));
     const ch = pick(CHALLENGES, rnd);
     const extra = shuffle(
@@ -308,6 +316,8 @@ const Game = {
     State.singing.totalRecordings += 1;
     State.singing.totalSeconds += take.rawDuration;
     State.singing.longestTake = Math.max(State.singing.longestTake || 0, take.rawDuration);
+    Diary.note('takes');
+    Diary.note('sang', Math.round(take.rawDuration));
     this.ensureDaily();
     State.daily.takes = (State.daily.takes || 0) + 1;
     const streak = this.registerSingingDay(take.rawDuration);
@@ -326,6 +336,7 @@ const Game = {
 
   onListen() {
     State.statistics.listens += 1;
+    Diary.note('listens');
     if (State.daily.listenDopamine < 10) {
       State.daily.listenDopamine += 1;
       this.reward({ dopamine: 3 });
@@ -337,6 +348,7 @@ const Game = {
   /* A cover was just saved (released): rewards, milestones, a letter — and sometimes a rare one. */
   onRelease(c) {
     const count = Music.released().length;
+    Diary.add('covers', c.title);
     const rare = Math.random() < 0.07;
     if (rare) {
       (State.coverMeta[c.id] || (State.coverMeta[c.id] = {})).rare = true;
@@ -378,19 +390,25 @@ const Game = {
 
   /* A new album was created: the first one gets a little party. */
   onAlbum() {
+    Diary.note('albums');
     const unlocked = this.checkAchievements();
     if (Music.albums().length !== 1) return;
+    const album = Music.albums()[0];
     UI.celebrate({
       emoji: '📀',
       title: '앨범 완성!',
       subtitle: '커버들이 함께 지낼 집이 생겼어요.',
       message: Messages.special('album'),
       sound: unlocked.length ? 'achievement' : 'reward',
+      // (her first album can go straight into the press: js/lp.js)
+      buttons: album && album.trackIds.length ? [{ label: '💿 LP로 굽기', primary: true, onClick: () => LP.open(album.id) }, { label: '신난다! 💗' }] : undefined,
     });
   },
 
   onGame(id, result, rewards) {
     State.statistics.gamesPlayed += 1;
+    Diary.note('games');
+    Diary.tally('gameBy', id);
     this.reward(rewards);
     this.track('game');
     Pet.react('game');
@@ -438,6 +456,7 @@ const Messages = {
     if (isNew) State.messages.seen.push(msg.id);
     State.messages.lastId = msg.id;
     State.statistics.messagesOpened += 1;
+    Diary.note('messages');
     Store.save();
     return { msg, isNew };
   },

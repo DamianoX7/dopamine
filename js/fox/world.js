@@ -179,6 +179,7 @@ export class World {
     this.showcaseOn = false; // the shop is open: the foxes pose, the camera comes close
     this.photoOn = false; //    she is taking pictures: the family poses, and she moves the camera
     this.pose = 'sit'; //       …how they pose ('mix' = each its own)
+    this.finder = null; //      …and the photo booth's viewfinder, when there is one (px of the view)
     this.poseSeed = 0;
     this.orbit = { yaw: 0, pitch: PITCH_PHOTO }; // where she turned and tilted the camera to
     this.yawNow = 0;
@@ -2895,7 +2896,10 @@ export class World {
       this.zoom = 1;
       this.orbit = { yaw: 0, pitch: PITCH_PHOTO };
       this.poseSeed = Math.floor(Math.random() * MIXED.length);
-    } else this.zoom = this.zoomKept || 1;
+    } else {
+      this.zoom = this.zoomKept || 1;
+      this.finder = null;
+    }
     this.foxes.forEach((f) => {
       if (on) f.brain.do('strike');
       else if (f.brain.doing === 'strike') f.brain.script = null;
@@ -2907,6 +2911,12 @@ export class World {
   setPose(pose) {
     this.pose = pose;
     this.poseSeed++;
+    this.wake();
+  }
+
+  /** Four pictures in a row (the photo booth, js/booth.js): the family is framed in `rect` (px of the view), not the whole view — or null. */
+  setFinder(rect) {
+    this.finder = rect ? { x: rect.x, y: rect.y, w: rect.w, h: rect.h } : null;
     this.wake();
   }
 
@@ -3003,14 +3013,15 @@ export class World {
     hi = Math.max(hi, hers.x + 0.24);
     const w = this.stage.clientWidth;
     const h = this.stage.clientHeight;
-    const fit = Math.min((0.74 * w) / (hi - lo + 0.25), (0.54 * h) / (0.2 + this.owner.rig.dims.height * this.owner.rig.size)); // pixels per unit that take the whole group in
+    const F = this.finder; // (the photo booth's viewfinder: the family fills that instead of the view)
+    const fit = Math.min(((F ? 0.8 : 0.74) * (F ? F.w : w)) / (hi - lo + 0.25), ((F ? 0.6 : 0.54) * (F ? F.h : h)) / (0.2 + this.owner.rig.dims.height * this.owner.rig.size)); // pixels per unit that take the whole group in
     this.zoomNow = damp(this.zoomNow, (this.zoom * fit) / this.basePpu, 5, dt);
     this.pitch = damp(this.pitch, this.orbit.pitch, 10, dt);
     this.yawNow = damp(this.yawNow, this.orbit.yaw, 10, dt);
     // on a tall screen the family stands below the middle of the picture, the scenery over their heads
     const tall = clamp(h / Math.max(1, w) - 1.1, 0, 1);
-    this.offset.x = damp(this.offset.x, 0, 7, dt);
-    this.offset.y = damp(this.offset.y, -tall * 0.1 * h, 7, dt);
+    this.offset.x = damp(this.offset.x, F ? w / 2 - (F.x + F.w / 2) : 0, 7, dt);
+    this.offset.y = damp(this.offset.y, F ? h / 2 - (F.y + F.h * 0.62) : -tall * 0.1 * h, 7, dt);
     this.camTarget.x = damp(this.camTarget.x, (lo + hi) / 2, 4, dt);
     this.camTarget.z = damp(this.camTarget.z, z, 4, dt);
     this.camTarget.y = damp(this.camTarget.y, 0.46, 4, dt);
@@ -3021,17 +3032,20 @@ export class World {
   /**
    * The picture she just took: what the camera sees now, on a canvas of its own — larger than
    * the screen (`long` pixels on its longer side), everyone in full fur, none of the game's marks.
+   * `rect` (px of the view): only that part of it (the photo booth's viewfinder).
    */
-  capture(long = 1440) {
+  capture(long = 1440, rect = null) {
     if (!this.stage) return null;
     this.grace();
     const r = this.renderer;
     const keep = { w: this.canvas.width, h: this.canvas.height, ratio: r.getPixelRatio() };
     const w0 = this.stage.clientWidth;
     const h0 = this.stage.clientHeight;
-    const k = long / Math.max(w0, h0);
-    const W = Math.round(w0 * k);
-    const H = Math.round(h0 * k);
+    const cut = rect || { x: 0, y: 0, w: w0, h: h0 };
+    const k = long / Math.max(cut.w, cut.h);
+    const W = Math.round(cut.w * k);
+    const H = Math.round(cut.h * k);
+    if (rect) this.camera.setViewOffset(w0, h0, this.offset.x + rect.x, this.offset.y + rect.y, rect.w, rect.h);
     // drawn half as large again and scaled down, so the fur comes out soft
     const over = Math.max(W, H) * 1.5 <= r.capabilities.maxTextureSize ? 1.5 : 1;
     const marks = [this.halo, this.marker, this.ring].map((m) => [m, m.visible]);
@@ -3052,6 +3066,7 @@ export class World {
     marks.forEach(([m, was]) => (m.visible = was));
     r.setPixelRatio(keep.ratio);
     r.setSize(keep.w / keep.ratio, keep.h / keep.ratio, false);
+    if (rect) this.placeCamera(); // (the whole view again)
     this.tuneShells();
     this.tuneFur();
     this.draw();

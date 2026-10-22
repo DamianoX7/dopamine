@@ -25,6 +25,13 @@ audio.preload = 'auto';
 let currentUrl = null;
 let unlockUrl = null;
 const owner = { pause: () => pause() };
+const endWatchers = new Set();
+
+/** `fn(singleId)` is called whenever a Single has played to its end (after the player has moved on). */
+export function onEnded(fn) {
+  endWatchers.add(fn);
+  return () => endWatchers.delete(fn);
+}
 
 audio.addEventListener('timeupdate', () => { if (player.get().singleId) player.set({ time: audio.currentTime }); });
 audio.addEventListener('loadedmetadata', () => {
@@ -32,7 +39,12 @@ audio.addEventListener('loadedmetadata', () => {
 });
 audio.addEventListener('play', () => { if (player.get().singleId) player.set({ playing: true }); });
 audio.addEventListener('pause', () => { if (player.get().singleId) player.set({ playing: false }); });
-audio.addEventListener('ended', () => { if (player.get().singleId) next({ auto: true }); });
+audio.addEventListener('ended', () => {
+  const id = player.get().singleId;
+  if (!id) return;
+  next({ auto: true });
+  endWatchers.forEach((fn) => { try { fn(id); } catch (err) { console.error(err); } });
+});
 audio.addEventListener('error', () => {
   if (!player.get().singleId) return;
   player.set({ playing: false, loading: false, error: '이 브라우저에서는 이 녹음을 재생할 수 없어요.' });
@@ -119,6 +131,18 @@ export function clock() {
 export function toggle() {
   if (audio.paused) play();
   else pause();
+}
+
+/**
+ * How fast it plays (1 = as recorded). `keepPitch` false: the voice goes up and down with it, as on a record that is
+ * held back by a finger or played at 45 instead of 33 (js/lp.js). Every new Single starts at 1 again.
+ */
+export function setRate(rate, keepPitch = true) {
+  const r = Math.max(0.0625, Math.min(4, rate));
+  for (const key of ['preservesPitch', 'webkitPreservesPitch', 'mozPreservesPitch']) {
+    if (key in audio) audio[key] = keepPitch;
+  }
+  if (Math.abs(audio.playbackRate - r) > 0.001) audio.playbackRate = r;
 }
 
 export function seek(t) {

@@ -69,7 +69,9 @@ host.register({
   /** Photo mode on or off; how the family should pose; the picture itself (a canvas). */
   photo: (on) => world && world.photo(on),
   pose: (name) => world && world.setPose(name),
-  capture: (long) => (world ? world.capture(long) : null),
+  /** The photo booth's viewfinder ({ x, y, w, h } px of the view, or null): the family is framed in it, and a picture can be of just that. */
+  finder: (rect) => world && world.setFinder(rect),
+  capture: (long, rect) => (world ? world.capture(long, rect) : null),
 });
 
 // index.html?debug=1 — a handle for poking around in the console

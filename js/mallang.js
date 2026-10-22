@@ -68,6 +68,7 @@ const Mallang = {
 
   async open() {
     if (this.ov) return;
+    Diary.note('mallang');
     const ov = (this.ov = UI.open(this.html(), { full: true, cls: 'is-mallang', label: '말랑 놀이터', onClose: () => this.closed() }));
     const root = $('[data-mallang]', ov.panel);
     const ok = await this.load();

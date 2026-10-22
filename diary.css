@@ -1,0 +1,505 @@
+/* ==================================================================
+   📔 하루 끝 한 장 — the card on Home, the page she decorates, her
+   diary and the month's album (js/diary.js); the stickers that go on
+   things (js/stickers.js).
+   ================================================================== */
+
+/* ---------- Home: today's page is ready ---------- */
+.diary-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 14px 12px 14px 16px;
+  background: linear-gradient(135deg, #fff6e0 0%, #ffe3ef 100%);
+  color: #4a2f43;
+  text-align: left;
+  box-shadow: var(--shadow), inset 0 0 0 2px rgba(255, 170, 120, 0.45);
+  transition: transform 0.15s;
+}
+.diary-card:active {
+  transform: scale(0.98);
+}
+.diary-ico {
+  flex: none;
+  font-size: 34px;
+  animation: diaryNod 2.6s ease-in-out infinite;
+}
+@keyframes diaryNod {
+  0%,
+  100% {
+    transform: rotate(-6deg);
+  }
+  50% {
+    transform: rotate(6deg) translateY(-2px);
+  }
+}
+.diary-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.diary-text b {
+  font-size: 16.5px;
+}
+.diary-text small {
+  color: #7d5a70;
+  font-size: 13px;
+}
+.diary-card .chev {
+  flex: none;
+  color: #b58aa3;
+}
+
+/* ---------- the page she decorates ---------- */
+.overlay.is-diary .ov-panel {
+  background: linear-gradient(170deg, #f6eadf 0%, #efe3f3 100%);
+}
+body.late-night .overlay.is-diary .ov-panel {
+  background: linear-gradient(170deg, #2a1d3d 0%, #1b1230 100%);
+}
+.diary-ed {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+}
+.de-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(var(--safe-t) + 10px) 14px 6px;
+}
+.de-head h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.de-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+}
+.de-page {
+  position: relative;
+  border-radius: 6px 14px 14px 6px;
+  box-shadow: 0 18px 40px -18px rgba(80, 40, 70, 0.55), 0 2px 6px rgba(80, 40, 70, 0.12);
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.de-page canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.de-mood-hit {
+  position: absolute;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+}
+.de-tools {
+  padding: 6px 14px calc(var(--safe-b) + 12px);
+}
+.de-tabs {
+  margin: 0 0 8px;
+  background: var(--surface);
+}
+.de-tray {
+  min-height: 132px;
+}
+.de-moods {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.de-mood {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 6px 2px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink-2);
+  transition: transform 0.15s;
+}
+.de-mood span {
+  font-size: 30px;
+  line-height: 1.15;
+}
+.de-mood small {
+  font-size: 11.5px;
+}
+.de-mood.on {
+  background: var(--surface-solid);
+  color: var(--pink-deep);
+  box-shadow: var(--shadow), inset 0 0 0 2px var(--pink);
+  transform: scale(1.04);
+}
+.de-hint {
+  margin: 6px 2px 0;
+  color: var(--ink-3);
+  font-size: 12px;
+  text-align: center;
+}
+.de-note input {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-solid);
+  font-family: var(--font-hand);
+  font-size: 19px;
+}
+.de-note input:focus {
+  outline: none;
+  border-color: var(--pink);
+}
+
+/* ---------- stickers ---------- */
+.stk-tray {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.stk-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 2px 4px;
+  scrollbar-width: thin;
+}
+.stk-pick {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  padding: 4px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--surface);
+  transition: transform 0.12s;
+}
+.stk-row.is-wide .stk-pick {
+  width: auto;
+  height: 50px;
+  padding: 6px 8px;
+}
+.stk-pick:active {
+  transform: scale(0.9);
+}
+.stk-pick img {
+  max-width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+.stk-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.stk {
+  position: absolute;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
+}
+.stk img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.stk.on {
+  outline: 2px dashed rgba(255, 79, 154, 0.85);
+  outline-offset: 3px;
+  border-radius: 6px;
+  cursor: grabbing;
+}
+.stk-x,
+.stk-turn {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: #ff4f9a;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 3px 8px rgba(120, 30, 80, 0.35);
+}
+.stk-x {
+  top: -18px;
+  left: -18px;
+}
+.stk-turn {
+  right: -18px;
+  bottom: -18px;
+  background: #8b5cf6;
+  cursor: nwse-resize;
+}
+
+/* ---------- her diary ---------- */
+.diary-book {
+  padding-bottom: 20px;
+}
+.diary-today {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin: 4px 0 6px;
+  padding: 16px;
+  text-align: left;
+  color: var(--ink);
+}
+.diary-today.is-ready {
+  background: linear-gradient(135deg, #fff6e0 0%, #ffe3ef 100%);
+  color: #4a2f43;
+  box-shadow: var(--shadow), inset 0 0 0 2px rgba(255, 170, 120, 0.5);
+}
+.dt-mood {
+  flex: none;
+  font-size: 40px;
+}
+.dt-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dt-text small {
+  color: var(--ink-2);
+  font-size: 13px;
+}
+.diary-today.is-ready .dt-text small {
+  color: #7d5a70;
+}
+.dt-sofar {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 6px;
+  font-family: var(--font-hand);
+  font-size: 16px;
+  color: var(--ink-2);
+}
+.diary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.diary-thumb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+.diary-thumb canvas {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 4px 8px 8px 4px;
+  background: #fffdf6;
+  box-shadow: var(--shadow);
+  transition: transform 0.15s;
+}
+.diary-thumb:nth-child(3n + 1) canvas {
+  transform: rotate(-1.5deg);
+}
+.diary-thumb:nth-child(3n + 2) canvas {
+  transform: rotate(1deg);
+}
+.diary-thumb:active canvas {
+  transform: scale(0.96);
+}
+
+/* the calendar: the days she wrote */
+.cal-day.has-page span {
+  filter: none;
+}
+.cal-page-link {
+  margin-top: 8px;
+}
+
+/* ---------- the month's album ---------- */
+.overlay.is-dalb .ov-panel {
+  background: linear-gradient(165deg, #ffe9f2 0%, #efe4ff 55%, #fff1e2 100%);
+}
+.dalb {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: calc(var(--safe-t) + 14px) 18px calc(var(--safe-b) + 16px);
+  color: #4a2f43;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.dalb .w-progress i {
+  background: rgba(160, 80, 130, 0.2);
+}
+.dalb .w-progress i.past,
+.dalb .w-progress i.now {
+  background: #e2507f;
+}
+.dalb-close {
+  position: absolute;
+  top: calc(var(--safe-t) + 4px);
+  right: 14px;
+}
+.dalb .w-nav .btn.ghost {
+  color: #a0466f;
+  box-shadow: inset 0 0 0 1.5px rgba(160, 70, 111, 0.35);
+}
+.dalb-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 1400px;
+}
+.dalb-slide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  transform-origin: left center;
+}
+.dalb-slide.turn-next {
+  animation: dalbNext 0.55s cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+.dalb-slide.turn-prev {
+  animation: dalbPrev 0.5s cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+@keyframes dalbNext {
+  from {
+    transform: rotateY(-62deg);
+    opacity: 0.2;
+  }
+}
+@keyframes dalbPrev {
+  from {
+    transform: translateX(-30%) rotateY(28deg);
+    opacity: 0;
+  }
+}
+.dalb-cover,
+.dalb-end {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+}
+.dalb-year {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: 22px;
+  color: #b06a8e;
+}
+.dalb-title {
+  letter-spacing: -0.06em;
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: 54px;
+  line-height: 1.05;
+}
+.dalb-fan {
+  position: relative;
+  width: 220px;
+  height: 200px;
+  margin: 10px 0 4px;
+}
+.dalb-fan canvas {
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  width: 132px;
+  height: 176px;
+  margin-left: -66px;
+  border-radius: 4px 8px 8px 4px;
+  background: #fffdf6;
+  box-shadow: 0 12px 26px -14px rgba(80, 40, 70, 0.6);
+  transform: translateX(calc(var(--k) * 56px)) rotate(calc(var(--k) * 9deg));
+}
+.dalb-stats {
+  list-style: none;
+  width: 100%;
+  max-width: 320px;
+  margin: 6px 0 0;
+  padding: 0;
+}
+.dalb-stats li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 4px;
+  border-bottom: 1px dashed rgba(160, 80, 130, 0.25);
+  font-size: 15px;
+}
+.dalb-note,
+.dalb-hint {
+  margin: 8px 0 0;
+  color: #a07790;
+  font-size: 14px;
+}
+.dalb-page {
+  margin: 0;
+  height: 100%;
+  max-height: 100%;
+  display: flex;
+  align-items: center;
+}
+.dalb-page canvas {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100dvh - 150px);
+  aspect-ratio: 3 / 4;
+  border-radius: 6px 14px 14px 6px;
+  box-shadow: 0 18px 40px -18px rgba(80, 40, 70, 0.6);
+}
+.dalb-heart {
+  font-size: 64px;
+  animation: heartBeat 2.4s ease-in-out infinite;
+}
+.dalb-end h2 {
+  letter-spacing: -0.06em;
+  margin: 4px 0 12px;
+  font-family: var(--font-hand);
+  font-size: 36px;
+  line-height: 1.2;
+}

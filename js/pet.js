@@ -835,6 +835,7 @@ const Pet = {
     this.tripWas = 'none';
     p.finds[id] = (p.finds[id] || 0) + 1;
     State.statistics.trips = (State.statistics.trips || 0) + 1;
+    Diary.add('gifts', find.name);
     p.happiness = Math.min(100, p.happiness + 8);
     p.bond += 2;
     Store.save();
@@ -1042,6 +1043,7 @@ const Pet = {
     p.happiness = Math.min(100, p.happiness + 4);
     p.bond += 1;
     State.statistics.petTaps += 1;
+    Diary.note('pets');
     Sfx.play('heart');
     if (State.daily.petDopamine < 20) {
       State.daily.petDopamine += 1;
@@ -1067,6 +1069,7 @@ const Pet = {
     Sfx.play('pop');
     UI.floatText('🍖', anchor);
     Game.track('feed');
+    Diary.note('feeds');
     this.care('feed', p.out);
     this.refresh();
     FoxHost.act('feed');
@@ -1081,6 +1084,7 @@ const Pet = {
     p.bond += 2;
     Sfx.play('reward');
     UI.floatText('🎾', anchor);
+    Diary.note('plays');
     this.care('play', p.out);
     this.refresh();
     FoxHost.act('play');
@@ -1286,6 +1290,7 @@ const Pet = {
     if (!key || seen[sky.kind]) return;
     seen[sky.kind] = true;
     State.statistics[key] = (State.statistics[key] || 0) + 1;
+    Diary.note(sky.kind);
     Store.save();
     Game.checkAchievements();
   },
@@ -1304,6 +1309,7 @@ const Pet = {
     const p = State.pet;
     const d = State.daily;
     State.statistics.concerts = (State.statistics.concerts || 0) + 1;
+    Diary.note('concerts');
     if ((d.concerts || 0) < 5) {
       d.concerts = (d.concerts || 0) + 1;
       p.happiness = Math.min(100, p.happiness + 6);
@@ -1696,10 +1702,14 @@ const FoxRoom = {
         <div class="fp-poses" role="radiogroup" aria-label="포즈">
           ${PHOTO_POSES.map(([id, name]) => `<button class="fp-pose" role="radio" aria-checked="false" data-action="photo-pose" data-pose="${id}">${name}</button>`).join('')}
         </div>
+        <div class="fp-finder" data-fp-finder hidden>
+          <span class="fp-dots" data-fp-dots aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          <b class="fp-count" data-fp-count aria-live="assertive"></b>
+        </div>
         <div class="fp-bar">
           <button class="fp-last" data-action="photo-album" data-photo-last aria-label="사진첩 열기"><span aria-hidden="true">🖼️</span></button>
           <button class="fp-shutter" data-action="photo-shoot" data-sfx="none" aria-label="찰칵! 사진 찍기"><i></i></button>
-          <span class="fp-side" aria-hidden="true"></span>
+          <button class="fp-mode" data-action="photo-mode" data-fp-mode aria-pressed="false" aria-label="네 컷으로 찍기 (스티커 사진기)"><span aria-hidden="true">🎞️</span><small>네 컷</small></button>
         </div>
         <div class="fp-flash" data-photo-flash aria-hidden="true"></div>
       </div>
@@ -1717,6 +1727,7 @@ const FoxRoom = {
   async open({ early = false } = {}) {
     if (this.ov) return;
     if (Opening.shut() && !early) return void Opening.tell();
+    if (!early) Diary.note('visits');
     if (State.settings.foxFullscreen) this.enterFullscreen();
     Pet.tick();
     Pet.previewing = null;
@@ -2079,6 +2090,7 @@ const FoxRoom = {
       this.setPose(this.pose);
       Photos.showLast();
     }
+    requestAnimationFrame(() => Booth.place()); // (the photo booth's viewfinder, if the camera is set to 네 컷: js/booth.js)
   },
 
   setPose(pose) {
@@ -2124,6 +2136,7 @@ const Juke = {
             : emptyState('🎤', '아직 들려줄 커버가 없어요', '스튜디오에서 노래를 녹음해 저장하면 여우들에게 들려줄 수 있어요.', '<button class="btn primary" data-juke-sing>🎤 노래 부르러 가기</button>')
         }
         <div class="dialog-actions">
+          ${list.length ? '<button class="btn soft" data-juke-radio>📻 라디오</button>' : ''}
           ${list.length > 1 ? '<button class="btn soft" data-juke-all>🔁 모두 이어서</button>' : ''}
           ${p.singleId ? '<button class="btn soft" data-juke-stop>■ 그만 듣기</button>' : ''}
           <button class="btn ghost" data-ov-cancel>닫기</button>
@@ -2138,6 +2151,7 @@ const Juke = {
         Sfx.play('pop');
         CoverHost.start(row.dataset.juke);
       } else if (on('[data-juke-all]')) CoverHost.start(list[0].id, list.map((c) => c.id));
+      else if (on('[data-juke-radio]')) Radio.start({ screen: false }); // (the DJ speaks over the fox's head: js/radio.js)
       else if (on('[data-juke-stop]')) CoverHost.stopAll();
       else if (on('[data-juke-sing]')) return void UI.close(ov).then(() => Actions.sing());
       else if (!on('[data-ov-cancel]')) return;

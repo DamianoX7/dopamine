@@ -152,10 +152,11 @@ Views.calendar = {
     for (let d = 1; d <= size; d++) {
       const key = `${this.ym}-${pad2(d)}`;
       const evs = byDay[key] || [];
-      const cls = [key === today ? 'is-today' : '', key === this.sel ? 'is-sel' : '', evs.length ? 'has-day' : '', weekdayOf(key) === 0 ? 'is-sun' : ''].join(' ');
-      const label = `${m}월 ${d}일${evs.length ? ', ' + evs.map((e) => e.name).join(', ') : ''}`;
+      const page = State.diary.pages[key]; // (a day she wrote in her diary shows how it felt: js/diary.js)
+      const cls = [key === today ? 'is-today' : '', key === this.sel ? 'is-sel' : '', evs.length ? 'has-day' : '', page ? 'has-page' : '', weekdayOf(key) === 0 ? 'is-sun' : ''].join(' ');
+      const label = `${m}월 ${d}일${evs.length ? ', ' + evs.map((e) => e.name).join(', ') : ''}${page ? ', 일기 있음' : ''}`;
       cells += `<button class="cal-day ${cls}" data-action="cal-pick" data-key="${key}" data-sfx="none" aria-label="${esc(label)}" aria-pressed="${key === this.sel}">
-        <b>${d}</b><span aria-hidden="true">${evs.length ? evs[0].emoji : ''}</span></button>`;
+        <b>${d}</b><span aria-hidden="true">${evs.length ? evs[0].emoji : page ? page.mood : ''}</span></button>`;
     }
 
     const n = Days.count(today);
@@ -204,6 +205,8 @@ Views.calendar = {
     const diff = daysBetween(today, key);
     const when = diff === 0 ? '오늘' : diff > 0 ? `${fmtNum(diff)}일 뒤` : `${fmtNum(-diff)}일 전`;
     const evs = Days.on(key);
+    const page = State.diary.pages[key];
+    const write = !page && Diary.missed().includes(key);
     return `<div class="cal-picked">
       <p class="cal-picked-head"><b>${fmtDay(key)}</b><span>${when}${n > 0 ? ` · 우리 ${fmtNum(n)}일째` : ''}</span></p>
       ${
@@ -211,6 +214,7 @@ Views.calendar = {
           ? evs.map((e) => `<p class="cal-picked-day"><span aria-hidden="true">${e.emoji}</span> ${esc(e.name)}</p>`).join('')
           : '<p class="hint">기념일은 없지만, 함께라서 좋은 날이에요.</p>'
       }
+      ${page || write ? `<button class="btn soft small cal-page-link" data-action="diary-open" data-day="${key}">📔 ${page ? `이날의 일기 보기 ${page.mood}` : '이날의 일기 쓰기'}</button>` : ''}
     </div>`;
   },
 

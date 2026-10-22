@@ -72,6 +72,7 @@ const CoverHost = {
 
   setQuiet(on) {
     this.quiet = !!on;
+    if (this.quiet) Radio.watch(this.player()); // (the radio goes off for the recording: js/radio.js)
   },
 
   /* ----- what the modules report ----- */
@@ -118,6 +119,21 @@ const CoverHost = {
       if (label) label.textContent = on ? '❚❚' : '▶';
     });
     FoxRoom.tune(p); // in the foxes' world it is shown over the view — and they dance to it
+    Radio.watch(p); // …and the radio goes off when something else is put on (js/radio.js)
+  },
+
+  /* A cover has played to its end. */
+  onEnded(id) {
+    Radio.ended(id);
+    LP.ended(id);
+  },
+
+  /* The album page: this album as a record, on the turntable (js/lp.js). */
+  openLP(id) {
+    LP.open(id);
+  },
+  lpPressed(id) {
+    return LP.pressed(id);
   },
 
   /* ----- helpers for the app's own pages ----- */

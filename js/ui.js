@@ -126,6 +126,7 @@ const UI = {
     const ov = { el: wrap, panel: wrap.querySelector('.ov-panel'), opts, closed: false, prevFocus: document.activeElement };
     this.stack.push(ov);
     document.body.classList.add('has-overlay');
+    if (opts.full) $('#pet-pop').classList.remove('show'); // (a fox's pop-up still showing would sit on the new screen's buttons)
     void wrap.offsetWidth; // commit the closed state so the opening transition runs
     wrap.classList.add('open');
     if (!opts.noHistory) {

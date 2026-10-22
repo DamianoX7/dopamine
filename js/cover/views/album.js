@@ -76,6 +76,10 @@ export function mountAlbum(root, { id }) {
           variant: 'primary', size: 'lg', icon: albumPlaying && ps.playing ? 'pause' : 'play', disabled: !tracks.length,
           onClick: () => (albumPlaying ? toggle() : playSingle(queue[0], { queue, context: { type: 'album', id: album.id } })),
         }),
+        button(window.CoverHost.lpPressed(album.id) ? 'LP로 듣기' : 'LP 굽기', {
+          variant: 'soft', icon: 'disc', disabled: !tracks.length,
+          onClick: () => window.CoverHost.openLP(album.id),
+        }),
         button('싱글 추가', { variant: 'soft', icon: 'plus', onClick: () => openAddTracksSheet(album.id) }),
         button('앨범 편집', { variant: 'soft', icon: 'edit', onClick: () => openAlbumForm({ album }) }),
         button('앨범 삭제', {

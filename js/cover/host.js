@@ -7,8 +7,10 @@ import { blockedReason } from './core/router.js';
 import { closeAllSheets } from './core/sheet.js';
 import { debounce } from './core/util.js';
 import { library, loadLibrary, collectGarbage, getSingle } from './library.js';
+import { blobUrl } from './blobUrls.js';
 import { syncLibrary } from './sync.js';
-import { player, playSingle, toggle, closePlayer, clock } from './player.js';
+import { player, playSingle, toggle, closePlayer, clock, onEnded, seek, setRate } from './player.js';
+import { claimAudioFocus, releaseAudioFocus } from './core/audioFocus.js';
 import { beatsOf } from './audio/beat.js';
 import { mountMiniPlayer } from './ui/miniPlayer.js';
 import { artworkEl } from './ui/common.js';
@@ -84,6 +86,7 @@ player.subscribe((p) => {
   }
   host.onPlayer(p);
 });
+onEnded((id) => host.onEnded(id)); // (the radio plays one song at a time and goes on when each one is over)
 
 // ------------------------------------------------------------------ boot
 
@@ -114,6 +117,14 @@ async function boot() {
     playerState: () => player.get(),
     /** For the foxes, who dance to the covers: where the one that is playing is (seconds), and its beat once that is known. */
     clock,
+    /** For the record player (js/lp.js): go to a moment of the Single that is in the player, and how fast it turns. */
+    seek: (t) => seek(t),
+    rate: (r, keepPitch) => setRate(r, keepPitch),
+    /** A stored picture (artwork) as an object URL, or null. */
+    artUrl: (id) => blobUrl(id),
+    /** Only one thing plays at a time: the radio's DJ, between two songs, is one of them (`owner.pause()` when something else starts). */
+    focus: (owner) => claimAudioFocus(owner),
+    unfocus: (owner) => releaseAudioFocus(owner),
     beats: (id) => beatsOf(id),
     artwork: (id, opts) => {
       const s = getSingle(id);

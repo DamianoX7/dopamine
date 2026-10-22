@@ -469,6 +469,9 @@ Views.me = {
             ? '<button class="me-link card" data-action="open-wrapped"><span class="ml-icon" aria-hidden="true">🎁</span><span class="ml-text"><b>커버 결산</b><small>스토리로 보는 나의 노래 기록</small></span><span class="chev" aria-hidden="true">›</span></button>'
             : `<div class="me-link card is-locked"><span class="ml-icon" aria-hidden="true">🔒</span><span class="ml-text"><b>커버 결산</b><small>커버 3곡부터 열려요 (${n}/3)</small></span></div>`
         }
+        <a class="me-link card" href="#/diary"><span class="ml-icon" aria-hidden="true">📔</span><span class="ml-text"><b>일기장</b><small>${
+          Object.keys(State.diary.pages).length ? `하루 끝 한 장 · ${Object.keys(State.diary.pages).length}장` : `${OPENS_AT}가 되면 오늘의 한 장이 열려요`
+        }</small></span><span class="chev" aria-hidden="true">›</span></a>
         <a class="me-link card" href="#/me/letters"><span class="ml-icon" aria-hidden="true">💌</span><span class="ml-text"><b>편지</b><small>${Post.waiting().length ? `새 편지 ${Post.waiting().length}통이 도착했어요!` : `${Messages.all().length}개 중 ${Messages.collected().length}개 발견${Post.kept().length ? ` · 받은 편지 ${Post.kept().length}통` : ''}`}</small></span><span class="chev" aria-hidden="true">›</span></a>
         ${
           Opening.shut()

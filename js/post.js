@@ -88,6 +88,7 @@ const Post = {
     const first = !letter.read;
     if (first) {
       letter.read = Date.now();
+      Diary.note('letters');
       Game.reward({ dopamine: 10 }, anchor);
       Game.track('message');
       Store.save();

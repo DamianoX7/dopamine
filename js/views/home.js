@@ -47,6 +47,8 @@ Views.home = {
 
       ${Post.cardHtml()}
 
+      ${Diary.cardHtml()}
+
       <div class="card dopa-card">
         <div class="dopa-top">
           <div>
@@ -82,6 +84,8 @@ Views.home = {
       </div>
 
       ${cont ? this.continueHtml(cont) : ''}
+
+      ${Radio.cardHtml()}
 
       ${
         shut
@@ -182,6 +186,7 @@ Views.home = {
     }
     if (!Opening.shut()) Pet.wantPortrait();
     Days.hail();
+    Diary.hail();
   },
 };
 

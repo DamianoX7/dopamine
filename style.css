@@ -4093,7 +4093,7 @@ body.has-mini #pet-pop {
   color: #fff;
   cursor: pointer;
 }
-.is-wrapped .ov-panel {
+.overlay.is-wrapped .ov-panel {
   background: linear-gradient(160deg, #ff5fa2, #a855f7 55%, #312e81);
   transition: background 0.4s;
 }

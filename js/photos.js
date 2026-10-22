@@ -47,6 +47,8 @@ const Photos = {
       };
       await DB.put('photos', rec);
       State.statistics.photos = (State.statistics.photos || 0) + 1;
+      Diary.note('photos');
+      Diary.put('photo', rec.id); // (the newest of the day goes on its page)
       Store.save();
       this.last = rec;
       this.showLast(true);
@@ -137,7 +139,7 @@ const Photos = {
   /* One picture, large: when and of whom, and the ways to keep it elsewhere or throw it away. */
   view(rec) {
     const url = URL.createObjectURL(rec.blob);
-    const name = `여우 사진 ${dateKey(new Date(rec.at))}.jpg`;
+    const name = `${rec.kind === 'four' ? '여우 네컷' : '여우 사진'} ${dateKey(new Date(rec.at))}.jpg`;
     const share = canShareFile(rec.blob, name);
     const scene = HABITATS.find((h) => h.id === rec.scene);
     const ov = UI.open(
@@ -185,6 +187,6 @@ const Photos = {
 };
 
 Object.assign(Actions, {
-  'photo-shoot': () => Photos.shoot(),
+  'photo-shoot': () => (Booth.mode === 'four' ? Booth.run() : Photos.shoot()), // (four in a row: js/booth.js)
   'photo-album': () => Photos.openAlbum(),
 });
