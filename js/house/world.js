@@ -8,6 +8,9 @@
 // The light is the light of the hour: the day through the window, a patch of sun on the floor
 // where the real sun puts it, the gold of the evening, the night — and then the lamps she has,
 // and the light by the door, which she can switch off.
+//
+// Who is in it: the girl who lives there (resident.js), Lorelei when she comes round (guest.js),
+// and the courier at the door with something she ordered (courier.js).
 import * as THREE from '../vendor/three.module.min.js';
 import { FUR_SUN } from '../fox/rig.js';
 import { glyphMaterial, disposeTree } from '../fox/kit.js';
@@ -16,6 +19,8 @@ import { FURNITURE, CELL, makeFurniture } from './furniture.js';
 import { Room, roomSpec, wallFrame, WALL_H } from './room.js';
 import { Guest } from './guest.js';
 import { Resident } from './resident.js';
+import { Courier } from './courier.js';
+import { makeFood } from './food.js';
 
 const FOV = 32;
 const YAW = -0.62; //            where the camera stands at first: in front, a little to the left…
@@ -133,8 +138,10 @@ export class HouseWorld {
     this.grid = null;
     this.guest = new Guest(this); //  Lorelei, when she comes round
     this.me = new Resident(this); //    …and the girl who lives here
+    this.courier = new Courier(this); // …and at the door, now and then, the courier
+    this.food = null; //                 what she has ordered and is waiting for (the app's: { order })
     this.fx = new Fx(scene);
-    this.bubbles = { guest: { el: null, until: 0 }, me: { el: null, until: 0 } }; // what each of them says, over her head
+    this.bubbles = { guest: { el: null, until: 0 }, me: { el: null, until: 0 }, rider: { el: null, until: 0 } }; // what each of them says, over their head
     this.showcaseOn = false; //         the girl is being dressed: the camera comes close to her
     this.viewWas = null;
     this.lit = { dark: 0, light: true }; // how dark it is outside (0 … 1), and whether the room's light is on
@@ -245,6 +252,7 @@ export class HouseWorld {
     this.pinch = null;
     this.drag = null;
     this.guest.leave(true);
+    this.courier.vanish(true);
     this.me.on = false;
     this.setShowcase(false);
     cancelAnimationFrame(this.raf);
@@ -340,6 +348,7 @@ export class HouseWorld {
     this.radioOn = !!look.radio;
     this.items.forEach((e) => e.id === 'radio' && e.it.set('on', this.radioOn));
     this.setGift(!!look.gift);
+    this.food = look.food || null;
     this.grid = null;
     // the girl who lives here: dressed as the app has her (built again when anything changed — then she gives a twirl)
     if (look.me && look.me.look) {
@@ -585,7 +594,7 @@ export class HouseWorld {
     _c.lerp(_c2.setScalar(Math.max(grey, 0.6)), 0.45);
     const sun = clamp(this.key.intensity / 1.6, 0.25, 1);
     FUR_SUN.value.copy(this.key.position).sub(this.key.target.position).normalize();
-    for (const who of [this.me, this.guest]) {
+    for (const who of [this.me, this.guest, this.courier]) {
       if (!who.on) continue;
       who.light(_c, sun);
       who.update(dt);
@@ -773,7 +782,7 @@ export class HouseWorld {
     });
     if (this.parcel && this.parcel.visible) targets.push(this.parcel);
     targets.push(...this.room.taps.filter((m) => this.visibleUp(m)));
-    targets.push(...this.guest.meshes(), ...this.me.meshes());
+    targets.push(...this.guest.meshes(), ...this.me.meshes(), ...this.courier.meshes());
     const hits = ray.intersectObjects(targets, true).filter((h) => this.visibleUp(h.object) && h.object.type !== 'Sprite');
     // (one of the two — even half hidden, in bed, behind the sofa — or a fingertip from her: she is who was meant, not the furniture)
     if (!this.edit) {
@@ -811,7 +820,7 @@ export class HouseWorld {
     };
     let best = null;
     let bd = reach;
-    for (const who of [this.me, this.guest]) {
+    for (const who of [this.me, this.guest, this.courier]) {
       if (!who.on || !who.rig) continue;
       const [hx, hy] = onPage(who.headPoint(_w));
       const [fx, fy] = onPage(_v.copy(who.pos));
@@ -918,6 +927,10 @@ export class HouseWorld {
     if (hit.kind === 'me') {
       this.me.tapped();
       return this.host.onTap('me');
+    }
+    if (hit.kind === 'rider') {
+      this.courier.tapped();
+      return this.host.onTap('rider');
     }
     this.host.onTap(hit.kind, hit.uid || null);
   }
@@ -1454,6 +1467,54 @@ export class HouseWorld {
     }
   }
 
+  /* ----- something to eat (js/delivery.js) ----- */
+
+  /** Is she waiting for something she ordered (it is on its way, or the courier is at the door)? */
+  foodWaiting() {
+    return !!((this.food && this.food.order) || this.courier.on);
+  }
+
+  /** Is somebody at the door, or going through it? (One at a time: Lorelei and the courier wait for each other.) */
+  doorBusy() {
+    const g = this.guest;
+    const t = g.task;
+    const coming = g.on && ((t && (t.do === 'door' || t.do === 'greet' || (t.do === 'walk' && t.direct))) || g.tasks.some((x) => x.do === 'door'));
+    return this.courier.on || g.going || coming;
+  }
+
+  /**
+   * The courier at the door: the camera comes over to the doorway (on) — and goes back to how it was (off), unless she
+   * has moved it meanwhile.
+   */
+  frameDoor(on) {
+    const v = this.view;
+    if (on) {
+      if (this.doorView || this.showcaseOn || !this.spec) return;
+      const s = this.spec;
+      this.doorView = { was: { zoom: v.zoom, target: v.target.clone() }, zoom: Math.min(v.zoom, 0.55), target: V(s.w / 2 - 0.3, 0.62, s.door.u - 0.05) };
+      v.zoom = this.doorView.zoom;
+      v.target.copy(this.doorView.target);
+      return;
+    }
+    const d = this.doorView;
+    this.doorView = null;
+    if (!d || Math.abs(v.zoom - d.zoom) > 0.01 || v.target.distanceTo(d.target) > 0.01) return;
+    v.zoom = d.was.zoom;
+    v.target.copy(d.was.target);
+  }
+
+  /** She has ordered `order` ({ id, name }): her phone. */
+  order(order) {
+    if (this.stage) this.me.ordered(order);
+  }
+
+  /** It is here: the courier comes up to the door. */
+  deliver(order) {
+    if (!this.stage || this.courier.on) return false;
+    this.courier.come(order);
+    return true;
+  }
+
   reachable(p) {
     const g = this.grid || this.makeGrid();
     const [i, j] = this.cellOf(p);
@@ -1504,15 +1565,25 @@ export class HouseWorld {
   placeBubbles() {
     this.placeBubble('guest', this.guest);
     this.placeBubble('me', this.me);
-    // (both talking at once, close together: what was said first goes up over what was said after)
-    const { guest: g, me: m } = this.bubbles;
-    if (!g.el || !m.el || g.el.hidden || m.el.hidden || !g.at || !m.at) return;
-    const [first, last] = (g.said || 0) <= (m.said || 0) ? [g, m] : [m, g];
-    const apart = Math.abs(first.at.x - last.at.x) - (first.at.w + last.at.w) / 2;
-    const above = last.at.y - last.at.h - 6;
-    if (apart >= 4 || first.at.y <= above) return;
-    first.at.y = above;
-    first.el.style.transform = `translate(${Math.round(first.at.x)}px, ${Math.round(above)}px) translate(-50%, -100%)`;
+    this.placeBubble('rider', this.courier);
+    // (talking at once, close together: what was said first goes up over what was said after)
+    const shown = Object.values(this.bubbles)
+      .filter((b) => b.el && !b.el.hidden && b.at)
+      .sort((a, b) => (b.said || 0) - (a.said || 0));
+    for (let i = 1; i < shown.length; i++) {
+      const b = shown[i];
+      let moved = false;
+      for (let j = 0; j < i; j++) {
+        const n = shown[j];
+        const apart = Math.abs(b.at.x - n.at.x) - (b.at.w + n.at.w) / 2;
+        const across = b.at.y > n.at.y - n.at.h - 6 && b.at.y - b.at.h < n.at.y; // (the one over the other, up the screen)
+        if (apart < 4 && across) {
+          b.at.y = n.at.y - n.at.h - 6;
+          moved = true;
+        }
+      }
+      if (moved) b.el.style.transform = `translate(${Math.round(b.at.x)}px, ${Math.round(b.at.y)}px) translate(-50%, -100%)`;
+    }
   }
 
   placeBubble(who, person) {
@@ -1538,6 +1609,28 @@ export class HouseWorld {
     if (this.thumbs.has(key)) return this.thumbs.get(key);
     const it = makeFurniture(id, { seed: 3 });
     if (!it) return '';
+    if (it.set) {
+      it.set('on', true);
+      if (id === 'calendar') it.set('calendar', { y: 2026, m: 11, d: 28, count: 100, marks: [] });
+    }
+    if (it.update) it.update(0.016, 2, { dark: 0.6 });
+    const wall = it.def.kind === 'wall';
+    if (!wall) it.object.rotation.y = -0.55;
+    return this.picture(key, it.object, size, wall);
+  }
+
+  /** A dish of the delivery menu (food.js), for the menu. */
+  foodThumb(id, size = 132) {
+    const key = `food:${id}:${size}`;
+    if (this.thumbs.has(key)) return this.thumbs.get(key);
+    const f = makeFood(id);
+    if (!f) return '';
+    f.object.rotation.y = -0.45;
+    return this.picture(key, f.object, size, false, 0.32, 0.006);
+  }
+
+  /* A thing on its own, softly lit on pink, as a small picture (kept: it is drawn once). */
+  picture(key, object, size, wall = false, up = 0.5, pad = 0.04) {
     this.grace();
     const r = this.renderer;
     const keep = { w: this.canvas.width, h: this.canvas.height, ratio: r.getPixelRatio() };
@@ -1548,23 +1641,16 @@ export class HouseWorld {
     const hemi = new THREE.HemisphereLight('#ffffff', '#f0d6e0', 1.8);
     const sun = new THREE.DirectionalLight('#fff6ea', 1.6);
     sun.position.set(-2, 4, 3);
-    scene.add(hemi, sun, it.object);
-    if (it.set) {
-      it.set('on', true);
-      if (id === 'calendar') it.set('calendar', { y: 2026, m: 11, d: 28, count: 100, marks: [] });
-    }
-    if (it.update) it.update(0.016, 2, { dark: 0.6 });
-    const wall = it.def.kind === 'wall';
-    if (!wall) it.object.rotation.y = -0.55;
-    it.object.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(it.object);
+    scene.add(hemi, sun, object);
+    object.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(object);
     const centre = box.getCenter(V());
     const dim = box.getSize(V());
     const camera = new THREE.PerspectiveCamera(26, 1, 0.05, 40);
-    const R = Math.max(dim.x, dim.y, dim.z) * 0.62 + 0.04;
+    const R = Math.max(dim.x, dim.y, dim.z) * 0.62 + pad;
     const dist = R / Math.tan((13 * Math.PI) / 180);
     if (wall) camera.position.set(centre.x, centre.y + dist * 0.08, centre.z + dist);
-    else camera.position.set(centre.x + dist * 0.25, centre.y + dist * 0.5, centre.z + dist * 0.83);
+    else camera.position.set(centre.x + dist * 0.25, centre.y + dist * up, centre.z + dist * 0.83);
     camera.lookAt(centre);
     r.setPixelRatio(1);
     r.setSize(size * 2, size * 2, false);
@@ -1575,7 +1661,7 @@ export class HouseWorld {
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(this.canvas, 0, 0, size, size);
     const url = out.toDataURL('image/webp', 0.9);
-    disposeTree(it.object);
+    disposeTree(object);
     r.setPixelRatio(keep.ratio);
     r.setSize(keep.w / keep.ratio, keep.h / keep.ratio, false);
     if (this.stage) this.draw();

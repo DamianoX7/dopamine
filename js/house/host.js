@@ -58,9 +58,16 @@ host.register({
   arrive: (stay) => world && world.guest.arrive(stay),
   leave: (now) => world && world.guest.leave(now),
   guestHere: () => !!(world && world.guest.on),
+  /** Something to eat (js/delivery.js): she has ordered it — out comes her phone; it is here — the courier comes to the door (→ false if
+   *  he cannot now); is somebody at the door; is she busy with it (the courier at the door, or eating). */
+  order: (o) => world && world.order(o),
+  deliver: (o) => (world ? world.deliver(o) : false),
+  doorBusy: () => !!(world && world.doorBusy()),
+  eating: () => !!(world && world.stage && world.me.busyEating()),
   /** Pictures for the shop: a thing on its own; a wallpaper's or a floor's swatch. */
   thumb: (id) => (ensure() ? world.thumb(id) : ''),
   swatch: (kind, id) => (ensure() ? world.swatch(kind, id) : ''),
+  foodThumb: (id) => (ensure() ? world.foodThumb(id) : ''),
   /** The room as it is now, a picture (a canvas). */
   capture: (long) => (world ? world.capture(long) : null),
 });

@@ -16,7 +16,8 @@
 
    And she lives there herself: a girl she has made, named and dressed
    as she likes (js/avatar.js), who sleeps in the bed at night and goes
-   about the house through the day.
+   about the house through the day — and orders in now and then: the
+   courier knocks with it (js/delivery.js).
 
    What she has and where it stands is State.house; the pictures and
    the records stay where they are kept (js/photos.js, the studio).
@@ -125,6 +126,7 @@ const HOUSE_TIPS = [
   '기념일엔 문 앞에 선물이 도착해요',
   '냉장고에는 업적마다 자석이 하나씩 붙어요',
   `가끔 ${josa(OWNER_NAME, '이/가')} 놀러 와요`,
+  '🛵 버튼으로 배달 음식을 시켜 줄 수 있어요. 배달원이 문을 두드려요',
 ];
 
 /* What Lorelei says when she comes round — and about what she sees. ('{name}' = her nickname) */
@@ -160,6 +162,7 @@ const HOUSE_LINES = {
   pumpkin: ['호박 등불 귀엽다 🎃'],
   tap: ['응? 불렀어? 💗', '헤헤, 안녕!', '나 여기 있어~', '오늘도 반가워!', '왜~? 😊'],
   meet: ['{me}! 잘 지냈어? 💗', '{me}, 안녕! 오늘 옷 예쁘다 ✨', '{me}! 보고 싶었어 👋', '놀러 왔어, {me}!'], // (to the girl who lives here: '{me}' is her name)
+  food: ['와, {food}! 맛있겠다~ 😋', '맛있는 냄새 난다~', '나도 한 입만…! 🥺'], // (what she has ordered has come: '{food}')
   bye: ['이제 여우들한테 가 봐야겠다. 또 올게! 👋', '잘 놀다 가! 다음에 또 봐 💗', '오늘 즐거웠어! 안녕~'],
 };
 const GUEST_EVERY = 90 * 60000; // she comes at most this often…
@@ -275,7 +278,8 @@ const HouseHost = {
   onPlace: (uid, place) => House.placed(uid, place), // …and put it down somewhere else
   onRefuse: () => House.refused(), //                  …where it cannot stand
   onGuest: (what) => House.guestSaid(what), //         Lorelei: 'hello', 'wave', 'bye', 'leaving', 'gone'
-  line: (who, kind) => (who === 'guest' ? House.guestLine(kind) : Avatar.line(kind)), // what Lorelei ('guest') or the girl ('me') says about `kind`
+  line: (who, kind) => (who === 'guest' ? House.guestLine(kind) : who === 'rider' ? Delivery.riderLine(kind) : Avatar.line(kind)), // what Lorelei ('guest'), the girl ('me') or the courier ('rider') says about `kind`
+  onDelivery: (what, o) => Delivery.said(what, o), //  the courier: 'knock', 'handed', 'gone' — and 'done': she has eaten it
   clock: () => CoverHost.clock(), //                   (where the song is, and its beat: she dances to it)
   beats: (id) => CoverHost.beats(id),
 };
@@ -342,6 +346,7 @@ const House = {
       gift: !!this.giftWaiting(),
       giftKey: (this.giftWaiting() || {}).key || null,
       me: { look: Avatar.look3d(), showcase: HouseRoom.meOn },
+      food: { order: (Delivery.pending() || {}).id || null },
       calendar: this.calendar(today),
       magnets: Object.keys(State.achievements).length,
       tune: CoverHost.tune(),
@@ -387,7 +392,7 @@ const House = {
     if (kind === 'window') return this.windowCard();
     if (kind === 'switch') return this.switchLight();
     if (kind === 'gift') return this.openGift();
-    if (kind === 'guest' || kind === 'me') return; // (they turn and wave: the 3D side has done it)
+    if (kind === 'guest' || kind === 'me' || kind === 'rider') return; // (they turn and wave: the 3D side has done it)
     if (kind === 'door') {
       Sfx.play('tap');
       return UI.toast(HouseHost.api && HouseHost.api.guestHere() ? `${josa(OWNER_NAME, '이/가')} 놀러 와 있어요 💗` : '현관문이에요. 가끔 누가 똑똑 두드려요 🚪', { icon: '🚪' });
@@ -985,7 +990,7 @@ const House = {
 
   /** A present waiting by the door — of today, or of yesterday if she was not here then: { key, id, event }. */
   giftWaiting() {
-    if (!State.house.made || Cloud.writer) return null;
+    if (!State.house.made) return null;
     const today = dateKey();
     for (const day of [today, addDays(today, -1)]) {
       for (const e of Days.on(day)) {
@@ -1029,7 +1034,7 @@ const House = {
   /** Is she coming round this time? (Never before she has met her in the foxes' world, nor at night; twice a day at most.) */
   guestDue() {
     const g = State.house.guest;
-    if (!State.pet.introduced || Opening.shut() || Cloud.writer) return false;
+    if (!State.pet.introduced || Opening.shut()) return false;
     const hour = new Date().getHours();
     if (hour < 9 || hour >= 23) return false;
     if (!g.met) return true; // (her first visit: the housewarming)
@@ -1043,7 +1048,7 @@ const House = {
   knock(tries = 0) {
     this.guestTimer = 0;
     if (!HouseRoom.ov || !HouseHost.api || !State.pet.introduced || Opening.shut()) return;
-    if (HouseRoom.editOn || HouseRoom.meOn || UI.top() !== HouseRoom.ov) {
+    if (HouseRoom.editOn || HouseRoom.meOn || UI.top() !== HouseRoom.ov || HouseHost.api.doorBusy()) {
       if (tries < 8) this.guestTimer = setTimeout(() => this.knock(tries + 1), 7000);
       return;
     }
@@ -1089,7 +1094,8 @@ const House = {
     if (!list || !list.length) return '';
     return pick(list)
       .replace(/\{name\}/g, State.user.nickname || '너')
-      .replace(/\{me\}/g, Avatar.name());
+      .replace(/\{me\}/g, Avatar.name())
+      .replace(/\{food\}/g, Delivery.foodName());
   },
 
   /* ----- a picture of the room ----- */
@@ -1141,7 +1147,7 @@ const House = {
   /* ----- the card on Home ----- */
 
   cardHtml() {
-    if (!State.onboarded || Cloud.writer) return '';
+    if (!State.onboarded && !Cloud.writer) return ''; // (his login has no onboarding: the house is there for him too — what he does in it stays on his device)
     const h = State.house;
     const gift = this.giftWaiting();
     const mail = Post.waiting().length;
@@ -1191,6 +1197,7 @@ const HouseRoom = {
         <div class="house-wait" aria-hidden="true"><span>🏠</span></div>
         <div class="fox-bubble house-bubble" data-house-bubble="guest" data-who="${esc(OWNER_NAME)}" hidden></div>
         <div class="fox-bubble house-bubble is-me" data-house-bubble="me" data-who="${esc(Avatar.name())}" hidden></div>
+        <div class="fox-bubble house-bubble is-rider" data-house-bubble="rider" data-who="🛵 ${RIDER_NAME}" hidden></div>
       </div>
       <div class="fox-hud house-hud">
         <div class="fh-top">
@@ -1203,11 +1210,13 @@ const HouseRoom = {
           <div class="fox-tune" data-house-tune hidden></div>
           <button class="fox-mail" data-action="house-mail" data-house-mail hidden><span aria-hidden="true">💌</span> <b>편지가 왔어요</b><small>우편함을 눌러 보세요</small></button>
           <button class="fox-mail is-present" data-action="house-gift" data-house-gift hidden></button>
+          <button class="fox-mail is-food" data-action="house-food" data-house-food hidden></button>
           ${State.house.taught ? '' : '<p class="fox-tip" data-house-tip>👆 물건을 눌러 보세요 · 손가락으로 밀면 집이 돌아가요</p>'}
         </div>
         <button class="fox-cam" data-action="house-snap" aria-label="방 사진 찍기"><span aria-hidden="true">📷</span></button>
         <button class="fox-cam is-light" data-action="house-light" data-house-light aria-label="불 켜기 끄기"><span aria-hidden="true">💡</span></button>
         <button class="fox-cam is-home" data-action="house-home" aria-label="처음 보던 곳으로 돌아가기"><span aria-hidden="true">🔄</span></button>
+        <button class="fox-cam is-food" data-action="house-food" aria-label="배달 시키기"><span aria-hidden="true">🛵</span></button>
         <div class="fh-actions">
           <button class="fh-act" data-action="house-lp"><span aria-hidden="true">💿</span><b>LP 듣기</b></button>
           <button class="fh-act" data-action="house-diary"><span aria-hidden="true">📔</span><b>일기장</b></button>
@@ -1343,6 +1352,7 @@ const HouseRoom = {
     House.held = null;
     House.preview = null;
     clearInterval(this.skyTimer);
+    Delivery.closed();
     clearTimeout(House.guestTimer);
     House.guestTimer = 0;
     if (this.loop) this.loop();
@@ -1363,6 +1373,7 @@ const HouseRoom = {
       this.recAt = now;
       House.recordState();
       this.tuneChip();
+      Delivery.tick();
     }
     const sel = $('[data-house-sel]', this.ov.panel);
     if (!sel || sel.hidden || !House.held || !HouseHost.api) return;
@@ -1392,6 +1403,7 @@ const HouseRoom = {
     const bubble = $('[data-house-bubble="me"]', panel);
     if (bubble) bubble.dataset.who = Avatar.name();
     this.tuneChip();
+    Delivery.chip();
   },
 
   /* The song on the turntable (or anywhere): what it is, pause, stop. */
@@ -1554,6 +1566,8 @@ const HouseRoom = {
   /** Her drawer open (she comes forward, the camera comes close) — or shut again (what she was only trying on, she takes off). */
   setMe(on) {
     if (!this.ov) return;
+    // (not while the courier is at the door, nor while she is eating: her hands are full)
+    if (on && HouseHost.api && HouseHost.api.eating()) return UI.toast(`${josa(Avatar.name(), '이/가')} 배달 음식을 받고 먹는 중이에요 😋 다 먹으면 꾸밀 수 있어요`, { icon: '🛵' });
     if (on && this.editOn) this.setEdit(false);
     this.meOn = !!on;
     if (!on) Avatar.trying = null;

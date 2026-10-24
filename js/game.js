@@ -82,6 +82,8 @@ const ACHIEVEMENTS = [
   { id: 'house_big', emoji: '🏡', name: '넓은 집', desc: '둘의 집을 넓혀요.', test: (s) => s.house.size >= 1 },
   { id: 'house_style', emoji: '👗', name: '오늘의 코디', desc: '둘의 집에 사는 나에게 새 옷을 사 입혀요.', test: (s) => ((s.house.me && s.house.me.owned) || []).length >= 1 },
   { id: 'house_closet', emoji: '🛍️', name: '옷장 부자', desc: '둘의 집에 사는 나의 옷과 소품을 열 가지 모아요.', test: (s) => ((s.house.me && s.house.me.owned) || []).length >= 10 },
+  { id: 'house_food', emoji: '🛵', name: '배달 왔어요', desc: '둘의 집에서 배달 음식을 처음 시켜 먹어요.', test: (s) => Object.keys((s.house.food && s.house.food.ate) || {}).length >= 1 },
+  { id: 'house_foodie', emoji: '🍽️', name: '배달 맛집 탐방', desc: '배달 메뉴를 모두 한 번씩 먹어 봐요.', test: (s) => Object.keys((s.house.food && s.house.food.ate) || {}).length >= DELIVERY_MENU.length },
   { id: 'radio_fm', emoji: '📻', name: '도파민 FM', desc: '여우 라디오로 내 노래를 세 곡 들어요.', test: (s) => (s.statistics.radio || 0) >= 3 },
   { id: 'four_cut', emoji: '🎞️', name: '인생네컷', desc: '여우들과 네 컷 사진을 찍어요.', test: (s) => (s.statistics.fourCuts || 0) >= 1 },
   { id: 'lp_press', emoji: '💿', name: '레코드 프레스', desc: '앨범을 LP로 구워요.', test: (s) => Object.keys(s.lp).length >= 1 },

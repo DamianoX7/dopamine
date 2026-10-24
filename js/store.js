@@ -126,7 +126,8 @@ function defaultState() {
     // picture is in which frame, which album on which poster, the lamps she has switched herself, the light by the door,
     // the record on the turntable, the presents of the days worth remembering she has opened, Lorelei's visits, whether
     // she has tapped anything in it yet — and the girl who lives in it (js/avatar.js): her name (and whether it was given
-    // her), how she looks and what she wears (ids, as AVATAR_DEFAULT), the clothes she has bought ('slot:id')
+    // her), how she looks and what she wears (ids, as AVATAR_DEFAULT), the clothes she has bought ('slot:id'); what she
+    // has ordered to eat and is waiting for ({ id, at, eta }: js/delivery.js), how many times she has had each dish
     house: {
       made: 0,
       size: 0,
@@ -145,6 +146,7 @@ function defaultState() {
       guest: { at: 0, day: '', today: 0, met: false, visits: 0 },
       taught: false,
       me: { name: '', named: false, look: {}, owned: [] },
+      food: { order: null, ate: {}, eating: null },
     },
     opening: { seen: false, greeted: false }, //           the rooms that open on a day of their own (js/opening.js): has she stood before them shut — and been told that they opened?
     // season: 'auto' = the foxes' world follows the calendar; or 'spring', 'summer', 'autumn', 'winter' (js/weather.js)

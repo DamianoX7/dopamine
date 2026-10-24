@@ -1691,6 +1691,8 @@ export class LoreleiAnimator {
     this.pivot = 0;
     this.add = {}; //       offsets on top of the pose, a frame at a time (same keys): a wave, a clap, a dance
     this.reach = null; //   { side: 'L' | 'R', point } — that hand goes to this point in the world, as far as her arm is long
+    this.hands = { L: null, R: null }; // …or each hand to a point of its own, both at once (a bowl in one, chopsticks in the other)
+    this.lastHand = { L: null, R: null };
     this.umbrella = false; // she has her umbrella up
     this.holds = null; //   'bag': what she has in her hands
 
@@ -1879,12 +1881,11 @@ export class LoreleiAnimator {
     grp.updateMatrixWorld(true);
     rig.light.uMid.value.setFromMatrixPosition(B.chest.matrixWorld); // (where she is: her shadow is looked up from there)
     for (const side of ['L', 'R']) {
-      const want = this.reach && this.reach.side === side ? 1 : 0;
-      const w = (this.reachW[side] = damp(this.reachW[side], want, want ? 7 : 5, dt));
-      if (w > 0.005 && this.reach && this.reach.side === side) this.solveArm(side, this.reach.point, w);
-      else if (w > 0.005 && this.lastReach) this.solveArm(side, this.lastReach, w);
+      const point = this.reach && this.reach.side === side ? this.reach.point : this.hands[side];
+      const w = (this.reachW[side] = damp(this.reachW[side], point ? 1 : 0, point ? 7 : 5, dt));
+      if (point) this.lastHand[side] = (this.lastHand[side] || V()).copy(point);
+      if (w > 0.005 && this.lastHand[side]) this.solveArm(side, this.lastHand[side], w); // (let go: the arm goes back from where it was)
     }
-    if (this.reach) this.lastReach = (this.lastReach || V()).copy(this.reach.point);
 
     // -- her hair: the tail hangs behind her left shoulder — it trails when she walks, swings out as she turns, bounces with her step
     const s = this.sway;

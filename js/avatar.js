@@ -179,6 +179,23 @@ const AVATAR_LINES = {
   guest: ['{owner} 왔구나! 어서 와 💗', '{owner}! 반가워 👋'],
   tap: ['앗, 깜짝이야!', '헤헤 😊', '간지러워~', '왜~?', '기분 좋아 💗', '응?'],
   dressed: ['어때, 예뻐? ✨', '새 옷 좋다!', '이거 마음에 들어 💗'],
+  // (ordering in: js/delivery.js — '{food}' is what she ordered)
+  order: ['{food} 주문 완료! 🛵', '{food} 시켰다~ 빨리 와라!', '오늘은 {food}! 😋'],
+  waiting: ['배달 언제 오지…', '{food} 기다리는 중~ 🛵', '배고파… 🥺'],
+  hungry: ['배고프다… 떡볶이 먹고 싶다 🥺', '마라탕 땡긴다 🌶️', '버블티 마시고 싶다 🧋', '치킨 먹고 싶다… 🍗'],
+  hungry_night: ['야식 먹고 싶다… 🌙', '이 시간에 치킨은 반칙인데… 🍗', '출출하다… 🌙'],
+  door: ['네~ 나가요!', '앗 왔다! 잠시만요~', '네에~! 🏃‍♀️'],
+  thanks: ['감사합니다~! 💗', '와 빨리 왔다! 감사해요 😊', '우와, 감사합니다!'],
+  bye: ['조심히 가세요~ 👋', '수고하세요! 💗', '감사합니다, 안녕히 가세요~'],
+  unpack: ['{food} 왔다! 🎉', '짜잔~ {food}! 😋', '잘 먹겠습니다! 🙏'],
+  eat_bubbletea: ['쭈욱~ 🧋', '펄 쫀득쫀득해!', '달달하다 💗'],
+  eat_tanghulu: ['와작! 🍓', '바삭바삭 달콤해~', '하나 더! 🍓'],
+  eat_tteokbokki: ['쫀득쫀득 🍢', '맵다 맵다! 🔥', '역시 떡볶이야!'],
+  eat_malatang: ['호로록~ 🍜', '얼얼해 🌶️', '국물 미쳤다…'],
+  eat_chicken: ['바삭바삭 🍗', '역시 치킨은 진리야', '겉바속촉!'],
+  eat_pizza: ['치즈 쭉~ 🍕', '따끈따끈해!', '피자 최고 😋'],
+  done: ['잘 먹었다! 😋', '배불러~ 💗', '행복해… 🥰', '또 시켜 먹어야지!'],
+  tap_eat: ['냠냠! 😋', '한 입 줄까? 🥺', '먹는 중이야~'],
 };
 const AVATAR_TABS = [
   ['face', '😊 얼굴'],
@@ -360,7 +377,9 @@ const Avatar = {
     }
     const list = AVATAR_LINES[k] || AVATAR_LINES[kind];
     if (!list || !list.length) return '';
-    return pick(list).replace(/\{owner\}/g, OWNER_NAME);
+    return pick(list)
+      .replace(/\{owner\}/g, OWNER_NAME)
+      .replace(/\{food\}/g, Delivery.foodName());
   },
 
   /* ----- the shop ----- */

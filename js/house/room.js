@@ -645,28 +645,29 @@ export class Room {
     trim.rotation.y = f.yaw;
     wall.pivot.parent.add(trim);
     this.doorTrim = trim;
-    // the door: hinged at its front edge, it opens into the room
+    // the door: hinged at its back edge, it opens into the room — back towards the back wall, so that whoever is on the
+    // step outside shows through the doorway
     const hinge = new THREE.Group();
-    hinge.position.copy(f.at(u + w / 2, 0, 0.02));
+    hinge.position.copy(f.at(u - w / 2, 0, 0.02));
     hinge.rotation.y = f.yaw;
     const leaf = new THREE.Group();
     const board = new THREE.Mesh(roundBox(w - 0.02, h - 0.02, 0.045, 0.015), new THREE.MeshStandardMaterial({ color: '#ff9cbc', roughness: 0.55 }));
-    board.position.set(-(w - 0.02) / 2, (h - 0.02) / 2 + 0.005, -0.03);
+    board.position.set((w - 0.02) / 2, (h - 0.02) / 2 + 0.005, -0.03);
     board.castShadow = true;
     board.layers.enable(SHADOW_LAYER);
     leaf.add(board);
     const panel = new THREE.Mesh(roundBox(w - 0.2, h * 0.36, 0.01, 0.008), new THREE.MeshStandardMaterial({ color: '#ffb3c9', roughness: 0.55 }));
-    panel.position.set(-(w - 0.02) / 2, h * 0.3, -0.006);
+    panel.position.set((w - 0.02) / 2, h * 0.3, -0.006);
     leaf.add(panel);
     const pane = new THREE.Mesh(new THREE.CircleGeometry(0.11, 24), new THREE.MeshStandardMaterial({ color: '#cfe8ff', roughness: 0.1, emissive: '#cfe8ff', emissiveIntensity: 0.25 }));
-    pane.position.set(-(w - 0.02) / 2, h * 0.76, -0.006);
+    pane.position.set((w - 0.02) / 2, h * 0.76, -0.006);
     leaf.add(pane);
     const knob = new THREE.Mesh(new THREE.SphereGeometry(0.025, 12, 10), new THREE.MeshStandardMaterial({ color: '#e9c26a', roughness: 0.3, metalness: 0.8 }));
-    knob.position.set(-w + 0.1, h * 0.48, 0.0);
+    knob.position.set(w - 0.1, h * 0.48, 0.0);
     leaf.add(knob);
     // a heart wreath on it
     const wreath = new THREE.Mesh(heart(0.16, 0.025), new THREE.MeshStandardMaterial({ color: '#7cc56c', roughness: 0.7 }));
-    wreath.position.set(-(w - 0.02) / 2, h * 0.57, 0.0);
+    wreath.position.set((w - 0.02) / 2, h * 0.57, 0.0);
     leaf.add(wreath);
     hinge.add(leaf);
     board.userData.tap = 'door';
@@ -823,7 +824,7 @@ export class Room {
     if (this.beam.intensity < 0.005) this.beam.intensity = 0;
     this.beam.shadow.autoUpdate = this.beam.intensity > 0;
     this.doorOpen = damp(this.doorOpen, this.doorWant, 3.2, dt);
-    if (this.door) this.door.rotation.y = wallFrame(this.spec, 'right').yaw + this.doorOpen * 1.65; // (into the room)
+    if (this.door) this.door.rotation.y = wallFrame(this.spec, 'right').yaw - this.doorOpen * 1.65; // (into the room)
   }
 
   /** Where the door is, inside and out: where she comes in from, and the first step in. */

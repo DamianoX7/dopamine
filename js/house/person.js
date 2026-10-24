@@ -2,14 +2,20 @@
 // (resident.js). Each has a simple mind — a list of things to do, one after the other, and when
 // it runs out, something else — and the same things to do: walk somewhere round what stands in
 // the way, look at a thing, sit on the sofa swinging her legs, lie down in bed and sleep, dance
-// to the record, turn and wave when she is tapped, say what she thinks (the app has the lines).
-// The animator is Lorelei's (../fox/lorelei.js): both girls are built on her bones.
+// to the record, turn and wave when she is tapped, say what she thinks (the app has the lines) —
+// and hold things in her hands (a bag, a phone, a bowl), upright whatever her arm does.
+// The animator is Lorelei's (../fox/lorelei.js): everybody in the house is built on her bones.
+import * as THREE from '../vendor/three.module.min.js';
 import { LoreleiAnimator, LORELEI_POSES } from '../fox/lorelei.js';
+import { disposeTree } from '../fox/kit.js';
 import { V } from './shapes.js';
 
 const WALK = 0.62; //   how fast she walks (world units a second)
 const TURN = 5.5; //    …and turns (radians a second)
 const HIPS = 0.507; //  her hips above her feet, standing
+const Y_AXIS = V(0, 1, 0);
+const _q = new THREE.Quaternion();
+const _q2 = new THREE.Quaternion();
 export const angle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 export const damp = (cur, target, rate, dt) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
 const ease = (k) => k * k * (3 - 2 * k);
@@ -28,7 +34,7 @@ export const pose = (name) => POSES[name] || LORELEI_POSES[name] || LORELEI_POSE
 export class Person {
   constructor(world, who) {
     this.world = world;
-    this.who = who; //       'guest' (Lorelei) or 'me' (the girl who lives here): whose lines, whose bubble
+    this.who = who; //       'guest' (Lorelei), 'me' (the girl who lives here), 'rider' (the courier): whose lines, whose bubble
     this.rig = null;
     this.anim = null;
     this.on = false; //      she is in the house
@@ -39,14 +45,18 @@ export class Person {
     this.last = null; //     what she did last (not the same thing twice running)
     this.lastSay = -99;
     this.dance = 0; //       how much she is dancing (0 … 1)
+    this.props = { L: null, R: null }; // what she has in her hands
   }
 
   /** Give her a body (a rig as Lorelei's): the animator moves it. Where she was, she stays. */
   setRig(rig) {
     const a = this.anim;
     if (this.rig) {
+      // (what she has in her hands she keeps, in her new ones)
+      const held = { L: this.drop('L'), R: this.drop('R') };
       this.world.scene.remove(this.rig.group);
       this.rig.dispose();
+      this.held = held;
     }
     this.rig = rig;
     const anim = (this.anim = new LoreleiAnimator(rig));
@@ -67,6 +77,10 @@ export class Person {
       }
     });
     this.world.scene.add(rig.group);
+    if (this.held) {
+      for (const side of ['L', 'R']) if (this.held[side]) this.hold(side, this.held[side].object, this.held[side].off);
+      this.held = null;
+    }
   }
 
   get pos() {
@@ -80,11 +94,59 @@ export class Person {
 
   /* ----- what she says ----- */
 
+  /** She says something about `kind` (the app has the lines). → how long it shows, in seconds (0: she had nothing to say). */
   say(kind, ms) {
     const text = this.world.host.line(this.who, kind);
-    if (!text) return;
+    if (!text) return 0;
     this.lastSay = this.world.time;
-    this.world.say(text, ms || Math.min(6000, 2200 + text.length * 70), this.who);
+    const long = ms || Math.min(6000, 2200 + text.length * 70);
+    this.world.say(text, long, this.who);
+    return long / 1000;
+  }
+
+  /* ----- what she has in her hands ----- */
+
+  /** `object` in her hand (`side`: 'L' or 'R'), at her palm (and `off` from it): upright, turned the way she faces. */
+  hold(side, object, off = null) {
+    this.drop(side);
+    if (!this.rig) return;
+    object.position.copy(this.rig.dims.palm);
+    if (off) object.position.add(off);
+    object.traverse((o) => {
+      if (o.isMesh) o.userData.person = this.who;
+    });
+    this.rig.bones[`hand${side}`].add(object);
+    this.props[side] = { object, off };
+    this.upright();
+  }
+
+  /** …taken out of her hand again (→ it, or null). */
+  drop(side) {
+    const p = this.props[side];
+    if (!p) return null;
+    if (p.object.parent) p.object.parent.remove(p.object);
+    this.props[side] = null;
+    return p;
+  }
+
+  /** Both hands empty (what was in them thrown away). */
+  dropAll() {
+    for (const side of ['L', 'R']) {
+      const p = this.drop(side);
+      if (p) disposeTree(p.object);
+    }
+    if (this.anim) this.anim.hands.L = this.anim.hands.R = null;
+  }
+
+  /* (whatever her arms do, what is in her hands stays upright, turned as she is) */
+  upright() {
+    for (const side of ['L', 'R']) {
+      const p = this.props[side];
+      if (!p || !p.object.parent) continue;
+      p.object.parent.getWorldQuaternion(_q).invert();
+      _q2.setFromAxisAngle(Y_AXIS, this.anim.yaw);
+      p.object.quaternion.copy(_q).multiply(_q2);
+    }
   }
 
   /* ----- what she does ----- */
@@ -118,20 +180,22 @@ export class Person {
    * She turns to `at` (a point — null: whoever is looking on) and waves, saying `line`; sitting, she waves from where she
    * sits; then she goes on with what she was doing. `after`: not now but in so many seconds (the other one is still talking).
    */
-  waveTo(at, line, after = 0) {
+  waveTo(at, line, after = 0, tries = 0) {
     if (!this.on) return;
     if (after > 0) {
-      this.pending = { at, line, when: this.world.time + after };
+      this.pending = { at, line, when: this.world.time + after, tries };
       return;
     }
     const t = this.task;
-    if (t && (t.do === 'greet' || t.do === 'wave' || t.do === 'door' || t.do === 'twirl')) return;
+    // (in the middle of something that will not wait — or sitting down, getting up: in a moment, if it is for somebody)
+    const later = () => line !== 'tap' && tries < 6 && (this.pending = { at, line, when: this.world.time + 0.8, tries: tries + 1 });
+    if (t && (t.do === 'greet' || t.do === 'wave' || t.do === 'door' || t.do === 'twirl')) return void later();
     if (t && (t.do === 'sit' || t.do === 'lie')) {
-      // (sitting down or getting up: a moment, then it is done; sat, she waves where she is; asleep, she stirs)
+      // (sat, she waves where she is; asleep, she stirs)
       if ((t.phase === 'sat' || t.phase === 'lying') && t.waveAt == null) {
         t.waveAt = t.age;
         this.say(t.do === 'lie' ? 'sleepy' : line);
-      }
+      } else if (t.phase !== 'sat' && t.phase !== 'lying') later();
       return;
     }
     // whatever she was doing, she does once she has waved (from where she has got to)
@@ -162,7 +226,7 @@ export class Person {
     if (this.pending && this.world.time >= this.pending.when) {
       const p = this.pending;
       this.pending = null;
-      this.waveTo(p.at, p.line);
+      this.waveTo(p.at, p.line, 0, p.tries || 0);
     }
     if (!this.task) {
       if (!this.tasks.length) this.plan();
@@ -233,6 +297,15 @@ export class Person {
         this.say(t.line);
         done = true;
         break;
+      case 'until':
+        // (waiting for something — `test()` — facing `at`, if there is something to face; `onStart()` once it begins)
+        if (!t.began) {
+          t.began = true;
+          if (t.onStart) t.onStart();
+        }
+        if (t.at) this.turnTo(Math.atan2(t.at.x - a.pos.x, t.at.z - a.pos.z), dt);
+        done = t.test() || (t.max && t.age > t.max);
+        break;
       case 'look': {
         const turned = this.turnTo(Math.atan2(t.at.x - a.pos.x, t.at.z - a.pos.z), dt);
         if (turned) {
@@ -279,6 +352,7 @@ export class Person {
     }
     if (done) this.task = null;
     a.update(dt);
+    this.upright();
   }
 
   /** Turn on the spot towards `yaw`; true once she faces it. */

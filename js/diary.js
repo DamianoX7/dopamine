@@ -158,6 +158,8 @@ const Diary = {
     else if (d.house) add('🏠', '둘의 집에 들렀어요');
     const wear = d.meWear || [];
     if (wear.length) add('👗', `${wear.length > 1 ? `‘${wear[0]}’ 외 ${wear.length - 1}개를` : quoted(wear[0], '을/를')} 새로 사서 입었어요`);
+    const food = d.food || [];
+    if (food.length) add('🛵', `${food.length > 1 ? `‘${food[0]}’ 외 ${food.length - 1}개를` : quoted(food[0], '을/를')} 배달시켜 먹었어요`);
     if (d.dream) add('💭', `${d.dream}의 꿈 이야기를 들었어요`);
     if (d.moon) add('🌕', '보름달에 소원을 빌었어요');
     else if (d.gazed) add('🌙', `여우들이랑 밤하늘의 ${josa(d.gazed, '을/를')} 올려다봤어요`);

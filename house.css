@@ -48,6 +48,9 @@
 .house-bubble.is-me[data-who]::before {
   color: #8a63d2;
 }
+.house-bubble.is-rider[data-who]::before {
+  color: #e0861a;
+}
 
 /* the name of the house, and the weather of the day under it */
 .house-id {
@@ -81,6 +84,9 @@
   top: calc(var(--safe-t) + 172px);
   font-size: 19px;
 }
+.house-room .fox-cam.is-food {
+  top: calc(var(--safe-t) + 226px);
+}
 .house-room .fox-cam.is-light.is-off {
   background: rgba(36, 32, 70, 0.88);
   box-shadow:
@@ -96,6 +102,13 @@
 }
 .house-room .fox-mail.is-present small {
   color: rgba(255, 255, 255, 0.9);
+}
+.house-room .fox-mail.is-food {
+  background: #fff6e6;
+}
+.house-room .fox-mail.is-food small {
+  font-variant-numeric: tabular-nums;
+  color: #a8662a;
 }
 
 /* (arranging) the buttons that float over the thing she has picked */
@@ -444,6 +457,80 @@
 }
 .house-page small {
   font-size: 11.5px;
+}
+/* the delivery menu: a picture of each dish, what it is, its price and how long it takes */
+.food-menu {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  max-height: 56vh;
+  overflow-y: auto;
+}
+.food-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 8px 10px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--surface-2);
+  color: var(--ink);
+  text-align: center;
+}
+.food-item:active {
+  transform: scale(0.97);
+}
+.food-item:disabled {
+  opacity: 0.55;
+}
+.food-item.on {
+  opacity: 1;
+  box-shadow: inset 0 0 0 2px #f2a24a;
+}
+.food-pic {
+  display: grid;
+  place-items: center;
+  width: 78%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #fff0f6;
+  font-size: 40px;
+}
+.food-pic img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.food-item b {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.food-desc {
+  font-size: 11.5px;
+  line-height: 1.25;
+  color: var(--ink-3);
+}
+.food-item small {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.food-item small b {
+  font-size: 12px;
+}
+.food-ate {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 10.5px;
+  font-style: normal;
+  color: #c7652a;
 }
 /* his letters, to read again */
 .house-letters {

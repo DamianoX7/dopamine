@@ -34,7 +34,7 @@ export const LOOK = {
   bottom: { kind: 'skirt', color: '#56608f', check: null }, //               kind: skirt, midi, jeans, shorts · check: { band, line } for a checked skirt
   legs: { kind: 'knee', color: '#ffffff' }, //                               kind: bare, ankle, knee, tights
   shoes: { kind: 'slippers', color: '#ffb7cc' }, //                          kind: slippers, sneakers, maryjane, boots
-  head: { kind: 'none', color: '#ff7fa8' }, //                               kind: none, ribbon, heart, blossom, headband, catears, beret, straw, santa
+  head: { kind: 'none', color: '#ff7fa8' }, //                               kind: none, ribbon, heart, blossom, headband, catears, beret, straw, santa (helmet: the courier's)
   glasses: { kind: 'none', color: '#5c4a58' }, //                            kind: none, round
   scarf: false,
 };
@@ -1630,6 +1630,43 @@ export function buildMe(lookIn) {
         }
       }
       wearOn('head', b.mesh(accMat));
+    }
+    if (kind === 'helmet') {
+      // a rider's helmet (the courier's, js/house/courier.js): a round shell over her hair, tipped back — up off her brow in
+      // front, down to her nape behind — a stripe over the top from front to back, and a short visor
+      const b = new Batch();
+      const c = at(0, HEAD_Y + 0.022, -0.014);
+      const R = 0.158;
+      const TIP = -0.42;
+      const SPAN = 1.68; // (how far down from its top the shell comes, before it is tipped back)
+      const place = (g) => {
+        g.rotateX(TIP);
+        g.translate(c.x, c.y, c.z);
+        return g;
+      };
+      b.add(place(new THREE.SphereGeometry(R, 32, 16, 0, Math.PI * 2, 0, SPAN)), { color: look.head.color });
+      // (inside it, a dark lining: the shell is seen from below too)
+      b.add(place(new THREE.SphereGeometry(R * 0.985, 28, 12, 0, Math.PI * 2, 0, SPAN).scale(-1, 1, 1)), { color: '#3b3340' });
+      const from = Math.PI / 2 - SPAN; // (where the edge is, in front, from straight ahead upwards)
+      const stripe = new THREE.TorusGeometry(R + 0.002, 0.011, 6, 48, Math.PI - 2 * from);
+      stripe.rotateZ(from);
+      stripe.rotateY(-Math.PI / 2);
+      b.add(place(stripe), { color: '#ffffff' });
+      // the visor: a short brim out of the front edge, curved round it
+      const vis = [];
+      const N = 12;
+      for (let i = 0; i <= N; i++) {
+        const a = -0.95 + (1.9 * i) / N;
+        // (its outer edge lower: once the shell is tipped back, the brim points out over her brow, a little down)
+        for (const [r, dy] of [[R * 0.97, 0], [R * 1.3, -0.028]]) vis.push(V(r * Math.sin(a), R * Math.sin(from) + dy, r * Math.cos(a)));
+      }
+      const vg = new THREE.BufferGeometry().setFromPoints(vis);
+      const idx = [];
+      for (let i = 0; i < N; i++) idx.push(2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 1, 2 * i + 3, 2 * i + 2);
+      vg.setIndex(idx.concat(idx.slice().reverse()));
+      vg.computeVertexNormals();
+      b.add(place(vg), { color: C(look.head.color).lerp(C('#3a2a40'), 0.22).getHex(), flat: true });
+      wearOn('head', b.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.32 })));
     }
     if (look.glasses.kind === 'round') {
       // round glasses: two rims before her eyes, a bridge, and the arms back to her ears
