@@ -49,6 +49,8 @@ Views.home = {
 
       ${Diary.cardHtml()}
 
+      ${House.cardHtml()}
+
       ${Moon.cardHtml()}
 
       ${Dream.cardHtml()}

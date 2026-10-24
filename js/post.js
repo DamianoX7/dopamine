@@ -71,6 +71,8 @@ const Post = {
     this.seen = this.waiting().length;
     Pet.refresh();
     FoxRoom.mailButton();
+    HouseRoom.refresh(); // (…and the flag of the mailbox in the house)
+    HouseHost.sync();
     // (never the pages he writes on: rebuilding them would take what he is typing)
     if (Router.is('home') || (Router.is('me') && [undefined, 'letters'].includes(Router.cur.params[0]))) Router.refresh();
   },

@@ -497,6 +497,7 @@ const UI = {
   /* ----- the pet pops up to react ----- */
   petPop(text, opts = {}) {
     if (CoverHost.quiet || !text) return;
+    if (typeof HouseRoom !== 'undefined' && HouseRoom.ov) return; // (in the house the fox is not there to say it)
     // a softer reaction never interrupts one that is still on screen
     if (opts.soft && Date.now() - (this.petAt || 0) < 3500) return;
     this.petAt = Date.now();

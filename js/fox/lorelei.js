@@ -29,10 +29,10 @@ const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const damp = (cur, target, rate, dt) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
-const catmull = (p0, p1, p2, p3, t) =>
+export const catmull = (p0, p1, p2, p3, t) =>
   0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (3 * p1 - p0 - 3 * p2 + p3) * t * t * t);
 /** A bump round `at`: 1 there, gone `up` above it or `down` below. */
-const bump = (x, at, up, down = up) => Math.exp(-(((x - at) / (x > at ? up : down)) ** 2));
+export const bump = (x, at, up, down = up) => Math.exp(-(((x - at) / (x > at ? up : down)) ** 2));
 
 /** How large she is drawn (her model is one unit tall): the foxes come up to her hip. */
 export const LORELEI_SIZE = 1.3;
@@ -64,12 +64,12 @@ const INK = {
 // ------------------------------------------------------------------ how she is lit, and what is drawn on her
 
 // Every vertex of her body says what it is made of (`aTex.w`), and where on its ring it is:
-const PLAIN = 0; //  cloth, leather
-const CHECK = 1; //  her skirt: squares round it (by the angle) and down it (aTex.z)
-const HAIR = 2; //   strands along the lock (the angle round it; aTex.xy is as long as the lock is thick there)
-const RIBS = 3; //   knitted ribs: aTex.z of them round the ring
-const SKIN = 4;
-const CHECKS = 14; // how many squares go round her skirt (and as many pleats)
+export const PLAIN = 0; //  cloth, leather
+export const CHECK = 1; //  her skirt: squares round it (by the angle) and down it (aTex.z)
+export const HAIR = 2; //   strands along the lock (the angle round it; aTex.xy is as long as the lock is thick there)
+export const RIBS = 3; //   knitted ribs: aTex.z of them round the ring
+export const SKIN = 4;
+export const CHECKS = 14; // how many squares go round her skirt (and as many pleats)
 
 const DRESS_VERTEX_HEAD = /* glsl */ `
 uniform vec3 uSunDir;
@@ -95,17 +95,15 @@ const DRESS_VERTEX_SHADOW = /* glsl */ `
 #endif
 `;
 
-/** A colour as the shader writes it. */
-const lin = (hex) => {
-  const c = new THREE.Color(hex);
-  return `vec3(${c.r.toFixed(4)}, ${c.g.toFixed(4)}, ${c.b.toFixed(4)})`;
-};
-
 const DRESS_FRAGMENT_HEAD = /* glsl */ `
 uniform vec3 uLight;
 uniform float uSun;
 #ifdef LORELEI_TEX
   varying vec4 vTex;
+  uniform vec3 uCkA; // (the check of a skirt: its squares, the bands between them, where two bands cross, the thread through them)
+  uniform vec3 uCkB;
+  uniform vec3 uCkC;
+  uniform vec3 uCkD;
 #endif
 #ifdef LORELEI_FACE
   uniform sampler2D uFaceMap;
@@ -148,11 +146,11 @@ float lorHigh = 0.0; // a height drawn on the surface: strands, ribs
     float dv = abs(fract(v) - 0.5) * 2.0;
     float bu = smoothstep(0.52 - wu, 0.52 + wu, du);
     float bv = smoothstep(0.52 - wv, 0.52 + wv, dv);
-    vec3 check = mix(${lin(INK.skirt)}, ${lin(INK.skirtBand)}, max(bu, bv));
-    check = mix(check, ${lin(INK.skirtDeep)}, bu * bv);
+    vec3 check = mix(uCkA, uCkB, max(bu, bv));
+    check = mix(check, uCkC, bu * bv);
     float lu = smoothstep(0.9 - wu, 0.9 + wu, du) * (1.0 - smoothstep(0.5, 1.6, wu * 12.0));
     float lv = smoothstep(0.9 - wv, 0.9 + wv, dv) * (1.0 - smoothstep(0.5, 1.6, wv * 12.0));
-    check = mix(check, ${lin(INK.skirtLine)}, max(lu * (1.0 - bv), lv * (1.0 - bu)) * 0.6);
+    check = mix(check, uCkD, max(lu * (1.0 - bv), lv * (1.0 - bu)) * 0.6);
     diffuseColor.rgb *= check;
   } else if (lorMode == ${HAIR}.0) {
     // strands, broad and fine — none finer than the picture can show
@@ -204,7 +202,7 @@ const DRESS_FRAGMENT_LIGHT = /* glsl */ `
 `;
 
 /** Makes a material hers: lit as she is, and drawing what the vertices ask for (`defines`: LORELEI_TEX for her body, LORELEI_FACE for her head). */
-function dress(material, uniforms, defines) {
+export function dress(material, uniforms, defines) {
   material.defines = { ...(material.defines || {}), ...defines };
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -226,7 +224,7 @@ function dress(material, uniforms, defines) {
 // ------------------------------------------------------------------ the mesh
 
 /** Collects the vertices of one skinned mesh: position, colour, bone weights, and what the shader is to draw there (aTex). */
-class Skin {
+export class Skin {
   constructor(boneIndex) {
     this.boneIndex = boneIndex;
     this.pos = [];
@@ -467,7 +465,7 @@ class Skin {
 }
 
 // rings that stay level, whatever the path through their middles does
-const LEVEL = { t: V(0, -1, 0), u: V(0, 0, 1), s: V(1, 0, 0) };
+export const LEVEL = { t: V(0, -1, 0), u: V(0, 0, 1), s: V(1, 0, 0) };
 
 /**
  * A body of level rings one above the other — her head, the cap of her hair. `rows`, from the top down:
@@ -475,7 +473,7 @@ const LEVEL = { t: V(0, -1, 0), u: V(0, 0, 1), s: V(1, 0, 0) };
  * off in front, `nB` behind. It can be made into a mesh (keys, for a loft with `frame: LEVEL`) and asked where its
  * surface is.
  */
-class Rings {
+export class Rings {
   constructor(rows, at, n = 2, nB = n) {
     this.rows = rows;
     this.at = at;
@@ -532,18 +530,18 @@ class Rings {
 
 // The middle of her head is 0.856 up; what is where in it is given from there. The painting of her face covers it from
 // temple to temple, and from under her chin up to her brow.
-const HEAD_Y = 0.856;
-const FACE = { half: 0.1, top: 0.03, bottom: -0.125 };
-const FACE_PX = 512; // across (it is as much higher as the face is)
+export const HEAD_Y = 0.856;
+export const FACE = { half: 0.1, top: 0.03, bottom: -0.125 };
+export const FACE_PX = 512; // across (it is as much higher as the face is)
 // Where things are in her face — measured off the picture of her from in front: her eyes a third of her face wide
 // each, far apart, as high as they are wide but for a quarter; each iris turned a little to her nose; her brows thin
 // and a little lower at their inner ends; a small mouth, low.
-const EYE = { x: 0.053, y: -0.0272, w: 0.0264, up: 0.0164, down: 0.019, iris: 0.0178, turn: 0.009 }; // its middle; half its width; how far the lids are from the middle; the iris
-const MOUTH = { x: 0.0015, y: -0.0842 };
-const NOSE_Y = -0.0552;
+export const EYE = { x: 0.053, y: -0.0272, w: 0.0264, up: 0.0164, down: 0.019, iris: 0.0178, turn: 0.009 }; // its middle; half its width; how far the lids are from the middle; the iris
+export const MOUTH = { x: 0.0015, y: -0.0842 };
+export const NOSE_Y = -0.0552;
 
 /** A point of a curve with two handles (p0 … p3: [x, y]) at t. */
-const curve = (p0, p1, p2, p3, t) => {
+export const curve = (p0, p1, p2, p3, t) => {
   const u = 1 - t;
   return [u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0], u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1]];
 };
@@ -800,7 +798,7 @@ function paintFace(eyes, mouth, blush) {
 // widest at her eyes and not much less at her cheeks, rounding in to a small chin; the skull above is all under her hair.
 // Her face is flat across, from one cheek to the other, and turns back only at her temples (HEAD_N squares the rings
 // off in front; behind they are round).
-const HEAD = [
+export const HEAD = [
   [0.116, 0.012, 0.012, 0.012, -0.006],
   [0.106, 0.047, 0.046, 0.051, -0.006],
   [0.084, 0.0735, 0.073, 0.0815, -0.006],
@@ -814,11 +812,11 @@ const HEAD = [
   [-0.11, 0.0335, 0.068, 0.0345, 0.009],
   [-0.1165, 0.014, 0.046, 0.016, 0.018],
 ];
-const HEAD_N = 4.4;
-const HEAD_NB = 2.25;
+export const HEAD_N = 4.4;
+export const HEAD_NB = 2.25;
 // …and the cap of her hair: a ball a good deal larger than her head — all round the crown, then only behind her ears
 // (in front it stops under her fringe), and in under itself at the nape.
-const CAP = [
+export const CAP = [
   [0.138, 0.014, 0.014, 0.014, -0.004],
   [0.13, 0.056, 0.054, 0.058, -0.004],
   [0.11, 0.09, 0.087, 0.094, -0.004],
@@ -830,7 +828,7 @@ const CAP = [
   [-0.076, 0.092, 0.006, 0.033, -0.046],
   [-0.096, 0.064, 0.006, 0.012, -0.04],
 ];
-const CAP_N = 2.12;
+export const CAP_N = 2.12;
 // Her tail of hair: tied high at the back of her head, on the left; up and out of the tie, over, and down behind her
 // left shoulder to her hip — [x, y, z, half its width, half its depth] along its middle.
 const TAIL = [
@@ -1446,7 +1444,8 @@ export function buildLorelei() {
   // how bright the day is (`uLight`), how much of a sun there is in it (`uSun`: 0 … 1) — the world keeps both; where
   // she is (`uMid`: her animator keeps it) and where the sun stands, for the shadow she walks into
   const light = { uLight: { value: new THREE.Color(1, 1, 1) }, uSun: { value: 1 }, uMid: { value: V(0, 0.6, 0) }, uSunDir: FUR_SUN, uClear: { value: 0.9 * LORELEI_SIZE } };
-  const material = dress(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), light, { LORELEI_TEX: 1 });
+  const checks = { uCkA: { value: ink.skirt.clone() }, uCkB: { value: ink.skirtBand.clone() }, uCkC: { value: ink.skirtDeep.clone() }, uCkD: { value: ink.skirtLine.clone() } };
+  const material = dress(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }), { ...light, ...checks }, { LORELEI_TEX: 1 });
   const mesh = new THREE.SkinnedMesh(geometry, material);
   mesh.frustumCulled = false;
   mesh.castShadow = true;
@@ -1915,6 +1914,7 @@ export class LoreleiAnimator {
       const share = i ? 0.24 : 0.36;
       B[name].rotation.set(s.lagX[i] * share * 1.6 - (i < 2 ? tipX * 0.42 : 0), i ? 0 : -turned * 0.55, s.lagZ[i] * share * 1.4 - (i < 2 ? tipZ * 0.4 : 0) + (i === links - 1 ? Math.sin(t * 1.3) * 0.03 : 0));
     });
+    if (rig.tail2) rig.tail2.forEach((name, i) => B[name].rotation.copy(B[rig.tail[Math.min(i, links - 1)]].rotation)); // (a second tail — twin tails, js/house/me.js — swings as the first)
     B.lockL.rotation.set(s.lagX[1] * 0.4 - tipX * 0.5, 0, s.lagZ[1] * 0.3 - tipZ * 0.5);
     B.lockR.rotation.set(s.lagX[1] * 0.4 - tipX * 0.5, 0, s.lagZ[1] * 0.3 - tipZ * 0.5);
 

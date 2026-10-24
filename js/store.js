@@ -121,6 +121,31 @@ function defaultState() {
     // the sweaters she knitted for the foxes, with a picture of hers on each (js/knit.js): { id, n, chart (in letters),
     // base, trim (yarns), fit ('back' | 'all'), rev, at } — and how many she has made (the first one's yarn was free)
     knit: { list: [], made: 0 },
+    // 둘의 집 (js/house.js): when it was furnished, how big it is, its wallpaper and its floor (and those she has), what
+    // stands in it ({ uid, id, x, z, r } on the floor, { uid, id, wall, u, y } on a wall), what she has put away, which
+    // picture is in which frame, which album on which poster, the lamps she has switched herself, the light by the door,
+    // the record on the turntable, the presents of the days worth remembering she has opened, Lorelei's visits, whether
+    // she has tapped anything in it yet — and the girl who lives in it (js/avatar.js): her name (and whether it was given
+    // her), how she looks and what she wears (ids, as AVATAR_DEFAULT), the clothes she has bought ('slot:id')
+    house: {
+      made: 0,
+      size: 0,
+      wall: 'cream',
+      floor: 'wood',
+      walls: ['cream'],
+      floors: ['wood'],
+      items: [],
+      stored: [],
+      photos: {},
+      posters: {},
+      lamps: {},
+      light: true,
+      record: null,
+      gifts: {},
+      guest: { at: 0, day: '', today: 0, met: false, visits: 0 },
+      taught: false,
+      me: { name: '', named: false, look: {}, owned: [] },
+    },
     opening: { seen: false, greeted: false }, //           the rooms that open on a day of their own (js/opening.js): has she stood before them shut — and been told that they opened?
     // season: 'auto' = the foxes' world follows the calendar; or 'spring', 'summer', 'autumn', 'winter' (js/weather.js)
     settings: { soundEnabled: true, theme: 'pink', lateNight: 'auto', reduceMotion: false, foxFullscreen: true, season: 'auto' },
@@ -178,6 +203,13 @@ function upgradeState(s) {
   p.things = p.things.filter((id) => p.owned.includes(id));
   // only things she has stand in the yard, each of them once
   p.yard = p.yard.filter((it, i) => it && p.decor.includes(it.id) && p.yard.findIndex((x) => x && x.id === it.id) === i);
+  // (the house's wallpaper and floor it came with are hers whatever happens)
+  const h = s.house;
+  if (!h.walls.includes('cream')) h.walls.unshift('cream');
+  if (!h.floors.includes('wood')) h.floors.unshift('wood');
+  if (!h.walls.includes(h.wall)) h.wall = 'cream';
+  if (!h.floors.includes(h.floor)) h.floor = 'wood';
+  h.items = h.items.filter((it, i) => it && it.uid && it.id && h.items.findIndex((x) => x && x.uid === it.uid) === i);
   // only kits she still has are growing
   for (const key of ['growth', 'stay']) Object.keys(p[key]).forEach((id) => p.foxes.includes(id) || delete p[key][id]);
   return s;
@@ -260,6 +292,10 @@ const Store = {
     State.statistics = d.statistics;
     State.daily = d.daily;
     State.pet = Object.assign(d.pet, { name: State.pet.name, named: State.pet.named, names: { red: State.pet.name } });
+    // (the girl in the house keeps her name, her face and her hair — the clothes she bought go with the coins)
+    const me = State.house.me || d.house.me;
+    State.house = d.house;
+    Object.assign(State.house.me, { name: me.name, named: me.named, look: me.look });
     State.singing.currentStreak = 0;
     State.singing.longestStreak = 0;
     Store.saveNow();

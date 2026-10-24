@@ -139,13 +139,13 @@ const Photos = {
   /* One picture, large: when and of whom, and the ways to keep it elsewhere or throw it away. */
   view(rec) {
     const url = URL.createObjectURL(rec.blob);
-    const name = `${rec.kind === 'four' ? '여우 네컷' : '여우 사진'} ${dateKey(new Date(rec.at))}.jpg`;
+    const name = `${rec.kind === 'four' ? '여우 네컷' : rec.kind === 'house' ? '우리 집' : '여우 사진'} ${dateKey(new Date(rec.at))}.jpg`;
     const share = canShareFile(rec.blob, name);
     const scene = HABITATS.find((h) => h.id === rec.scene);
     const ov = UI.open(
       `<div class="photo-view">
-        <img class="pv-img" src="${url}" alt="${esc(rec.names.join(', '))}의 사진" style="aspect-ratio:${rec.w} / ${rec.h}">
-        <p class="pv-cap"><b>${esc(fmtDateLong(rec.at))}</b>${scene ? ` · ${esc(scene.name)}` : ''}<br>${esc(rec.names.join(' · '))}</p>
+        <img class="pv-img" src="${url}" alt="${rec.names.length ? `${esc(rec.names.join(', '))}의 사진` : '우리 집 사진'}" style="aspect-ratio:${rec.w} / ${rec.h}">
+        <p class="pv-cap"><b>${esc(fmtDateLong(rec.at))}</b>${scene ? ` · ${esc(scene.name)}` : rec.kind === 'house' ? ` · ${esc(HOUSE_NAME)}` : ''}${rec.names.length ? `<br>${esc(rec.names.join(' · '))}` : ''}</p>
         <div class="dialog-actions col">
           <a class="btn primary wide" href="${url}" download="${esc(name)}" data-pv-save>⬇️ 내 기기에 저장</a>
           ${share ? '<button class="btn soft wide" data-pv-share>📤 공유하기</button>' : ''}

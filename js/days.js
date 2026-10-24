@@ -118,7 +118,7 @@ const Days = {
       emoji: now[0].emoji,
       title: `오늘은 ${now.map((e) => e.name).join(' · ')}!`,
       subtitle: n > 0 ? `우리가 만난 지 ${fmtNum(n)}일째 되는 날이에요 💗` : '',
-      extraHtml: gift ? `<p class="cel-note">🎁 여우 세상에서 ${esc(josa(OWNER_NAME, '이/가'))} 기다리고 있대요!</p>` : '',
+      extraHtml: (gift ? `<p class="cel-note">🎁 여우 세상에서 ${esc(josa(OWNER_NAME, '이/가'))} 기다리고 있대요!</p>` : '') + (House.giftWaiting() ? `<p class="cel-note">🏠 ${esc(HOUSE_NAME)} 문 앞에도 선물이 와 있어요!</p>` : ''),
       buttons: gift
         ? [{ label: `🎁 ${OWNER_NAME} 만나러 가기`, primary: true, onClick: () => FoxRoom.open() }, { label: '📅 달력 보기', onClick: () => Router.go('#/calendar') }]
         : [{ label: '📅 달력 보기', onClick: () => Router.go('#/calendar') }, { label: '신난다! 💗', primary: true }],

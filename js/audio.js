@@ -146,6 +146,13 @@ const Sfx = {
       Sfx.tone(c, o, t + 0.08, 1175, 0.16, { type: 'triangle', vol: 0.4 });
     },
     error: (c, o, t) => Sfx.tone(c, o, t, 260, 0.18, { type: 'triangle', vol: 0.35, glide: 180 }),
+    // a knock at the door: two soft raps on wood
+    knock: (c, o, t) => {
+      [0, 0.17].forEach((d) => {
+        Sfx.tone(c, o, t + d, 190, 0.09, { type: 'triangle', vol: 0.9, glide: 120 });
+        Sfx.tone(c, o, t + d, 420, 0.03, { type: 'square', vol: 0.12 });
+      });
+    },
     // a camera: click-clack
     shutter: (c, o, t) => {
       Sfx.tone(c, o, t, 2200, 0.025, { type: 'square', vol: 0.3 });

@@ -119,6 +119,7 @@ const CoverHost = {
       if (label) label.textContent = on ? '❚❚' : '▶';
     });
     FoxRoom.tune(p); // in the foxes' world it is shown over the view — and they dance to it
+    HouseRoom.tune(p); // …and in the house, on the turntable (js/house.js)
     Radio.watch(p); // …and the radio goes off when something else is put on (js/radio.js)
   },
 
