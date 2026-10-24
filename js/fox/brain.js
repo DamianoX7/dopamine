@@ -34,12 +34,13 @@ const RING = 10; //  how many corners there are to turn at round each of those
 const LEAD = 0.3; // …and how far short of a corner it begins to turn (its nose is well ahead of its middle)
 
 const CALM = { wag: 0, ears: 0, mouth: 0, pant: 0, chew: 0, eyes: 'open', breath: 1, shake: 0, wiggle: 0, tailUp: 0 };
+const KNIT_YAW = Math.PI + 0.4; // the fox she knits a sweater for: its back to where the view is first, a little turned (world.js: knitOn)
 
 // what a fox can be called away from by another fox
 const FREE = new Set(['wander', 'lookAbout', 'sitAwhile', 'lieAwhile', 'sniffAbout', 'groom', 'yawn', 'stretch', 'shake', 'mope', 'follow', 'visit', 'greetBack', 'snuggle', 'nuzzle', 'lookOn']);
 const RESTING = new Set(['sitAwhile', 'lieAwhile', 'groom', 'snuggle', 'sleep', 'mope', 'strokedBy']);
 // …and what it finishes first, whatever the weather does
-const INTENT = new Set(['fetchLetter', 'present', 'bringGift', 'eat', 'playBall', 'party', 'lullaby', 'strike', 'model', 'depart', 'alight', 'wake', 'petted', 'greet', 'arrive', 'unwrapped', 'lookOn', 'stepUp', 'sing', 'takeCover']);
+const INTENT = new Set(['fetchLetter', 'present', 'bringGift', 'eat', 'playBall', 'party', 'lullaby', 'strike', 'model', 'depart', 'alight', 'wake', 'petted', 'greet', 'arrive', 'unwrapped', 'lookOn', 'stepUp', 'sing', 'takeCover', 'moonGaze']);
 
 export class Brain {
   constructor(world, fox) {
@@ -183,6 +184,7 @@ export class Brain {
     if (w.showcaseOn) return ['model']; // the shop is open: stay in view and show off
     if (w.tune && w.tune.on) return [st.mood === 'sleepy' ? 'lullaby' : 'party']; // one of her covers is playing
     if (st.mood === 'sleepy') return ['sleep'];
+    if (w.gazing === 'moon') return ['moonGaze', [w.foxes.filter((f) => f !== this.fox && f.brain.doing === 'moonGaze').length]]; // she is looking up at the moon: so are they
     const env = w.env;
     const sky = w.sky;
     const kid = this.baby ? 1 : 0;
@@ -415,6 +417,19 @@ export class Brain {
   lookAtYou(w = 0.85) {
     this.watch = null;
     this.a.look = this.w.camera.position;
+    this.a.lookW = w;
+  }
+
+  /** Which way the moon is, while she looks up at it (world.gaze) — as a yaw. */
+  moonward() {
+    const g = this.w.gazeView;
+    return g ? Math.atan2(Math.sin(g.az), -Math.cos(g.az)) : this.a.yaw;
+  }
+
+  /** Eyes on the moon. */
+  lookAtMoon(w = 1) {
+    this.watch = null;
+    this.a.look = this.w.moonAt;
     this.a.lookW = w;
   }
 
@@ -1477,8 +1492,26 @@ export class Brain {
     yield* this.turnTo(this.toCamera() - side * 0.5, 6);
     a.setPose('sit', 5);
     let hops = w.gifting ? w.gifting.hops : 0;
+    let howls = w.gifting ? w.gifting.howls : 0;
+    let up = false; // (turned to the moon, while she looks up at it: world.gaze)
     for (let t = 0, next = 0; w.gifting && t < 120; ) {
       t += yield;
+      if (!!w.gazing !== up) {
+        // the moon — and the view turned up to it: everyone faces it (and back to her when it is over)
+        up = !!w.gazing;
+        a.setPose('stand', 6);
+        yield* this.turnTo(up ? this.moonward() + side * 0.12 : this.toCamera() - side * 0.5, 4);
+        a.setPose(up ? 'gaze' : 'sit', 5);
+      }
+      if (up) {
+        this.lookAtMoon(1);
+        a.mood.wag = 0.25 + 0.15 * Math.sin(t * 1.4);
+        if (w.gifting && w.gifting.howls !== howls) {
+          howls = w.gifting.howls;
+          yield* this.howlAt(place);
+        }
+        continue;
+      }
       a.mood.wag = 0.45 + 0.25 * Math.sin(t * 2.2);
       if (w.gifting && w.gifting.hops !== hops) {
         // (something to jump for — trick or treat: world.present)
@@ -1497,6 +1530,62 @@ export class Brain {
       if (born && w.foxes.includes(born) && born !== this.fox) this.lookAt(born, 0.9);
       else this.lookAt(her, 0.85);
     }
+  }
+
+  /** A song for the full moon: nose to the sky, a long "아우우—" (the app plays it). `i`: its place in the choir — they come in one after another. */
+  *howlAt(i = 0) {
+    const a = this.a;
+    yield* this.wait(0.15 * i);
+    a.setPose('howl', 5);
+    a.mood.eyes = 'happy';
+    for (let t = 0; t < 3.5; ) {
+      t += yield;
+      a.mood.mouth = t < 0.35 ? (t / 0.35) * 0.85 : t > 3.1 ? 0.6 * (3.5 - t) / 0.4 : 0.6 + 0.22 * Math.sin(t * 3.4 + i);
+      a.mood.wag = 0.3;
+    }
+    a.mood.mouth = 0;
+    a.setPose(this.w.gazing ? 'gaze' : 'sit', 4);
+    yield* this.wait(0.7);
+    a.mood.eyes = 'open';
+  }
+
+  /**
+   * She looks up at the night sky (world.gaze): to a place in a row across the view, the moon before it — the first in
+   * the middle, then to either side — and there it sits, nose up, for as long as she looks.
+   */
+  *moonGaze(place = 0) {
+    const a = this.a;
+    const w = this.w;
+    const g = w.gazeView;
+    if (!g) return;
+    this.close = true;
+    const dx = Math.sin(g.az);
+    const dz = -Math.cos(g.az);
+    const side = place % 2 ? -1 : 1;
+    const out = 0.36 * Math.ceil(place / 2) * side;
+    const back = 0.18 * (place % 3); // (not quite a row: a little before and behind one another)
+    const to = this.clampPoint(g.x + dz * -out + dx * (0.3 - back), g.z + dx * out + dz * (0.3 - back), 0.9);
+    yield* this.wait(0.15 * place);
+    if (Math.hypot(to.x - a.pos.x, to.z - a.pos.z) > 0.12 * this.S) yield* this.goTo(to.x, to.z, { speed: 'trot', stop: 0.08, timeout: 6 });
+    yield* this.turnTo(this.moonward() + (Math.random() - 0.5) * 0.3, 5);
+    a.setPose('gaze', 4);
+    this.lookAtMoon(1);
+    for (let t = 0, next = rand(3, 6); w.gazing; ) {
+      t += yield;
+      a.mood.wag = 0.2 + 0.12 * Math.sin(t * 1.3 + place);
+      if (t < next) continue;
+      // now and then a glance at the one beside it, and back up
+      next = t + rand(4, 8);
+      const pal = this.pals().find((f) => f.brain.doing === 'moonGaze');
+      if (pal) {
+        a.setPose('sit', 4);
+        this.lookAt(pal, 0.7);
+        yield* this.wait(rand(0.8, 1.4));
+        a.setPose('gaze', 4);
+        this.lookAtMoon(1);
+      }
+    }
+    a.setPose('stand', 5);
   }
 
   /**
@@ -1726,31 +1815,49 @@ export class Brain {
     yield* this.wait(rand(1.5, 3));
   }
 
-  /** The shop is open: sit facing you for as long as it stays open. */
+  /**
+   * The shop is open: sit facing you for as long as it stays open. (While she knits it a sweater, the fox she is
+   * dressing stands with its back to where you look from — her picture is on its back — and you walk round it.)
+   */
   *model() {
     const a = this.a;
+    const w = this.w;
     let t = 0;
     let settled = false;
+    let turned = false;
     this.close = true;
-    while (this.w.showcaseOn) {
+    while (w.showcaseOn) {
+      const back = w.knitOn && this.fox === w.focus;
       // its place changes when the shop turns to another fox
-      const at = this.w.modelSpot(this.fox);
+      const at = w.modelSpot(this.fox);
       const off = Math.hypot(at.x - a.pos.x, at.z - a.pos.z);
-      if (!settled || off > 0.16) {
+      if (!settled || off > 0.16 || back !== turned) {
         if (off > 0.1) {
           a.setPose('stand', 8);
           a.mood.wag = 0;
           a.lookW = 0;
           yield* this.goTo(at.x, at.z, { speed: 'trot', stop: 0.1, timeout: 5 });
         }
-        yield* this.turnTo(this.toCamera(), 6);
-        a.setPose('sit', 5);
-        this.lookAtYou(0.9);
+        turned = back;
+        if (back) {
+          a.setPose('stand', 6);
+          yield* this.turnTo(KNIT_YAW, 4);
+          a.lookW = 0;
+        } else {
+          yield* this.turnTo(this.toCamera(), 6);
+          a.setPose('sit', 5);
+          this.lookAtYou(0.9);
+        }
         settled = true;
       }
-      t += yield;
+      const dt = yield;
+      t += dt;
       a.mood.wag = 0.35 + 0.3 * Math.max(0, Math.sin(t * 1.1 + this.place()));
-      if (Math.abs(wrapAngle(this.toCamera() - a.yaw)) > 0.25) yield* this.turnTo(this.toCamera(), 3);
+      if (back) {
+        // (and now and then it looks round over its shoulder, as if to see how it looks)
+        if (Math.random() < dt * 0.22) this.lookAtYou(Math.random() < 0.5 ? 0.45 : 0);
+        if (Math.abs(wrapAngle(KNIT_YAW - a.yaw)) > 0.3) yield* this.turnTo(KNIT_YAW, 3);
+      } else if (Math.abs(wrapAngle(this.toCamera() - a.yaw)) > 0.25) yield* this.turnTo(this.toCamera(), 3);
     }
   }
 

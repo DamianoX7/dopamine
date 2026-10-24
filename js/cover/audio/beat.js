@@ -1,24 +1,40 @@
 // Listens to a finished cover the way a dancer would: where its beats fall, how fast they
 // come, and how loud and how lively each moment is. The foxes dance to that (js/fox/dance.js).
-// Nothing here touches the playback — the saved recording is read once, a piece at a time,
-// the first time it is played to them.
+// …and what key it is in (key.js): with how fast it goes, that makes its flower in the song
+// garden (js/garden.js). Nothing here touches the playback — the saved recording is read once,
+// a piece at a time, the first time it is played to them (or planted).
 import { getBlob } from '../core/db.js';
 import { getSingle } from '../library.js';
+import { keyOf } from './key.js';
 
 const RATE = 11025; //  plenty to find a beat in
 const done = new Map(); // audio blob id → what was heard (null: it could not be read)
 const busy = new Map(); // …→ the listening that is under way
 
 /**
- * What is known of a cover's beat: { bpm, beats (seconds), step, level, energy } — `level` (how
- * loud) and `energy` (how lively that part of the song is) are bytes, `step` seconds apart.
- * Null until it has been listened to; asking starts that.
+ * What is known of a cover's beat: { bpm, beats (seconds), step, level, energy, key } — `level` (how
+ * loud) and `energy` (how lively that part of the song is) are bytes, `step` seconds apart; `key`:
+ * see key.js. Null until it has been listened to; asking starts that.
  */
 export function beatsOf(singleId) {
   const single = getSingle(singleId);
   if (!single || !single.audioId) return null;
   const key = single.audioId;
   if (done.has(key)) return done.get(key);
+  hear(key);
+  return null;
+}
+
+/** …the same, once it has been listened to: a promise (of null, if it could not be). */
+export async function heardOf(singleId) {
+  const single = getSingle(singleId);
+  if (!single || !single.audioId) return null;
+  const key = single.audioId;
+  if (!done.has(key)) await hear(key);
+  return done.get(key) || null;
+}
+
+function hear(key) {
   if (!busy.has(key)) {
     const job = listen(key)
       .catch((err) => {
@@ -32,14 +48,17 @@ export function beatsOf(singleId) {
       });
     busy.set(key, job);
   }
-  return null;
+  return busy.get(key);
 }
 
 async function listen(audioId) {
   const blob = await getBlob(audioId);
   if (!blob) return null;
   const pcm = (await readWav(blob)) || (await decode(blob));
-  return pcm ? analyse(pcm.samples, pcm.rate) : null;
+  if (!pcm) return null;
+  const heard = analyse(pcm.samples, pcm.rate);
+  if (heard) heard.key = keyOf(pcm.samples, pcm.rate);
+  return heard;
 }
 
 // ------------------------------------------------------------------ reading the recording

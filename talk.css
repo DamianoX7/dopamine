@@ -159,6 +159,51 @@
     transform: translateX(14px) scale(0.92);
   }
 }
+/* …or to write: a line across the top of the window, and the two ways on under it */
+.talk-ask.is-write {
+  left: 12px;
+  align-items: stretch;
+}
+.talk-write {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: talkPick 0.26s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+}
+.talk-field {
+  width: 100%;
+  padding: 13px 20px;
+  border: 3px solid #ffd34d;
+  border-radius: 22px;
+  background: #fffbe8;
+  color: #5b4520;
+  font: inherit;
+  font-size: 17px;
+  box-shadow: 0 10px 20px -12px rgba(70, 45, 20, 0.7);
+  cursor: text;
+}
+.talk-field::placeholder {
+  color: #b9a888;
+}
+.talk-field:focus {
+  outline: none;
+  border-color: #ffb21d;
+}
+.talk-write-btns {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.talk-write .talk-pick {
+  animation: none;
+}
+.talk-pick.is-ok {
+  background: #ffd34d;
+  color: #5b4520;
+}
+.talk-pick.is-ok:disabled {
+  opacity: 0.45;
+}
 
 @media (max-width: 420px) {
   .talk-box {
@@ -172,14 +217,16 @@
 }
 body.reduce-motion .talk,
 body.reduce-motion .talk-more,
-body.reduce-motion .talk-pick {
+body.reduce-motion .talk-pick,
+body.reduce-motion .talk-write {
   transition: none;
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .talk,
   .talk-more,
-  .talk-pick {
+  .talk-pick,
+  .talk-write {
     transition: none;
     animation: none;
   }

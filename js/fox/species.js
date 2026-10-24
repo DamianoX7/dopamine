@@ -37,6 +37,9 @@ const RED = {
   tailLift: -0.3, // how a single tail is carried (radians above level)
   fur: 1, //        fur length
   tipAmt: 0, //     how strongly the tips of the fur take `tip`
+  // where a sweater goes (knit.js), in keys of the lofts of the torso and the forelegs (rig.js): its hem — further back
+  // along the spine than under the belly — its collar, and how far down the forelegs its sleeves reach
+  knit: { hemTop: 3.3, hemBelly: 4.5, collar: 8.6, sleeveFrom: 0, sleeve: 3.1 },
   colors: {
     coat: '#de6a1f',
     back: '#b24a14',

@@ -14,14 +14,16 @@
        '안녕!',                                            // a page
        { text: '줄 게 있어.', cue: () => … },             // cue: as the page comes up
        { text: '받을래?', ask: ['응!', '뭔데?'] },         // something to answer: its number goes to what follows
+       { text: '소원은?', write: { placeholder, ok, skip, max } }, // …or to write: the words go to what follows ('' = kept to herself)
        (answer) => (answer ? '후후, 궁금하지?' : '좋아!'), // …a page may be made of the last answer
        { rest: 1600, cue: () => … },                       // the window makes way for what happens meanwhile
        '…',
      ], { who: '로렐라이', speaking: (on) => … });         // speaking: told when the words begin to come, and when they are all there
 
    Nothing closes it but its end: it is a handful of pages. `said` is
-   the answers she gave, in order — or null, if it was not told to
-   the end after all (the app took everything off the screen).
+   the answers she gave, in order (a number for a pick, the words for
+   something she wrote) — or null, if it was not told to the end after
+   all (the app took everything off the screen).
    ================================================================== */
 
 const TALK_SPEED = 26; //  letters a second
@@ -56,7 +58,7 @@ const Talk = {
       const askEl = $('[data-talk-ask]', root);
       const said = [];
       let i = -1; //         the page that shows
-      let page = null; //    …as it was made: { text, ask, cue, rest }
+      let page = null; //    …as it was made: { text, ask, write, cue, rest }
       let typing = 0; //     the timer that types it out
       let shown = 0; //      how many letters of it show
       let letters = []; //   …of these
@@ -97,6 +99,27 @@ const Talk = {
           root.classList.add('is-asking');
           const first = $('[data-talk-pick]', askEl);
           if (first) first.focus({ preventScroll: true });
+        } else if (page.write) {
+          // a few words of her own: a line to write on, and two ways on — with them, or without
+          const w = page.write;
+          askEl.innerHTML = `<form class="talk-write" data-talk-write>
+              <input class="talk-field" data-talk-field type="text" maxlength="${w.max || 60}" placeholder="${esc(w.placeholder || '')}" aria-label="${esc(page.text)}" autocomplete="off" enterkeyhint="done">
+              <div class="talk-write-btns">
+                ${w.skip ? `<button type="button" class="talk-pick" data-talk-skip data-sfx="none">${esc(w.skip)}</button>` : ''}
+                <button type="submit" class="talk-pick is-ok" data-talk-ok data-sfx="none" disabled>${esc(w.ok || '확인')}</button>
+              </div>
+            </form>`;
+          askEl.hidden = false;
+          askEl.classList.add('is-write');
+          root.classList.add('is-asking');
+          const field = $('[data-talk-field]', askEl);
+          const okBtn = $('[data-talk-ok]', askEl);
+          field.addEventListener('input', () => (okBtn.disabled = !field.value.trim()));
+          $('[data-talk-write]', askEl).addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (field.value.trim()) answered(field.value.trim().slice(0, w.max || 60));
+          });
+          field.focus({ preventScroll: true });
         } else root.classList.add('is-waiting');
       };
 
@@ -118,6 +141,7 @@ const Talk = {
         page = typeof p === 'string' ? { text: p } : p;
         root.classList.remove('is-waiting', 'is-asking');
         askEl.hidden = true;
+        askEl.classList.remove('is-write');
         askEl.innerHTML = '';
         try {
           if (page.cue) page.cue(answer);
@@ -148,25 +172,30 @@ const Talk = {
       const advance = () => {
         if (done || root.classList.contains('is-away') || !page) return;
         if (typing) return void settled();
-        if (page.ask && page.ask.length) return; // (she has to pick an answer)
+        if ((page.ask && page.ask.length) || page.write) return; // (she has to pick an answer — or write one)
         Sfx.play('tap');
+        next();
+      };
+      /* She has answered: `value` = the number of what she picked, or the words she wrote. */
+      const answered = (value) => {
+        if (done) return;
+        answer = value;
+        said.push(answer);
+        Sfx.play('pop');
+        ov.panel.focus({ preventScroll: true });
         next();
       };
       const tap = (e) => {
         const pick = e.target.closest('[data-talk-pick]');
-        if (pick) {
-          answer = +pick.dataset.talkPick;
-          said.push(answer);
-          Sfx.play('pop');
-          ov.panel.focus({ preventScroll: true });
-          return void next();
-        }
+        if (pick) return void answered(+pick.dataset.talkPick);
+        if (e.target.closest('[data-talk-skip]')) return void answered('');
+        if (e.target.closest('[data-talk-write]')) return; // (the line she writes on; the button that sends it goes by the form)
         advance();
       };
       const key = (e) => {
         if (UI.top() !== ov) return;
         if (e.key === 'Escape') e.stopPropagation(); // (it is not something to be dismissed)
-        if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('[data-talk-pick]')) {
+        if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('[data-talk-pick], [data-talk-write]')) {
           e.preventDefault();
           advance();
         }

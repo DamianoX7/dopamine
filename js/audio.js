@@ -82,7 +82,7 @@ const Sfx = {
         } catch (e) {
           /* ignore */
         }
-      }, 2500);
+      }, fn.ms || 2500); // (a sound that goes on longer says so)
     } catch (e) {
       /* sound is optional */
     }
@@ -151,5 +151,58 @@ const Sfx = {
       Sfx.tone(c, o, t, 2200, 0.025, { type: 'square', vol: 0.3 });
       Sfx.tone(c, o, t + 0.07, 1300, 0.045, { type: 'square', vol: 0.26 });
     },
+    // a star of ours coming out in the night sky (js/stars.js): a soft bell — while they keep coming, each a step further
+    // up the scale, like a music box
+    twinkle: (c, o, t) => {
+      const now = performance.now();
+      Sfx.twinkles = now - (Sfx.twinkleAt || 0) < 1500 ? (Sfx.twinkles || 0) + 1 : 0;
+      Sfx.twinkleAt = now;
+      const f = [1046.5, 1174.7, 1318.5, 1568, 1760][Sfx.twinkles % 5] * (Sfx.twinkles % 10 < 5 ? 1 : 2);
+      Sfx.tone(c, o, t, f, 0.7, { vol: 0.2, attack: 0.004 });
+      Sfx.tone(c, o, t, f * 3, 0.25, { vol: 0.03 });
+    },
+    // the foxes' song to the full moon (js/moon.js): long "아우우—"s, one coming in after another, wavering, and down at the end
+    howl: Object.assign(
+      (c, o, t) => {
+        [392, 494, 587].forEach((f, i) => {
+          const at = t + 0.35 + 0.15 * i;
+          const end = at + 3.3 - 0.15 * i;
+          const voice = c.createGain();
+          const soft = c.createBiquadFilter();
+          soft.type = 'lowpass';
+          soft.frequency.value = 1700;
+          voice.gain.setValueAtTime(0.0001, at);
+          voice.gain.exponentialRampToValueAtTime(0.3, at + 0.3);
+          voice.gain.setValueAtTime(0.3, end - 0.7);
+          voice.gain.exponentialRampToValueAtTime(0.0001, end);
+          const wobble = c.createOscillator();
+          const depth = c.createGain();
+          wobble.frequency.value = 5.2 + i * 0.4;
+          depth.gain.value = f * 0.012;
+          wobble.connect(depth);
+          [['sine', 1, 1], ['triangle', 2, 0.16]].forEach(([type, k, vol]) => {
+            const osc = c.createOscillator();
+            const g = c.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(f * k * 0.72, at);
+            osc.frequency.exponentialRampToValueAtTime(f * k, at + 0.45);
+            osc.frequency.linearRampToValueAtTime(f * k * 1.06, at + 1.6);
+            osc.frequency.linearRampToValueAtTime(f * k * 1.02, end - 0.6);
+            osc.frequency.exponentialRampToValueAtTime(f * k * 0.68, end);
+            depth.connect(osc.frequency);
+            g.gain.value = vol;
+            osc.connect(g);
+            g.connect(soft);
+            osc.start(at);
+            osc.stop(end + 0.05);
+          });
+          soft.connect(voice);
+          voice.connect(o);
+          wobble.start(at);
+          wobble.stop(end + 0.05);
+        });
+      },
+      { ms: 4800 }
+    ),
   },
 };

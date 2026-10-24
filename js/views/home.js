@@ -49,6 +49,10 @@ Views.home = {
 
       ${Diary.cardHtml()}
 
+      ${Moon.cardHtml()}
+
+      ${Dream.cardHtml()}
+
       <div class="card dopa-card">
         <div class="dopa-top">
           <div>
@@ -187,6 +191,8 @@ Views.home = {
     if (!Opening.shut()) Pet.wantPortrait();
     Days.hail();
     Diary.hail();
+    Moon.hail();
+    Dream.hail();
   },
 };
 

@@ -1,0 +1,204 @@
+/* ==================================================================
+   💭 The fox's dream — the card on Home in the morning, the dream
+   itself (its picture and its story), and the dream diary
+   (js/dream.js).
+   ================================================================== */
+
+/* ---------- Home: the fox had a dream ---------- */
+.dream-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 14px 12px 14px 16px;
+  background: linear-gradient(135deg, #2a2160 0%, #6b4f9a 60%, #c27bb0 100%);
+  color: #fff8f4;
+  text-align: left;
+  box-shadow:
+    var(--shadow),
+    inset 0 0 0 2px rgba(255, 220, 245, 0.3);
+  transition: transform 0.15s;
+}
+.dream-card:active {
+  transform: scale(0.98);
+}
+.dream-ico {
+  flex: none;
+  font-size: 34px;
+  animation: dreamFloat 3.4s ease-in-out infinite;
+}
+@keyframes dreamFloat {
+  50% {
+    transform: translateY(-4px) rotate(-4deg);
+  }
+}
+.dream-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dream-text b {
+  font-size: 16.5px;
+}
+.dream-text small {
+  color: #ead9f4;
+  font-size: 13px;
+}
+.dream-card .chev {
+  flex: none;
+  color: #e1cdf0;
+}
+
+/* ---------- the dream: its picture, and the fox's words ---------- */
+.overlay.is-dream .ov-panel {
+  background: linear-gradient(180deg, #1b1640 0%, #2e2263 45%, #4a3578 100%);
+  color: #fff8f4;
+}
+.dream {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.dream-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.dream-head h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.dream-head small {
+  color: #cbbde6;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.dream-pic {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 18px 36px -18px rgba(5, 0, 20, 0.9);
+}
+.dream-pic img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: dreamIn 0.8s ease both;
+}
+@keyframes dreamIn {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+  }
+}
+.dream-wait {
+  margin: 0;
+  padding: 0 24px;
+  color: #d9ccf0;
+  font-size: 14px;
+  text-align: center;
+  animation: dreamFloat 2.4s ease-in-out infinite;
+}
+.dream-story {
+  font-family: Gaegu, Jua, cursive;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+.dream-story p {
+  margin: 0 0 6px;
+  animation: dreamLine 0.6s ease both;
+  animation-delay: calc(0.5s + var(--i, 0) * 0.55s);
+}
+.dream-story .dream-title {
+  color: #ffd9ee;
+  font-size: 22px;
+  animation-delay: 0.2s;
+}
+@keyframes dreamLine {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.dream .dialog-actions .btn.soft {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff8f4;
+}
+.dream .dialog-actions .btn.ghost {
+  color: #e6dbf5;
+}
+
+/* ---------- the dream diary ---------- */
+.dream-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 10px;
+}
+.dream-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 12px 12px 14px;
+  border: 0;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #2a2160 0%, #4f3a82 100%);
+  color: #fff8f4;
+  text-align: left;
+}
+.dream-row:active {
+  transform: scale(0.98);
+}
+.dr-day {
+  flex: none;
+  min-width: 58px;
+  color: #d9ccf0;
+  font-size: 12.5px;
+}
+.dr-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dr-text b {
+  font-size: 15px;
+}
+.dr-text small {
+  overflow: hidden;
+  color: #d9ccf0;
+  font-size: 12.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.dream-row .chev {
+  flex: none;
+  color: #cbbde6;
+}
+
+body.reduce-motion .dream-ico,
+body.reduce-motion .dream-pic img,
+body.reduce-motion .dream-wait,
+body.reduce-motion .dream-story p {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dream-ico,
+  .dream-pic img,
+  .dream-wait,
+  .dream-story p {
+    animation: none;
+  }
+}

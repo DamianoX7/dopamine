@@ -209,6 +209,7 @@ const OWNER_LINES = {
   hello: ['안녕! 오늘도 왔구나 💗', '여우들이 기다리고 있었어!', '{fox} 오늘 기분 좋아 보이지?', '오늘은 뭐 하고 놀까?', '나는 {me}. 여우들이랑 같이 살아!', '여우들 쓰다듬어 주면 좋아해!'],
   hungry: ['여우들이 배고픈가 봐…', '밥 줄 시간이야! 🍖'],
   night: ['쉿… 여우들 자고 있어 🌙', '나도 조금만 잘게… 💤'],
+  evening: ['어느새 밤이 됐네 🌙', '오늘 달은 {moon}이야 🌙', '밤하늘 예쁘다… 🌙 버튼 눌러서 같이 봐!', '별 보러 갈래? ✨'], // (after dusk, before the foxes sleep: js/moon.js)
   rain: ['비 오는 날도 좋아 ☔', '우산 챙겨 오길 잘했다!', '여우들은 비를 피하러 갔어.'],
   snow: ['눈이다! 여우들이 신났어 ❄️', '눈사람 만들까?'],
   wind: ['으, 모래바람…!', '눈에 모래 들어가겠어!'],
@@ -218,6 +219,7 @@ const OWNER_LINES = {
   christmas: ['메리 크리스마스! 🎄', '산타 모자 어때? 잘 어울리지?', '트리 불빛 예쁘지? ✨', '여우들 꼭 루돌프 같지 않아?', '오늘 밤엔 산타가 올까? 🎅'], // (at Christmas, js/christmas.js)
   feed: ['밥 먹자~!', '맛있는 거 가져왔어!', '많이 먹어 🍖'],
   play: ['간다~!', '잡아 봐!', '공 간다!'],
+  knit: ['{fox} 스웨터 직접 뜬 거야? 너무 잘 어울려!', '{fox} 스웨터 그림 진짜 귀엽다 🧶', '스웨터 입으니까 {fox} 더 포근해 보여!', '나도 하나 떠 주면 안 돼? 헤헤'], // (the fox she is with wears a sweater she knitted: js/knit.js)
 };
 
 /* How the family can pose for a picture (js/fox/brain.js: strike). */
@@ -337,7 +339,7 @@ const FoxHost = {
     const pv = Pet.previewing;
     const trip = Pet.trip();
     const look = {
-      foxes: Pet.home().map((id) => ({ id, worn: Pet.outfit(id).slice(), grown: Pet.grown(id) })),
+      foxes: Pet.home().map((id) => ({ id, worn: Pet.dressed(id), grown: Pet.grown(id) })),
       away: trip && Pet.away(trip.fox) ? [{ id: trip.fox, grown: Pet.grown(trip.fox) }] : [], // out exploring: not in the yard, but it still lives there
       gift: Pet.tripPhase() === 'back' ? trip.fox : null, //                                     …or home again, with a gift in its mouth
       lead: p.species,
@@ -346,11 +348,13 @@ const FoxHost = {
       decor: p.yard.map((it) => ({ id: it.id, x: it.x, z: it.z, r: it.r })), // (no x: not one she has placed herself — the 3D side arranges those)
       held: FoxRoom.tab === 'yard' ? Pet.held : null,
       tune: CoverHost.tune(),
+      garden: Garden.look(), // (a flower for every cover she has released: js/garden.js)
+      ours: Stars.look(), //    (…and a star in the night sky for every day worth remembering: js/stars.js)
       mail: Pet.mailWaiting(),
       scene: p.scene,
       season: Weather.seasonIn(p.scene), // (the meadow and the farm follow the year; the other habitats are one season always)
       sky: Weather.now(p.scene), //         …and the weather there, right now
-      night: document.body.classList.contains('late-night'),
+      night: Moon.dark(), // (from dusk, by the sky over Seoul: js/moon.js — the foxes only sleep from midnight: mood)
       mood: Pet.mood(),
       reduce: reducedMotion(),
     };
@@ -419,6 +423,11 @@ const FoxHost = {
   onDecorPick: (id) => Pet.hold(id), //         she touched one while arranging the yard
   onDecorUse: () => Pet.yardFun(), //           a fox has had its fun with one
   onPuddle: () => Pet.puddle(), //              …or has jumped into a puddle
+  onFlower: (id) => Garden.tapped(id), //       she tapped a flower of the song garden
+  onBloom: (id) => Garden.bloomed(id), //       …a new one has opened before her eyes
+  onStar: (id) => Stars.tapped(id), //          she tapped a star of ours in the night sky (null: the sky round them)
+  onStarsSeen: (ids) => Stars.saw(ids), //      …new ones have come out before her eyes
+  knitOf: (id) => Knit.design(id), //          a sweater she knitted, with her picture on it (or the one she is knitting): js/knit.js
   clock: () => CoverHost.clock(), //            where the cover that is playing is (seconds)
   beats: (id) => CoverHost.beats(id), //        …and its beat, once the studio has listened to it
 };
@@ -475,7 +484,7 @@ const Pet = {
     const lines = mine && mine.length ? mine : OWNER_LINES[kind];
     if (!lines || !lines.length) return '';
     const name = this.nameOf(id);
-    return pick(lines).replace('{fox!}', josa(name, '아/야')).replace('{fox}', name).replace('{me}', josa(OWNER_NAME, '이야/야'));
+    return pick(lines).replace('{fox!}', josa(name, '아/야')).replace('{fox}', name).replace('{me}', josa(OWNER_NAME, '이야/야')).replace('{moon}', Moon.moon().name);
   },
 
   /* She was tapped: a wave, and a word — about the hour, the weather, or the foxes. */
@@ -485,10 +494,11 @@ const Pet = {
     if (Chat.calling) return void Chat.begin(); // …or something to say: she is heard out (js/chat.js)
     if (Halloween.waiting() && !Halloween.playing) return void Halloween.begin(); // …or it is Halloween: trick or treat
     if (Christmas.waiting() && !Christmas.playing) return void Christmas.begin(); // …or Christmas: her present
+    if (Moon.waiting() && !Moon.playing) return void Moon.begin(); // …or the night of the full moon
     const sky = Weather.now(FoxHost.scene()).kind;
     const trip = this.trip();
     const kind =
-      this.mood() === 'sleepy' ? 'night' : !this.home().length && trip ? 'alone' : sky === 'rain' ? 'rain' : sky === 'snow' ? 'snow' : sky === 'wind' ? 'wind' : this.mood() === 'hungry' && Math.random() < 0.6 ? 'hungry' : Halloween.on() ? 'halloween' : Christmas.on() ? 'christmas' : 'hello';
+      this.mood() === 'sleepy' ? 'night' : !this.home().length && trip ? 'alone' : sky === 'rain' ? 'rain' : sky === 'snow' ? 'snow' : sky === 'wind' ? 'wind' : this.mood() === 'hungry' && Math.random() < 0.6 ? 'hungry' : Halloween.on() ? 'halloween' : Christmas.on() ? 'christmas' : Moon.dark() && Math.random() < 0.5 ? 'evening' : Knit.wears(State.pet.species) && Math.random() < 0.4 ? 'knit' : 'hello';
     if (FoxHost.api && !FoxHost.failed) FoxHost.api.owner(this.ownerLine(kind, kind === 'alone' ? trip.fox : State.pet.species));
   },
 
@@ -506,6 +516,17 @@ const Pet = {
   outfit(id = State.pet.species) {
     const all = State.pet.outfits;
     return all[id] || (all[id] = []);
+  },
+
+  /* …as the 3D side knows it: a sweater she knitted by how often she has drawn on it (js/knit.js), so that pictures of it are drawn anew. */
+  wornNow(id = State.pet.species) {
+    return this.outfit(id).map((x) => Knit.worn(x));
+  },
+
+  /* …and as it shows in the foxes' world: while she knits a sweater for the fox she is with, it wears that one. */
+  dressed(id) {
+    const worn = this.wornNow(id);
+    return Knit.ov && id === State.pet.species ? worn.filter((x) => !Knit.isKnit(x)).concat('knit-draft') : worn;
   },
 
   /* `worn` with `id` put on too: a hat in place of the one it had on (one at a time). → a new list. */
@@ -862,7 +883,7 @@ const Pet = {
 
   faceKey() {
     const id = State.pet.species;
-    return `${id}@${this.grown(id)}|${this.outfit().join()}`;
+    return `${id}@${this.grown(id)}|${this.wornNow().join()}`;
   },
 
   /* The portrait is kept between visits, so showing it never has to start the 3D engine. */
@@ -884,7 +905,7 @@ const Pet = {
     const id = State.pet.species;
     let url = '';
     try {
-      url = FoxHost.api.snapshot('fox', id, { worn: this.outfit().slice(), size: 220, grown: this.grown(id) }) || '';
+      url = FoxHost.api.snapshot('fox', id, { worn: this.wornNow(), size: 220, grown: this.grown(id) }) || '';
     } catch (e) {
       console.warn('[Pet] portrait failed', e);
     }
@@ -999,7 +1020,8 @@ const Pet = {
     const present = Present.waiting(); // Lorelei has something for her
     const spooky = !present && Halloween.waiting(); // …or a game to play: trick or treat
     const merry = !present && !spooky && Christmas.waiting(); // …or a Christmas present
-    const says = present ? `${josa(OWNER_NAME, '이/가')} 줄 게 있대요! 🎁` : spooky ? `${josa(OWNER_NAME, '이/가')} 트릭 오어 트릿 하재요! 🎃` : merry ? `${josa(OWNER_NAME, '이/가')} 크리스마스 선물을 준비했대요! 🎄` : mail ? '우편함에 편지가 왔어!' : gift ? `${josa(this.nameOf(trip.fox), '이/가')} 선물을 물고 돌아왔어!` : empty ? `탐험을 떠났어요 · ${this.tripLeft()} 뒤에 돌아와요` : this.moodLine();
+    const full = !present && !spooky && !merry && Moon.waiting(); // …or the full moon to look at together
+    const says = present ? `${josa(OWNER_NAME, '이/가')} 줄 게 있대요! 🎁` : spooky ? `${josa(OWNER_NAME, '이/가')} 트릭 오어 트릿 하재요! 🎃` : merry ? `${josa(OWNER_NAME, '이/가')} 크리스마스 선물을 준비했대요! 🎄` : full ? `오늘 밤은 보름달! ${josa(OWNER_NAME, '이/가')} 같이 보재요 🌕` : mail ? '우편함에 편지가 왔어!' : gift ? `${josa(this.nameOf(trip.fox), '이/가')} 선물을 물고 돌아왔어!` : empty ? `탐험을 떠났어요 · ${this.tripLeft()} 뒤에 돌아와요` : this.moodLine();
     return `
       <button class="pet-face" data-action="fox-open" aria-label="${esc(p.name)} 만나러 가기">${this.avatarHtml('is-big')}</button>
       <div class="pet-side">
@@ -1009,7 +1031,7 @@ const Pet = {
         <p class="pet-says">${esc(says)}</p>
         ${this.barsHtml()}
       </div>
-      <button class="btn primary wide pet-go" data-action="fox-open">${present ? `🎁 ${esc(OWNER_NAME)} 만나러 가기` : spooky ? `🎃 ${esc(OWNER_NAME)} 만나러 가기` : merry ? `🎄 ${esc(OWNER_NAME)} 만나러 가기` : mail ? '💌 편지 받으러 가기' : gift ? '🎁 선물 받으러 가기' : empty ? '🏡 마당 보러 가기' : `🦊 ${esc(p.name)} 만나러 가기`}</button>`;
+      <button class="btn primary wide pet-go" data-action="fox-open">${present ? `🎁 ${esc(OWNER_NAME)} 만나러 가기` : spooky ? `🎃 ${esc(OWNER_NAME)} 만나러 가기` : merry ? `🎄 ${esc(OWNER_NAME)} 만나러 가기` : full ? `🌕 보름달 보러 가기` : mail ? '💌 편지 받으러 가기' : gift ? '🎁 선물 받으러 가기' : empty ? '🏡 마당 보러 가기' : `🦊 ${esc(p.name)} 만나러 가기`}</button>`;
   },
 
   barsHtml() {
@@ -1540,7 +1562,8 @@ const Pet = {
             .join('')}</div>`
         : '';
       const items = PET_SHOP.filter((it) => !it.gift || this.owns(kind, it.id)); // (a present shows once it is hers)
-      return `${who}<p class="hint">${several ? `${esc(josa(p.name, '이/가'))} 걸칠 것을 골라요. ` : ''}가진 장식은 누를 때마다 쓰고 벗어요. 여러 개를 함께 걸쳐도 되지만, 모자는 하나씩만 써요.</p>${grid(items.map((it) => this.itemHtml(kind, it)).join(''))}`;
+      // (first the sweaters she knits herself, with a picture of hers on them: js/knit.js)
+      return `${who}${Knit.shopHtml()}<p class="hint">${several ? `${esc(josa(p.name, '이/가'))} 걸칠 것을 골라요. ` : ''}가진 장식은 누를 때마다 쓰고 벗어요. 여러 개를 함께 걸쳐도 되지만, 모자는 하나씩만 써요.</p>${grid(items.map((it) => this.itemHtml(kind, it)).join(''))}`;
     }
     if (kind === 'yard') {
       return `<p class="shop-count"><span>마당에 놓은 물건</span><b>${p.yard.length}개</b></p>
@@ -1615,6 +1638,7 @@ const FoxRoom = {
   skyTimer: 0, //    while it is open: the weather is looked at every few seconds…
   skyDue: 0, //      …and the moment it may change
   skyWas: null, //   the sky she last saw here: { scene, kind }
+  gazeOn: false, //  she is looking up at the night sky (the controls make way for its card)
 
   canFullscreen() {
     const el = document.documentElement;
@@ -1664,6 +1688,7 @@ const FoxRoom = {
         </div>
         <div class="fh-mid">
           <div class="fox-tune" data-fox-tune hidden></div>
+          <div class="fox-flower" data-fox-flower hidden></div>
           <button class="fox-mail is-trip" data-action="fox-trip" data-fox-trip hidden></button>
           <button class="fox-mail" data-action="fox-letter" data-fox-mail hidden></button>
           <button class="fox-mail is-present" data-action="fox-present" data-fox-present hidden></button>
@@ -1673,6 +1698,7 @@ const FoxRoom = {
         </div>
         <button class="fox-cam" data-action="fox-photo" aria-label="사진 찍기"><span aria-hidden="true">📷</span></button>
         <button class="fox-cam is-trip" data-action="fox-trip" data-fox-trip-btn aria-label="탐험 보내기"><span aria-hidden="true">🧭</span></button>
+        <button class="fox-cam is-moon" data-action="fox-moon" data-fox-moon aria-label="밤하늘 보기" hidden><span aria-hidden="true">🌙</span></button>
         <button class="fox-sky" data-action="fox-sky" data-fox-sky aria-label="여우 세상의 계절과 날씨"></button>
         <div class="fh-actions">
           <button class="fh-act" data-action="pet-pet" data-sfx="none"><span aria-hidden="true">💗</span><b>쓰다듬기</b></button>
@@ -1693,6 +1719,14 @@ const FoxRoom = {
         </div>
         <div data-fox-preview></div>
         <div class="fd-body" data-fox-shop></div>
+      </div>
+      <div class="fox-gaze" data-fox-gaze hidden>
+        <div class="fg-top">
+          <button class="fh-btn" data-action="gaze-exit" aria-label="밤하늘 보기 끝내기">✕</button>
+          <div class="fg-card" data-fg-card aria-live="polite"></div>
+        </div>
+        <div class="fg-memory" data-fg-memory aria-live="polite" hidden></div>
+        <button class="fg-wishes" data-action="moon-wishes" data-fg-wishes hidden></button>
       </div>
       <div class="fox-photo" data-fox-photo hidden>
         <div class="fp-top">
@@ -1734,6 +1768,8 @@ const FoxRoom = {
     Pet.asked = {};
     this.tab = null;
     this.photoOn = false;
+    this.gazeOn = false;
+    Moon.litWas = null;
     Pet.held = null;
     this.tuneKey = '';
     const ov = (this.ov = UI.open(this.html(), { full: true, cls: 'is-fox', label: `${State.pet.name}의 세상`, onClose: () => this.closed() }));
@@ -1784,6 +1820,8 @@ const FoxRoom = {
     Present.arrive(); // (if Lorelei has something for her, she calls before long)
     Halloween.arrive(); // (…or, on Halloween, to play trick or treat)
     Christmas.arrive(); // (…or, at Christmas, to give her present)
+    Moon.arrive(); //      (…or, on the night of the full moon, to look at it together)
+    Garden.study(); //     (a cover still a bud is listened to: what flower it will be)
     Chat.arrive({ quiet: met }); // …and now and then she has something to say (js/chat.js)
     if (early) return; // (he is looking at how something will be: what follows is for her own visits)
     await sleep(900);
@@ -1823,7 +1861,11 @@ const FoxRoom = {
     this.ov = null;
     this.tab = null;
     this.photoOn = false;
+    this.gazeOn = false;
     this.gig = null;
+    Knit.left();
+    Garden.hide();
+    Stars.leave();
     Pet.previewing = null;
     Pet.held = null;
     clearTimeout(Pet.thumbTimer);
@@ -1835,6 +1877,7 @@ const FoxRoom = {
     Chat.left();
     Halloween.left();
     Christmas.left();
+    Moon.left();
     FoxHost.unmount();
     this.leaveFullscreen();
     Pet.refresh();
@@ -1843,6 +1886,7 @@ const FoxRoom = {
   /* Open the shop on a tab, switch tabs, or close it (null). */
   setShop(tab) {
     if (!this.ov) return;
+    if (tab) this.setGaze(false);
     const turned = tab !== this.tab;
     this.tab = tab;
     if (!tab || (turned && Pet.previewing && Pet.previewing.kind === 'yard')) Pet.previewing = null;
@@ -1858,6 +1902,7 @@ const FoxRoom = {
   /* Tell the 3D view which part of the shop is open and how much of the screen it covers: the foxes (or, on its yard tab, the whole yard) stay in the part that shows. */
   frame() {
     if (!this.ov || !FoxHost.api || !FoxHost.stage) return;
+    if (Knit.ov) return Knit.frame(); // (she is knitting: the fox she dresses above the sheet)
     const drawer = $('[data-fox-drawer]', this.ov.panel);
     if (!this.tab) return FoxHost.api.frame(null);
     // (its size as it is laid out: while it slides in, less of it shows than that)
@@ -1987,17 +2032,39 @@ const FoxRoom = {
   },
 
   /*
-     The season and the weather, written over the view — and passed on to the 3D side, which draws it. When the sky
-     changes while she is watching, she is told (the foxes have their own say: js/fox/weatherlife.js).
+     The season and the weather, written over the view — and passed on to the 3D side, which draws it; and the sky over
+     Seoul (js/moon.js): the evening, the night, the moon. When the sky changes while she is watching, she is told (the
+     foxes have their own say: js/fox/weatherlife.js).
   */
   sky() {
     if (!this.ov) return;
     const scene = FoxHost.scene();
     const sky = Weather.now(scene);
+    const heavens = Moon.now();
     const el = $('[data-fox-sky]', this.ov.panel);
     el.innerHTML = Weather.chipHtml(scene);
     el.dataset.kind = sky.kind;
-    if (FoxHost.api && FoxHost.stage) FoxHost.api.weather(sky);
+    if (FoxHost.api && FoxHost.stage) {
+      FoxHost.api.heavens(heavens);
+      FoxHost.api.weather(sky);
+    }
+    // night falls, or day breaks — or the moon comes up — while she is here: the world turns with it, and she is told
+    const lit = { dark: heavens.dark, up: heavens.moon.up && heavens.moon.id !== 'new' };
+    const litWas = Moon.litWas;
+    Moon.litWas = lit;
+    if (litWas && litWas.dark !== lit.dark) {
+      FoxHost.sync();
+      if (!lit.dark) this.setGaze(false);
+    }
+    if (litWas && (litWas.dark !== lit.dark || litWas.up !== lit.up)) {
+      // (…and on the night of the full moon, it may be time now: Lorelei calls)
+      this.presentChip();
+      Moon.arrive();
+    }
+    this.moonButton(heavens);
+    if (this.gazeOn) this.gazeCard();
+    const moonNews = UI.top() === this.ov && !OwnerSays.on && Moon.news(litWas, lit);
+    if (moonNews) UI.toast(moonNews.text, { icon: moonNews.icon, ms: 3600 });
     const was = this.skyWas;
     this.skyWas = { scene, kind: sky.kind };
     if (scene === State.pet.scene) Pet.skySeen(sky);
@@ -2017,6 +2084,51 @@ const FoxRoom = {
       this.skyDue = setTimeout(turn, Weather.untilNext() + 300);
     };
     this.skyDue = setTimeout(turn, Weather.untilNext() + 300);
+  },
+
+  /* The 🌙 button: at night, to look up at the sky — tonight's moon on it (stars, while it is down); a spark on it
+     while there are new stars of ours to come out (js/stars.js). */
+  moonButton(heavens = Moon.now()) {
+    if (!this.ov) return;
+    const el = $('[data-fox-moon]', this.ov.panel);
+    el.hidden = !heavens.dark || !FoxHost.api || FoxHost.failed;
+    el.firstElementChild.textContent = Moon.emoji();
+    el.classList.toggle('has-new', !el.hidden && Stars.fresh() > 0);
+  },
+
+  /* She looks up at the night sky (js/fox/world.js: gaze) — or back down. */
+  setGaze(on) {
+    if (!this.ov || on === this.gazeOn) return;
+    if (on && (!FoxHost.api || FoxHost.failed || !FoxHost.stage || !Moon.dark())) return;
+    if (on && this.tab) this.setShop(null);
+    if (on && this.photoOn) this.setPhoto(false);
+    if (on && !FoxHost.api.gaze('moon')) return;
+    if (!on && FoxHost.api) FoxHost.api.gaze(null);
+    this.gazeOn = on;
+    Stars.leave();
+    const root = $('[data-fox-room]', this.ov.panel);
+    root.classList.toggle('gaze-on', on);
+    $('[data-fox-gaze]', root).hidden = !on;
+    if (!on) return void this.moonButton(); // (the new stars she has seen come out: the spark goes)
+    this.gazeCard();
+    const m = Moon.moon();
+    State.moon.looked += 1;
+    if (m.up && m.id !== 'new') Diary.put('gazed', m.name);
+    Store.save();
+    Game.checkAchievements();
+  },
+
+  /* …the card over the sky: tonight's moon in a few words, our constellations (js/stars.js), and her wishes, if there are any. */
+  gazeCard() {
+    if (!this.ov) return;
+    $('[data-fg-card]', this.ov.panel).innerHTML = Moon.card() + Stars.lines().map((l) => `<small class="fg-stars">${esc(l)}</small>`).join('');
+    const n = State.moon.wishes.length;
+    const el = $('[data-fg-wishes]', this.ov.panel);
+    el.hidden = !n;
+    el.innerHTML = `<span aria-hidden="true">🌕</span> 보름달에 빈 소원 <b>${n}</b>`;
+    // (our constellations keep out of the card's way)
+    const card = $('[data-fg-card]', this.ov.panel);
+    if (FoxHost.api) FoxHost.api.gazeCard({ right: card.offsetLeft + card.offsetWidth, bottom: card.offsetTop + card.offsetHeight });
   },
 
   /* The button for his letter: "have it fetched" while it is in the mailbox, "take it" once a fox has brought it. */
@@ -2058,23 +2170,26 @@ const FoxRoom = {
     if (Chat.calling) el.innerHTML = `<span aria-hidden="true">💬</span><b>${esc(josa(OWNER_NAME, '이/가'))} 할 말이 있대요</b><small>눌러서 듣기</small>`;
   },
 
-  /* "Lorelei has something for you" (or, on Halloween, a game to play; at Christmas, her present): there for as long as she has — a tap, and she gives it. */
+  /* "Lorelei has something for you" (or, on Halloween, a game to play; at Christmas, her present; on the night of the full moon, the moon): there for as long as she has — a tap, and she gives it. */
   presentChip() {
     if (!this.ov) return;
     const el = $('[data-fox-present]', this.ov.panel);
     const gift = Present.waiting() && !Present.playing;
     const game = !gift && !Present.playing && Halloween.waiting() && !Halloween.playing;
     const merry = !gift && !game && !Present.playing && !Halloween.playing && Christmas.waiting() && !Christmas.playing;
-    el.hidden = !gift && !game && !merry;
+    const full = !gift && !game && !merry && !Present.playing && !Halloween.playing && !Christmas.playing && Moon.waiting() && !Moon.playing;
+    el.hidden = !gift && !game && !merry && !full;
     if (gift) el.innerHTML = `<span aria-hidden="true">🎁</span><b>${esc(josa(OWNER_NAME, '이/가'))} 줄 게 있대요!</b><small>눌러서 받기</small>`;
     else if (game) el.innerHTML = `<span aria-hidden="true">🎃</span><b>${esc(josa(OWNER_NAME, '이/가'))} 부르고 있어요!</b><small>트릭 오어 트릿</small>`;
     else if (merry) el.innerHTML = `<span aria-hidden="true">🎄</span><b>${esc(josa(OWNER_NAME, '이/가'))} 부르고 있어요!</b><small>메리 크리스마스</small>`;
+    else if (full) el.innerHTML = `<span aria-hidden="true">🌕</span><b>${esc(josa(OWNER_NAME, '이/가'))} 부르고 있어요!</b><small>보름달 같이 보기</small>`;
   },
 
   /* Start or stop taking pictures: the shop and the buttons make way, the family poses. */
   setPhoto(on) {
     if (!this.ov || on === this.photoOn) return;
     if (on && !Pet.anyoneHome('사진을 찍어 주세요')) return;
+    if (on) this.setGaze(false);
     if (on && (!FoxHost.api || FoxHost.failed)) {
       UI.toast('이 기기에서는 3D 화면을 쓸 수 없어서 사진을 찍을 수 없어요.', { icon: '📷', ms: 3600 });
       return;
@@ -2312,7 +2427,15 @@ Object.assign(Actions, {
   'fox-juke': () => Juke.open(),
   'fox-trip': () => Trip.open(),
   'fox-back': () => FoxHost.api && FoxHost.api.lookBack(),
-  'fox-sky': () => UI.toast(Weather.describe(FoxHost.scene()), { icon: SKIES[Weather.now(FoxHost.scene()).kind].emoji, ms: 4200 }),
+  'fox-sky': () => {
+    // (at night, the moon as well)
+    const scene = FoxHost.scene();
+    const night = Moon.dark();
+    UI.toast(night ? `${Weather.describe(scene)} ${Moon.describe()}` : Weather.describe(scene), { icon: night && Weather.now(scene).kind === 'clear' ? Moon.emoji() : SKIES[Weather.now(scene).kind].emoji, ms: night ? 6500 : 4200 });
+  },
+  'fox-moon': () => FoxRoom.setGaze(!FoxRoom.gazeOn),
+  'gaze-exit': () => FoxRoom.setGaze(false),
+  'moon-wishes': () => Moon.showWishes(),
   'tune-toggle': () => {
     const p = CoverHost.player();
     if (p.singleId) CoverHost.play(p.singleId);

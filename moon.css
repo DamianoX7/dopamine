@@ -1,0 +1,311 @@
+/* ==================================================================
+   🌙 The real moon — the button over the foxes' world at night, the
+   card over the sky when she looks up, her wishes, and the card on
+   Home on the night of the full moon (js/moon.js); and the day a star
+   of our constellations tells, when she taps it (js/stars.js).
+   ================================================================== */
+
+/* ---------- the foxes' world: the night sky ---------- */
+/* a round button under the compass, there from dusk */
+.fox-cam.is-moon {
+  top: calc(var(--safe-t) + 172px);
+  background: rgba(22, 28, 64, 0.88);
+  box-shadow:
+    0 10px 24px -12px rgba(10, 10, 40, 0.9),
+    inset 0 0 0 2px rgba(214, 222, 255, 0.35);
+}
+.fox-cam.is-moon[hidden] {
+  display: none;
+}
+/* …with a spark on it while new stars of ours wait to come out (js/stars.js) */
+.fox-cam.is-moon.has-new::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #161c40;
+  border-radius: 50%;
+  background: #ffd76a;
+  box-shadow: 0 0 10px 2px rgba(255, 215, 106, 0.8);
+  animation: newStar 1.8s ease-in-out infinite;
+}
+@keyframes newStar {
+  50% {
+    box-shadow: 0 0 3px 0 rgba(255, 215, 106, 0.5);
+    transform: scale(0.82);
+  }
+}
+
+/* looking up: the game's buttons go, the sky's card comes */
+.fox-room.gaze-on .fox-hud {
+  display: none;
+}
+.fox-gaze {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: calc(var(--safe-t) + 10px) max(12px, env(safe-area-inset-right, 0px)) calc(var(--safe-b) + 20px) max(12px, env(safe-area-inset-left, 0px));
+  pointer-events: none;
+}
+.fox-gaze[hidden] {
+  display: none;
+}
+.fg-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.fg-top > * {
+  pointer-events: auto;
+}
+.fg-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 11px 18px 12px;
+  border-radius: 22px;
+  background: rgba(14, 18, 48, 0.6);
+  color: #f3f1ff;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: fgIn 0.5s 0.7s ease both;
+}
+.fg-card b {
+  font-size: 16px;
+}
+.fg-card small {
+  color: rgba(226, 229, 255, 0.82);
+  font-size: 12.5px;
+}
+@keyframes fgIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+.fg-wishes {
+  align-self: center;
+  padding: 10px 20px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 245, 216, 0.93);
+  color: #5b4520;
+  font-size: 14px;
+  box-shadow: 0 10px 24px -12px rgba(10, 10, 40, 0.9);
+  pointer-events: auto;
+  animation: fgIn 0.5s 0.9s ease both;
+}
+.fg-wishes[hidden] {
+  display: none;
+}
+.fg-wishes b {
+  margin-left: 2px;
+  color: #c98a12;
+}
+.fg-wishes:active {
+  transform: scale(0.96);
+}
+
+/* ---------- our constellations (js/stars.js) ---------- */
+/* how many stars there are, on the card at the top */
+.fg-card .fg-stars {
+  color: #ffe7a8;
+}
+/* a star she tapped: that day, along the bottom of the sky */
+.fg-memory {
+  align-self: center;
+  width: min(100%, 420px);
+  margin: auto 0 12px;
+  padding: 12px 12px 14px 16px;
+  border-radius: 22px;
+  background: rgba(14, 18, 48, 0.74);
+  color: #fff8e6;
+  box-shadow:
+    0 14px 30px -14px rgba(5, 5, 30, 0.95),
+    inset 0 0 0 1.5px rgba(255, 231, 168, 0.28);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  pointer-events: auto;
+  animation: memoryIn 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+.fg-memory[hidden] {
+  display: none;
+}
+@keyframes memoryIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+}
+.fm-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.fm-emoji {
+  flex: none;
+  font-size: 28px;
+  filter: drop-shadow(0 0 8px rgba(255, 231, 168, 0.6));
+}
+.fm-title {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.fm-title i {
+  color: #ffe7a8;
+  font-size: 11.5px;
+  font-style: normal;
+}
+.fm-title b {
+  font-size: 15.5px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.fm-title small {
+  color: rgba(226, 229, 255, 0.8);
+  font-size: 12px;
+}
+.fm-close {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: #e6e8ff;
+  font-size: 13px;
+}
+.fm-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 10px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid rgba(255, 231, 168, 0.18);
+  list-style: none;
+}
+.fm-lines li {
+  display: flex;
+  gap: 8px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.fm-lines li span {
+  flex: none;
+  width: 20px;
+  text-align: center;
+}
+
+/* ---------- her wishes ---------- */
+.wish-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 10px;
+  padding: 0;
+  list-style: none;
+}
+.wish-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 16px 13px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #1d2452 0%, #39407e 100%);
+  color: #fff8e6;
+}
+.wish-day {
+  color: #c9cff5;
+  font-size: 12px;
+}
+.wish-text {
+  font-size: 15.5px;
+  line-height: 1.45;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.wish-text i {
+  color: #c9cff5;
+  font-style: normal;
+}
+
+/* ---------- Home: tonight is the full moon ---------- */
+.moon-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 14px 12px 14px 16px;
+  background: linear-gradient(135deg, #1b2150 0%, #3b3f86 100%);
+  color: #fff8e6;
+  text-align: left;
+  box-shadow:
+    var(--shadow),
+    inset 0 0 0 2px rgba(255, 233, 170, 0.35);
+  transition: transform 0.15s;
+}
+.moon-card:active {
+  transform: scale(0.98);
+}
+.moon-ico {
+  flex: none;
+  font-size: 34px;
+  filter: drop-shadow(0 0 10px rgba(255, 236, 170, 0.75));
+  animation: moonGlow 3.2s ease-in-out infinite;
+}
+@keyframes moonGlow {
+  50% {
+    filter: drop-shadow(0 0 18px rgba(255, 236, 170, 0.95));
+    transform: translateY(-2px);
+  }
+}
+.moon-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.moon-text b {
+  font-size: 16.5px;
+}
+.moon-text small {
+  color: #d4d6f6;
+  font-size: 13px;
+}
+.moon-card .chev {
+  flex: none;
+  color: #c9cdf2;
+}
+
+body.reduce-motion .fg-card,
+body.reduce-motion .fg-wishes,
+body.reduce-motion .fg-memory,
+body.reduce-motion .fox-cam.is-moon.has-new::after,
+body.reduce-motion .moon-ico {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fg-card,
+  .fg-wishes,
+  .fg-memory,
+  .fox-cam.is-moon.has-new::after,
+  .moon-ico {
+    animation: none;
+  }
+}

@@ -36,6 +36,12 @@ host.register({
   sync: (look) => world && world.apply(look || host.look()),
   /** The weather as it is now (the app keeps the clock): { kind, level, wet … } — see js/weather.js. */
   weather: (sky) => world && world.setWeather(sky),
+  /** The sky over Seoul as it is now (the app keeps it): the sun, the evening, the moon — see js/moon.js (Moon.now). */
+  heavens: (sky) => world && world.setHeavens(sky),
+  /** Look up at the night sky ('moon'), or back down (null). → false if it cannot be just now. */
+  gaze: (why) => !!world && world.gaze(why),
+  /** …and where the card over the sky reaches to, `{ right, bottom }` (px): our constellations keep out of its way. */
+  gazeCard: (rect) => world && world.setGazeCard(rect),
   /** A reaction; `id` = the fox it is about (otherwise the one she is with, or all of them). */
   act: (name, id) => world && world.act(name, id),
   say: (text, ms, id) => world && world.say(text, ms, world.byId(id)),
@@ -51,14 +57,24 @@ host.register({
   lookBack: () => world && world.lookBack(),
   /**
    * The shop opened — on its foxes, outfits or habitats ('shop'), or on the yard ('yard') — or
-   * closed (null). `inset` = how many pixels of the view it covers, { right } or { bottom }.
+   * closed (null); or she is knitting a sweater ('knit', js/knit.js). `inset` = how many pixels
+   * of the view it covers, { right } or { bottom }.
    */
   frame: (mode, inset) => world && world.setMode(mode, inset),
   /** Turn a thing in the yard an eighth of a turn; false if there is no room for that. */
   turnDecor: (id) => !!world && world.turnDecor(id),
+  /** She has drawn on the picture of a sweater (js/knit.js: { id, chart, base, trim, fit, rev }): the foxes wearing it show it at once. */
+  knit: (design) => world && world.knit(design),
+  /** …a picture that is no more: its knitting goes. */
+  unknit: (id) => world && world.unknit(id),
   snapshot(kind, id, opts) {
     const w = ensure();
     return w ? w.snapshot(kind, id, opts) : '';
+  },
+  /** The fox `id` on its own, the whole of it, in a pose, on nothing (a canvas): for pictures drawn elsewhere — see World.cutout. */
+  cutout(id, opts) {
+    const w = ensure();
+    return w ? w.cutout(id, opts) : null;
   },
   foxOnPage: (id) => (world ? world.foxOnPage(id) : null),
   /** A fox has a new id (a kit that grew up); the next sync() gives it its grown body. */

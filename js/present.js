@@ -64,6 +64,7 @@ const OwnerSays = {
     this.on = true;
     this.live = !!(FoxHost.api && !FoxHost.failed && FoxHost.stage);
     FoxRoom.setPhoto(false);
+    FoxRoom.setGaze(false);
     if (FoxRoom.tab) FoxRoom.setShop(null);
     Pet.previewing = null;
     Pet.held = null;
@@ -288,12 +289,12 @@ const Present = {
   arrive() {
     FoxRoom.presentChip();
     clearTimeout(this.timer);
-    if (!this.waiting() || this.rehearsing || Meet.rehearsing || Chat.rehearsing || Halloween.rehearsing || Christmas.rehearsing) return; // (he is looking at how something will be: the real one keeps)
+    if (!this.waiting() || this.rehearsing || Meet.rehearsing || Chat.rehearsing || Halloween.rehearsing || Christmas.rehearsing || Moon.rehearsing) return; // (he is looking at how something will be: the real one keeps)
     const ov = FoxRoom.ov;
     const tryIt = () => {
       if (FoxRoom.ov !== ov || !this.waiting()) return;
       // (not over a letter she is reading, the shop, the camera, Lorelei's first hello: when she is back with the foxes)
-      if (!this.playing && !OwnerSays.on && UI.top() === ov && !FoxRoom.tab && !FoxRoom.photoOn) return void this.begin();
+      if (!this.playing && !OwnerSays.on && UI.top() === ov && !FoxRoom.tab && !FoxRoom.photoOn && !FoxRoom.gazeOn) return void this.begin();
       this.timer = setTimeout(tryIt, 2000);
     };
     this.timer = setTimeout(tryIt, 1400);
@@ -345,7 +346,7 @@ const Present = {
 };
 
 Object.assign(Actions, {
-  'fox-present': () => (Present.waiting() ? Present.begin() : Halloween.waiting() ? Halloween.begin() : Christmas.begin()), // (the chip is for any of them: FoxRoom.presentChip)
+  'fox-present': () => (Present.waiting() ? Present.begin() : Halloween.waiting() ? Halloween.begin() : Christmas.waiting() ? Christmas.begin() : Moon.begin()), // (the chip is for any of them: FoxRoom.presentChip)
   'present-rehearse': async () => {
     await Router.go('#/home');
     Present.test();

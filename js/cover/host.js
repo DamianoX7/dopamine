@@ -11,7 +11,7 @@ import { blobUrl } from './blobUrls.js';
 import { syncLibrary } from './sync.js';
 import { player, playSingle, toggle, closePlayer, clock, onEnded, seek, setRate } from './player.js';
 import { claimAudioFocus, releaseAudioFocus } from './core/audioFocus.js';
-import { beatsOf } from './audio/beat.js';
+import { beatsOf, heardOf } from './audio/beat.js';
 import { mountMiniPlayer } from './ui/miniPlayer.js';
 import { artworkEl } from './ui/common.js';
 import { mountStudio } from './studio/view.js';
@@ -126,6 +126,8 @@ async function boot() {
     focus: (owner) => claimAudioFocus(owner),
     unfocus: (owner) => releaseAudioFocus(owner),
     beats: (id) => beatsOf(id),
+    /** How fast a cover goes and what key it is in, once it has been listened to: a promise of { bpm, key: { tonic, mode, strength } } or null (js/garden.js). */
+    traits: (id) => heardOf(id).then((h) => (h ? { bpm: h.bpm, key: h.key || null } : null)),
     artwork: (id, opts) => {
       const s = getSingle(id);
       return artworkEl(s ? s.artworkId : null, { seed: s ? s.title : '', ...opts });

@@ -257,6 +257,8 @@ export const ANIMUD = {
   tailLift: -0.2,
   fur: 1,
   tipAmt: 0,
+  // (its sweater goes over the trunk only — the ruff lies over the front of it — and its sleeves over the broad shoulders)
+  knit: { hemTop: 3.3, hemBelly: 4.4, collar: 7, sleeveFrom: 0.5, sleeve: 4.4 },
   // (paler and bluer than they are to look: the daylight of the foxes' world is warm, and the grass throws green up at them)
   colors: {
     coat: '#fbe8e3',
@@ -280,6 +282,7 @@ export const ANIMUD = {
     sniff: { hy: -0.03, hrx: 0.26, nrx: 0.14, hdx: 0.1, tl: 0.1, earB: 0.1 },
     sleep: { hry: 0.2, sry: 0.2, cry: 0.2, nry: 0.2, nrx: 0.16, hdy: 0.15, hdx: 0.1, hdz: 0.1, tl: 0.15, tc: 0, ts: 0.9, earB: 0.2, earD: 0.3 },
     howl: { nrx: -0.12, hdx: -0.25 },
+    gaze: { nrx: 0.02, hdx: -0.1 },
   },
   extra: { pink: '#f4c3bb', rose: '#e9a8a0', earDeep: '#ecc0b8', lash: INK.lash, brow: INK.brow },
 
@@ -312,7 +315,7 @@ export const ANIMUD = {
           { c: V(0, yB + 0.012, zC + 0.06), rx: 0.094, ry: 0.092, ryB: 0.098, w: { chest: 1 }, fur: 0.85 },
           { c: V(0, yB + 0.016, zC + 0.095), rx: 0.05, ry: 0.05, w: { chest: 1 }, fur: 0.75 },
         ],
-        { segs: 16, sub: 3, comb: -1, droop: 0.3, color: plain }
+        { segs: 16, sub: 3, comb: -1, droop: 0.3, color: plain, part: 'torso' }
       );
       // the neck: up out of the shoulders into the head (the ruff is in front of it)
       coat.loft(
@@ -415,7 +418,7 @@ export const ANIMUD = {
             { c: V(x, 0.03, zC + 0.038), rx: 0.034, ry: 0.042, ryB: 0.03, w: { [Pw]: 1 }, fur: 0.2 },
             { c: V(x, 0.008, zC + 0.04), rx: 0.032, ry: 0.04, ryB: 0.028, w: { [Pw]: 1 }, fur: 0.15 },
           ],
-          { segs: 10, sub: 2, comb: 1, color: legColor }
+          { segs: 10, sub: 2, comb: 1, color: legColor, part: 'legF' }
         );
         coat.blob(V(x, 0.021, zC + 0.06), 0.035, 0.023, 0.04, { w: { [Pw]: 1 }, furLen: 0.15, color: pawColor });
 

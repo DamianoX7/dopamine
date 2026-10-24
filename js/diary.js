@@ -150,7 +150,11 @@ const Diary = {
     if (d.concerts) add('🪩', '여우들에게 내 커버를 들려줬어요');
     if (d.photos) add('📷', `여우 사진을 ${d.photos}장 찍었어요`);
     if (d.fourcut) add('🎞️', '여우들이랑 네 컷 사진을 찍었어요');
+    if (d.knit) add('🧶', '그림을 그려서 여우 스웨터를 떴어요');
     (d.gifts || []).slice(0, 2).forEach((g) => add('🧭', `탐험 간 여우가 ${quoted(g, '을/를')} 물어 왔어요`));
+    if (d.dream) add('💭', `${d.dream}의 꿈 이야기를 들었어요`);
+    if (d.moon) add('🌕', '보름달에 소원을 빌었어요');
+    else if (d.gazed) add('🌙', `여우들이랑 밤하늘의 ${josa(d.gazed, '을/를')} 올려다봤어요`);
     if (d.snow) add('⛄', '여우 세상에 눈이 내렸어요');
     else if (d.rain) add('☔', '여우 세상에 비가 내렸어요');
     if (d.games) {

@@ -19,6 +19,9 @@
 // of the yard, its lights twinkling; the foxes wear Santa hats and antlers, Lorelei a Santa hat and her scarf — and in
 // the evening the light goes blue. Through the year she dresses for the season of the place: cherry blossom in her
 // hair in spring, a straw hat in summer, a beret in autumn, a scarf in winter.
+// The sky is Seoul's (js/moon.js keeps it): the sun sets when it sets there, and the night is lit by tonight's moon.
+// At night she can look up at it (gaze: heavens.js draws the sky) — and on the night of the full moon the foxes sing to it.
+// Round the back of the yard grows the song garden (garden.js): a flower for every cover she has released.
 import * as THREE from '../vendor/three.module.min.js';
 import { buildFox, FUR_SUN } from './rig.js';
 import { FoxAnimator } from './animator.js';
@@ -27,9 +30,12 @@ import { buildLorelei, LoreleiAnimator } from './lorelei.js';
 import { Keeper } from './keeper.js';
 import { buildHabitat } from './scenes.js';
 import { speciesOf } from './species.js';
-import { makeBowl, makeBall, makeBed, makeMic, makeMailbox, makeLetter, makeGift, makeAccessory, makeRadio, makePresent, PAPER, makeOwnerHat, makeOwnerClothes, makeLantern, makeTree } from './props.js';
+import { makeBowl, makeBall, makeBed, makeMic, makeMailbox, makeLetter, makeGift, makeAccessory, dress, makeRadio, makePresent, PAPER, makeOwnerHat, makeOwnerClothes, makeLantern, makeTree } from './props.js';
+import { repaint, unknit, keepKnits } from './knit.js';
 import { makeDecor } from './decor.js';
 import { Sky } from './sky.js';
+import { Heavens } from './heavens.js';
+import { SongGarden } from './garden.js';
 import { beatAt, curveAt, pickMove } from './dance.js';
 import { V, clamp, TAU, glyphMaterial, disposeTree } from './kit.js';
 
@@ -38,6 +44,7 @@ const TAN = Math.tan((FOV * Math.PI) / 360);
 const PITCH = (56 * Math.PI) / 180; //      how steeply the camera looks down
 const PITCH_CLOSE = (44 * Math.PI) / 180; // …and when it comes in close, in the shop
 const PITCH_PHOTO = (40 * Math.PI) / 180; // …and when she starts taking pictures (from there she tilts it herself)
+const PITCH_KNIT = (47 * Math.PI) / 180; //  …and while she knits a sweater, over the back of the fox that will wear it
 // each fox its own pose, for the "all different" picture
 const MIXED = ['sit', 'smile', 'lie', 'proud', 'bow'];
 const ZOOM_MIN = 0.55;
@@ -50,6 +57,17 @@ const PRINTS = 160;
 // Halloween: where the jack-o'-lanterns stand, round the edge of the yard (0 = the front, towards you; π = the back)
 const LANTERNS = [2.5, -2.45, 1.5, -1.42, 0.66];
 const LANTERN_R = 0.085;
+// the light of an evening, at its deepest — how much of the day's light is left, and which colours it turns, how far:
+// a sunset's, and the evening of Halloween and of Christmas (see setLight)
+const DUSK = {
+  sunset: { sunI: 0.64, hemi: 0.72, sun: ['#ff8a3d', 0.75], sky: ['#f2a07e', 0.5], ground: ['#5c4234', 0.38], bg: ['#7a5a50', 0.4] },
+  halloween: { sunI: 0.62, hemi: 0.66, sun: ['#ff8a4a', 0.6], sky: ['#9d80dc', 0.55], ground: ['#3d2c4c', 0.45], bg: ['#4d3b62', 0.5] },
+  christmas: { sunI: 0.58, hemi: 0.72, sun: ['#ffb070', 0.5], sky: ['#7f92d8', 0.55], ground: ['#344060', 0.45], bg: ['#475683', 0.5] },
+};
+// looking up at the night sky (see gaze): how wide the view is at least, across (degrees) — and how quickly she looks
+// up (of the whole way, a second)
+const GAZE_WIDE = 34;
+const GAZE_RATE = 0.75;
 // Christmas: the tree's size, and where it may stand along the back of the yard (the best place first; as for LANTERNS)
 const TREE_S = 0.86;
 const TREE_AT = [Math.PI + 0.42, Math.PI - 0.42, Math.PI, Math.PI + 0.8, Math.PI - 0.8, Math.PI + 1.15, Math.PI - 1.15];
@@ -75,6 +93,7 @@ const SHIFTS = [];
 for (let dx = -1.6; dx <= 1.601; dx += 0.2) for (let dz = -1.2; dz <= 1.201; dz += 0.2) SHIFTS.push([Math.round(dx * 10) / 10, Math.round(dz * 10) / 10]);
 SHIFTS.sort((p, q) => Math.hypot(p[0], 1.3 * p[1]) - Math.hypot(q[0], 1.3 * q[1]));
 const damp = (cur, target, rate, dt) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
+const DEG = Math.PI / 180;
 const _v = V();
 const _w = V();
 const _ray = new THREE.Raycaster();
@@ -87,6 +106,12 @@ const _sa = [];
 const _sb = [];
 const _pa = V();
 const _pb = V();
+const _up = V(0, 1, 0);
+const _gc = new THREE.PerspectiveCamera(); // (the camera as it will be once she has looked up: see gazeCamera)
+const _mk = V();
+// what stands in the way of the sky, drawn in white on black (see skyMask)
+const MASK_SOLID = new THREE.MeshBasicMaterial({ color: '#ffffff' });
+const MASK_SKY = new THREE.Color('#000000');
 
 /** Emoji that float up and fade: hearts, notes, Zzz, sparkles, crumbs. */
 class Fx {
@@ -177,6 +202,7 @@ export class World {
     this.zoomNow = 1; //     …eased
     this.pitch = PITCH;
     this.showcaseOn = false; // the shop is open: the foxes pose, the camera comes close
+    this.knitOn = false; //     …on the sweater she is knitting: the fox she dresses turns its back (her picture is on it), and she can walk round it
     this.photoOn = false; //    she is taking pictures: the family poses, and she moves the camera
     this.pose = 'sit'; //       …how they pose ('mix' = each its own)
     this.finder = null; //      …and the photo booth's viewfinder, when there is one (px of the view)
@@ -288,6 +314,17 @@ export class World {
 
     this.fx = new Fx(scene);
     this.sky = new Sky(this); // the weather: what falls, the light under it, the puddles it leaves (sky.js)
+    this.heavens = new Heavens(this); // the night sky, the moon and the stars — for when she looks up (heavens.js)
+    // looking up at it: why ('moon' — she asked to; 'present' — Lorelei is showing her), and how far up the view is (0 … 1);
+    // where the family looks up from, and which way: { x, z, az }
+    this.gazing = null;
+    this.gazeK = 0;
+    this.gazeView = null;
+    this.gazeCard = { right: 0, bottom: 0 }; // where the card over the sky reaches to (px — the app says: setGazeCard)
+    this.gazeSession = 0; //                    (one more each time she looks up)
+    this.maskTarget = null; //                  (what skyMask draws into)
+    this.moonAt = V(0, 20, -40); // (…and a point far off towards the moon: what the foxes look at)
+    this.garden = new SongGarden(this); // a flower for every cover she has released, round the yard (garden.js)
     this.lit = null; //         the light of the habitat as it is by day or by night, before the weather dims it
     this.cover = null; //       the foxes' places out of the rain: { key, at: fox → place } (see coverFor)
     this.foxes = []; //   { id, rig, anim, brain, worn, accessories, baby, guest, wet } — in the app's order
@@ -315,7 +352,7 @@ export class World {
       'wheel',
       (e) => {
         e.preventDefault();
-        this.setZoom(this.zoom * Math.exp(-e.deltaY * 0.0014));
+        if (!this.gazing) this.setZoom(this.zoom * Math.exp(-e.deltaY * 0.0014));
       },
       { passive: false }
     );
@@ -426,6 +463,9 @@ export class World {
       this.owner.brain.do('helloYou', null, 1.3); // …and Lorelei waves
     }
     if (this.gift && this.state.mood !== 'sleepy') this.gift.fox.brain.then('bringGift');
+    // a flower of the song garden that has come up since she was last here: her fox goes over to it
+    const fresh = this.garden.fresh[0];
+    if (fresh && this.lead && this.state.mood !== 'sleepy') this.lead.brain.then('comeTo', fresh.x + (this.env.bounds.cx - fresh.x) * 0.12, fresh.z + (this.env.bounds.cz - fresh.z) * 0.12 + 0.05);
     this.wake();
   }
 
@@ -443,6 +483,8 @@ export class World {
     this.lookBack();
     this.setMode(null);
     this.photo(false);
+    this.gaze(null);
+    this.gazeK = 0;
     this.endPresent();
     this.unhail();
     this.leaving.splice(0).forEach((f) => this.forget(f)); // (one that was on its way out is gone by the time she looks again)
@@ -507,8 +549,14 @@ export class World {
    */
   setMode(mode, inset = {}) {
     this.inset = { right: (mode && inset.right) || 0, bottom: (mode && inset.bottom) || 0 };
-    const show = mode === 'shop';
+    const show = mode === 'shop' || mode === 'knit';
     const edit = mode === 'yard';
+    if ((mode === 'knit') !== this.knitOn) {
+      this.knitOn = mode === 'knit';
+      this.orbit = { yaw: 0, pitch: PITCH_KNIT };
+      this.pointer.down = false;
+      this.yawNow = Math.atan2(Math.sin(this.yawNow), Math.cos(this.yawNow)); // (however often she went round it: the short way back)
+    }
     if (show !== this.showcaseOn) {
       this.showcaseOn = show;
       this.foxes.forEach((f) => {
@@ -527,6 +575,17 @@ export class World {
     }
     if (mode) this.lookBack();
     this.wake();
+  }
+
+  /** She has drawn on the picture of a sweater (js/knit.js): whoever wears it shows it as it is now. */
+  knit(design) {
+    repaint(design);
+    this.wake();
+  }
+
+  /** …or the one she was drawing is put away (or a sweater is unravelled). */
+  unknit(id) {
+    unknit(id);
   }
 
   /** How far out the camera has to be for the whole yard to show in the part of the view the shop leaves free. */
@@ -551,8 +610,126 @@ export class World {
     // shift the picture so its middle sits in the part of the screen the shop leaves free
     if (Math.abs(this.offset.x) > 0.5 || Math.abs(this.offset.y) > 0.5) cam.setViewOffset(w, h, this.offset.x, this.offset.y, w, h);
     else if (cam.view && cam.view.enabled) cam.clearViewOffset();
-    else cam.updateProjectionMatrix();
+    if (this.gazeK > 0.0005 && this.gazeView) this.gazeCamera(w, h);
+    else cam.fov = FOV;
+    cam.updateProjectionMatrix();
     if (Math.abs((ppu * this.renderer.getPixelRatio()) / (this.furAt || 1) - 1) > 0.04) this.tuneFur();
+  }
+
+  /**
+   * Looking up at the night sky (gaze): the camera low behind the family, turned towards the moon and tilted up at it,
+   * wide enough for all of them — eased in from where it was by gazeK. The moon is shown that much nearer the horizon
+   * that it is in the picture as well (heavens.js: aim).
+   */
+  gazeCamera(w, h) {
+    const cam = this.camera;
+    const g = this.gazeView;
+    const k = this.gazeK * this.gazeK * (3 - 2 * this.gazeK);
+    const fov = clamp((2 * Math.atan(Math.tan((GAZE_WIDE / 2) * DEG) * (h / w))) / DEG, 46, 72);
+    const half = (fov / 2) * DEG;
+    // the horizon a quarter of the way up the picture — or nearer the middle while Lorelei talks (her window is along the bottom)
+    const tilt = half * (this.gazing === 'present' ? 0.12 : 0.5);
+    const across = 2 * Math.atan(Math.tan(half) * (w / h));
+    const dist = clamp((0.95 * Math.sqrt(this.yard)) / Math.tan(across / 2), w > h ? 2.9 : 2.2, 5.5);
+    const dx = Math.sin(g.az);
+    const dz = -Math.cos(g.az);
+    // down it comes with its eyes on the family, and only at the last looks up over them: (the bare edge of the
+    // world, far off, is never long in view on the way)
+    _pa.set(g.x - dx * dist, 0.42, g.z - dz * dist);
+    cam.position.lerp(_pa, k);
+    const up = clamp((this.gazeK - 0.45) / 0.55, 0, 1);
+    const lift = up * up * (3 - 2 * up);
+    _pb.copy(this.camTarget).lerp(_v.set(g.x, 0.3, g.z), k);
+    _w.set(_pa.x + dx * Math.cos(tilt) * 20, _pa.y + Math.sin(tilt) * 20, _pa.z + dz * Math.cos(tilt) * 20);
+    cam.lookAt(_pb.lerp(_w, lift));
+    cam.fov = FOV + (fov - FOV) * k;
+    const ox = this.offset.x * (1 - k);
+    const oy = this.offset.y * (1 - k);
+    if (Math.abs(ox) > 0.5 || Math.abs(oy) > 0.5) cam.setViewOffset(w, h, ox, oy, w, h);
+    else if (cam.view && cam.view.enabled) cam.clearViewOffset();
+    const m = this.heavens.sky && this.heavens.sky.moon;
+    this.heavens.aim(g.az, m && m.up ? clamp(m.alt, 12 * DEG, tilt + half * 0.6) : tilt + half * 0.5);
+    // (our constellations go where she will see them once she has looked up: in open sky to either side of the moon —
+    // heavens.js works it out from the camera as it will be then, and what stands in the way of the sky: skyMask)
+    _gc.fov = fov;
+    _gc.aspect = w / h;
+    _gc.position.copy(_pa);
+    _gc.lookAt(_w);
+    _gc.updateMatrixWorld(true);
+    _gc.updateProjectionMatrix();
+    this.heavens.frame({ cam: _gc, w, h, card: this.gazeCard, session: this.gazeSession, mask: (cols, rows) => this.skyMask(_gc, cols, rows) });
+  }
+
+  /**
+   * What stands in the way of the sky as `cam` sees it — the trees, the hills, the family: a picture of `cols` × `rows`
+   * of it, turned into 1 where something is and 0 where there is sky (for heavens.js to lay our constellations out in).
+   * Only what is solid counts: not the sky itself, nor the weather, nor anything you see through (ice, all but). The
+   * family is on its way to where they look up from (brain.js, keeper.js: moonGaze): not where they are now, but the
+   * ground they will be on, as high as her head there, is in the way.
+   */
+  skyMask(cam, cols, rows) {
+    const r = this.renderer;
+    if (!this.maskTarget || this.maskTarget.width !== cols || this.maskTarget.height !== rows) {
+      if (this.maskTarget) this.maskTarget.dispose();
+      this.maskTarget = new THREE.WebGLRenderTarget(cols, rows);
+    }
+    const family = new Set([this.owner, ...this.foxes, ...this.leaving].map((f) => f.rig.group));
+    const thin = (x) => x.transparent && x.opacity < 0.6;
+    const off = [];
+    this.scene.traverseVisible((o) => {
+      const m = o.material;
+      if (family.has(o) || o === this.heavens.group || o === this.sky.group || o.isSprite || o.isPoints || o.isLine || (m && (Array.isArray(m) ? m.some(thin) : thin(m)))) off.push(o);
+    });
+    off.forEach((o) => (o.visible = false));
+    const was = { bg: this.scene.background, fog: this.scene.fog, shadows: r.shadowMap.autoUpdate, target: r.getRenderTarget() };
+    const px = new Uint8Array(cols * rows * 4);
+    try {
+      this.scene.background = MASK_SKY;
+      this.scene.fog = null;
+      this.scene.overrideMaterial = MASK_SOLID;
+      r.shadowMap.autoUpdate = false;
+      r.setRenderTarget(this.maskTarget);
+      r.render(this.scene, cam);
+      r.readRenderTargetPixels(this.maskTarget, 0, 0, cols, rows, px);
+    } finally {
+      // (whatever happened, everything as it was)
+      r.setRenderTarget(was.target);
+      r.shadowMap.autoUpdate = was.shadows;
+      this.scene.background = was.bg;
+      this.scene.fog = was.fog;
+      this.scene.overrideMaterial = null;
+      off.forEach((o) => (o.visible = true));
+    }
+    // (the picture comes bottom row first)
+    const mask = new Uint8Array(cols * rows);
+    for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) mask[y * cols + x] = px[((rows - 1 - y) * cols + x) * 4] > 60 ? 1 : 0;
+    // the family where they will be: from the end of the foxes' row to her, a little before and behind it
+    const g = this.gazeView;
+    if (g) {
+      const dx = Math.sin(g.az);
+      const dz = -Math.cos(g.az);
+      const n = this.foxes.length;
+      const tall = this.owner.rig.dims.height * this.owner.rig.size * (this.gazing === 'present' ? 1.3 : 1.05); // (as she kneels to look up, her hat on; standing, to tell her story)
+      let x0 = 1;
+      let x1 = -1;
+      let y0 = 1;
+      let y1 = -1;
+      for (const s of [-0.76 - 0.16 * Math.min(4, n), 0.36 * Math.ceil(Math.max(0, n - 1) / 2) + 0.3]) {
+        for (const f of [-0.3, 0.9]) {
+          for (const y of [0, tall]) {
+            _mk.set(g.x - dz * s + dx * f, y, g.z + dx * s + dz * f).project(cam);
+            x0 = Math.min(x0, _mk.x);
+            x1 = Math.max(x1, _mk.x);
+            y0 = Math.min(y0, _mk.y);
+            y1 = Math.max(y1, _mk.y);
+          }
+        }
+      }
+      for (let y = Math.max(0, Math.floor(((1 - y1) / 2) * rows)); y < Math.min(rows, Math.ceil(((1 - y0) / 2) * rows)); y++) {
+        for (let x = Math.max(0, Math.floor(((x0 + 1) / 2) * cols)); x < Math.min(cols, Math.ceil(((x1 + 1) / 2) * cols)); x++) mask[y * cols + x] = 1;
+      }
+    }
+    return mask;
   }
 
   wake() {
@@ -599,6 +776,7 @@ export class World {
   }
 
   draw() {
+    this.heavens.place(this.camera);
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -643,6 +821,8 @@ export class World {
       this.fitView();
     }
     this.setTune(next.tune);
+    this.setGarden(next.garden || []);
+    this.heavens.setOurs(next.ours || []); // (our constellations, for when she looks up: js/stars.js)
     const spooky = this.setHalloween(next.halloween || null);
     const festive = this.setChristmas(next.christmas || null);
     this.dressOwner();
@@ -751,6 +931,7 @@ export class World {
     for (const l of this.lanterns) l.object.position.set(l.bx * k, 0, l.bz * k);
     if (this.tree) this.tree.object.position.set(this.tree.bx * k, 0, this.tree.bz * k);
     this.placeDecor();
+    if (this.garden) this.garden.place();
   }
 
   sendHome(fox, i) {
@@ -777,6 +958,7 @@ export class World {
       if (fox.worn.join() !== def.worn.join()) this.setWorn(fox, def.worn);
     });
     this.foxes.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+    keepKnits(this.foxes.concat(this.leaving).flatMap((f) => f.worn)); // (the knitting of a sweater nobody wears any more goes)
     this.stamp++;
   }
 
@@ -888,14 +1070,9 @@ export class World {
       a.object.removeFromParent();
       disposeTree(a.object);
     });
-    fox.accessories = [];
     fox.worn = list.slice();
-    list.forEach((id) => {
-      const acc = makeAccessory(id, fox.rig);
-      if (!acc) return;
-      fox.rig.bones[acc.bone].add(acc.object);
-      fox.accessories.push(acc);
-    });
+    fox.accessories = list.map((id) => makeAccessory(id, fox.rig)).filter(Boolean);
+    dress(fox.rig, fox.accessories);
   }
 
   /** After the family changed: the size of the yard and of the things in it, and how much fur each fox gets. */
@@ -941,37 +1118,60 @@ export class World {
     this.things.mic.setHeight(0.5 * rig.scale * (0.86 + 0.14 * rig.headScale));
   }
 
+  /**
+   * The light of the habitat as the sky over Seoul has it now (js/moon.js): its own by day; going gold as the sun goes
+   * down, then blue; and at night the moon's — as bright as tonight's moon is, and from its side of the sky while it is
+   * up. (The sky dims and tints it for the weather, every frame: sky.js.)
+   */
   setLight() {
     const env = this.env;
     if (!env) return;
-    const L = this.night ? { ...env.day, ...env.night } : env.day;
-    // (the light as the habitat has it; the sky dims and tints it for the weather, every frame)
-    this.lit = { sunI: L.sunI, hemi: L.hemi, sun: new THREE.Color(L.sun), sky: new THREE.Color(L.sky), ground: new THREE.Color(L.ground), bg: new THREE.Color(L.bg) };
-    if (this.spooky && this.spooky.dusk && !this.night) {
-      // Halloween evening: the sun low and red, the sky gone violet, the ground in shadow — and the lanterns lit
-      const lit = this.lit;
-      lit.sunI *= 0.62;
-      lit.hemi *= 0.66;
-      lit.sun.lerp(_c.set('#ff8a4a'), 0.6);
-      lit.sky.lerp(_c.set('#9d80dc'), 0.55);
-      lit.ground.lerp(_c.set('#3d2c4c'), 0.45);
-      lit.bg.lerp(_c.set('#4d3b62'), 0.5);
-    } else if (this.festive && this.festive.dusk && !this.night) {
-      // Christmas evening: the light going blue, the sun low and warm, the ground in shadow — the tree's lights the brighter for it
-      const lit = this.lit;
-      lit.sunI *= 0.58;
-      lit.hemi *= 0.72;
-      lit.sun.lerp(_c.set('#ffb070'), 0.5);
-      lit.sky.lerp(_c.set('#7f92d8'), 0.55);
-      lit.ground.lerp(_c.set('#344060'), 0.45);
-      lit.bg.lerp(_c.set('#475683'), 0.5);
+    const sky = this.heavens.sky;
+    const day = env.day;
+    const night = { ...env.day, ...env.night };
+    const lit = (L) => ({ sunI: L.sunI, hemi: L.hemi, sun: new THREE.Color(L.sun), sky: new THREE.Color(L.sky), ground: new THREE.Color(L.ground), bg: new THREE.Color(L.bg) });
+    // the evening: a sunset's light as the sun goes down — on Halloween and at Christmas, the day's own evening light,
+    // from five o'clock whatever the sun does (js/halloween.js, js/christmas.js)
+    const own = this.spooky && this.spooky.dusk ? 'halloween' : this.festive && this.festive.dusk ? 'christmas' : null;
+    const gold = own ? 1 : sky ? sky.gold : 0;
+    const blue = this.night ? 1 : sky ? sky.blue : 0;
+    const L = lit(day);
+    const T = DUSK[own || 'sunset'];
+    L.sunI *= 1 + (T.sunI - 1) * gold;
+    L.hemi *= 1 + (T.hemi - 1) * gold;
+    ['sun', 'sky', 'ground', 'bg'].forEach((key) => L[key].lerp(_c.set(T[key][0]), T[key][1] * gold));
+    const pos = _v.fromArray(day.pos);
+    pos.y *= 1 - 0.4 * gold * (1 - blue); // (a low sun: long shadows)
+    if (blue > 0) {
+      // …and on into the night, under the moon
+      const N = lit(night);
+      const m = sky && sky.moon;
+      const shine = !m ? 0.6 : m.up ? (0.25 + 0.75 * m.fraction) * clamp(0.4 + m.alt / 0.5, 0.4, 1) : 0.12;
+      N.sunI *= 0.74 + 0.48 * shine;
+      N.hemi *= 0.9 + 0.16 * shine;
+      N.sun.lerp(_c.set('#eef2ff'), 0.3 * shine);
+      const np = _w.fromArray(night.pos);
+      if (m && m.up) np.x = Math.abs(np.x) * (Math.sin(m.az) < 0 ? -1 : 1); // (it shines from the east as it rises, from the west as it sets)
+      L.sunI += (N.sunI - L.sunI) * blue;
+      L.hemi += (N.hemi - L.hemi) * blue;
+      ['sun', 'sky', 'ground', 'bg'].forEach((key) => L[key].lerp(N[key], blue));
+      pos.lerp(np, blue);
     }
-    this.sunOff.set(L.pos[0], L.pos[1], L.pos[2]).multiplyScalar(2.3);
+    this.lit = L;
+    this.sunOff.copy(pos).multiplyScalar(2.3);
     this.placeSun();
     this.sky.light();
-    this.scene.environmentIntensity = this.night ? 0.3 : 0.55;
+    this.scene.environmentIntensity = 0.55 - 0.25 * blue;
     env.setNight(this.night);
     if (this.stage) this.stage.classList.toggle('is-night', this.night);
+  }
+
+  /** The sky as the app has it (js/moon.js: Moon.now) — the sun, how far evening has come, the moon. */
+  setHeavens(sky) {
+    if (!sky) return;
+    this.heavens.set(sky);
+    this.setLight();
+    if (this.gazing) this.aimGaze();
   }
 
   // ---------------------------------------------------------------- every frame
@@ -1021,6 +1221,7 @@ export class World {
     this.updatePresent(dt);
     this.updateHalloween(dt);
     this.updateChristmas(dt);
+    this.garden.update(dt, this.time);
     this.fx.update(dt);
     this.updatePrints(dt);
 
@@ -1055,13 +1256,19 @@ export class World {
     }
 
     this.ppu = damp(this.ppu || this.basePpu, this.basePpu, 4, dt); // eases when the yard grows
+    // looking up at the night sky, or back down (gaze)
+    this.gazeK = clamp(this.gazeK + (this.gazing ? 1 : -1) * dt * (this.state.reduce ? 4 : GAZE_RATE), 0, 1);
+    if (this.gazeK === 0 && !this.gazing) this.gazeView = null;
+    if (this.gazeView) this.moonAt.copy(this.heavens.at).multiplyScalar(40).add(_v.set(this.gazeView.x, 0, this.gazeView.z));
+    this.heavens.update(dt, this.time, this.gazeK);
     if (this.photoOn) return this.updatePhotoCamera(dt);
 
     // the camera: a little after her fox from afar, right on it up close (on the yard, with nobody at home)
     const b = this.env.bounds;
     const who = (close && this.focus) || lead;
     const S = who ? who.rig.scale : 1;
-    this.yawNow = damp(this.yawNow, 0, 6, dt);
+    const knit = close && this.knitOn; // (round the fox in its new sweater, as far as she has turned the view)
+    this.yawNow = damp(this.yawNow, knit ? this.orbit.yaw : 0, 6, dt);
     // in the shop a fox fills the view the same whatever the size of the yard, and a small one comes closer still
     // …and while she arranges the yard, all of it shows
     // …and when foxes have left it for cover (under a tree, in the barn), the camera goes most of the way to where
@@ -1080,9 +1287,11 @@ export class World {
       away.x = x;
       away.z = z;
     }
-    const zoomTo = close ? (this.zoom * 1.5 * this.unitPpu) / this.basePpu / Math.pow(clamp(S, 0.45, 1.1), 0.55) : chat ? Math.min(1.85 * this.unitPpu, (0.44 * h) / me.rig.size) / this.basePpu : edit ? Math.min(this.zoom, this.fitZoom()) : Math.min(this.zoom, fit);
+    // (knitting: closer still — but all of the fox in the part of the view over her sheet, however little that is)
+    const knitFit = knit ? Math.min(0.78 * (h - this.inset.bottom), 0.6 * (this.stage.clientWidth - this.inset.right)) / (1.05 * S) : Infinity;
+    const zoomTo = close ? (this.zoom * Math.min((knit ? 2 : 1.5) * this.unitPpu / Math.pow(clamp(S, 0.45, 1.1), 0.55), knitFit)) / this.basePpu : chat ? Math.min(1.85 * this.unitPpu, (0.44 * h) / me.rig.size) / this.basePpu : edit ? Math.min(this.zoom, this.fitZoom()) : Math.min(this.zoom, fit);
     this.zoomNow = damp(this.zoomNow, zoomTo, away ? 2.5 : 5, dt);
-    this.pitch = damp(this.pitch, close ? PITCH_CLOSE : chat ? PITCH_PHOTO : PITCH, 4, dt);
+    this.pitch = damp(this.pitch, knit ? this.orbit.pitch : close ? PITCH_CLOSE : chat ? PITCH_PHOTO : PITCH, 4, dt);
     // on a tall screen the yard sits a little below the middle: woods above it, the buttons below
     const tall = clamp(h / Math.max(1, this.stage.clientWidth) - 1.1, 0, 1);
     this.offset.x = damp(this.offset.x, this.inset.right / 2, 7, dt);
@@ -1114,6 +1323,11 @@ export class World {
     } else {
       let toX = b.cx + (aimX - b.cx) * follow;
       let toZ = b.cz + (aimZ - b.cz) * follow;
+      if (knit && who) {
+        // (on the middle of its sweater: a little towards its head)
+        toX += Math.sin(who.anim.yaw) * 0.1 * S;
+        toZ += Math.cos(who.anim.yaw) * 0.1 * S;
+      }
       if (this.hailing && !close && !edit && !away) {
         // Lorelei would like a word: the view leans her way, as far as it takes for her to be seen — between the card
         // at the top and the buttons at the bottom (a fox that goes out into the country takes it along all the same)
@@ -1129,7 +1343,7 @@ export class World {
       this.camTarget.x = damp(this.camTarget.x, toX, 2.8, dt);
       this.camTarget.z = damp(this.camTarget.z, toZ, 2.8, dt);
     }
-    this.camTarget.y = damp(this.camTarget.y, close ? 0.3 * S : chat ? 0.5 : 0.15, 4, dt);
+    this.camTarget.y = damp(this.camTarget.y, knit ? 0.34 * S : close ? 0.3 * S : chat ? 0.5 : 0.15, 4, dt);
     this.placeCamera();
     this.placeSun();
     this.placeBubble();
@@ -1491,7 +1705,7 @@ export class World {
   /** `fox` speaks (the one she is with, unless another is named). */
   say(text, ms = 2600, fox = null) {
     const el = this.bubble.el;
-    if (!el || !text) return;
+    if (!el || !text || this.gazing) return; // (no bubbles in the sky)
     this.bubble.fox = fox || this.lead;
     // (what Lorelei says has her name over it)
     if (this.bubble.fox === this.owner) el.dataset.who = this.host.ownerName();
@@ -1587,6 +1801,15 @@ export class World {
 
   onDown(e) {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (this.gazing) {
+      // (looking up at the sky: there is no ground to tap — but there are our stars, and a tap on one tells its day; on
+      // nothing, the day that is up goes)
+      if (this.gazing !== 'moon' || this.gazeK < 0.9) return;
+      const id = this.heavens.starAt(e.clientX, e.clientY, this.camera, this.canvas.getBoundingClientRect());
+      if (id) this.heavens.focus(id);
+      if (this.host.onStar) this.host.onStar(id);
+      return;
+    }
     try {
       this.canvas.setPointerCapture(e.pointerId);
     } catch (err) {
@@ -1602,6 +1825,8 @@ export class World {
       return;
     }
     if (this.photoOn) return void Object.assign(p, { down: true, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, fox: null });
+    // (knitting her a sweater: a drag goes round the fox that will wear it, a tap on it is a pat)
+    if (this.knitOn) return void Object.assign(p, { down: true, pan: false, owner: false, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, t: performance.now(), fox: this.foxAt(this.cast(e)) });
     if (this.editOn) return void this.editDown(e);
     Object.assign(p, { down: true, pan: false, owner: false, x: e.clientX, y: e.clientY, t: performance.now(), fox: this.foxAt(this.cast(e)) });
     this.fling = null; // (a finger on the ground stops it gliding)
@@ -1624,16 +1849,18 @@ export class World {
       this.setZoom((this.pinch.zoom * Math.hypot(a.x - b.x, a.y - b.y)) / this.pinch.d);
       return;
     }
-    if (this.photoOn) {
-      // drag: round the family, and up and down
+    if (this.photoOn || (this.knitOn && p.down && (p.pan || Math.hypot(e.clientX - p.x, e.clientY - p.y) > 8))) {
+      // drag: round the family (or the fox in its sweater, all the way round), and up and down
       if (!p.down) return;
-      this.orbit.yaw = clamp(this.orbit.yaw - (e.clientX - p.lastX) * 0.006, -1.3, 1.3);
+      if (this.knitOn) p.pan = true; // (…and it is no pat when she lets go)
+      this.orbit.yaw = this.knitOn ? this.orbit.yaw - (e.clientX - p.lastX) * 0.008 : clamp(this.orbit.yaw - (e.clientX - p.lastX) * 0.006, -1.3, 1.3);
       this.orbit.pitch = clamp(this.orbit.pitch + (e.clientY - p.lastY) * 0.004, 0.52, 1.08);
       p.lastX = e.clientX;
       p.lastY = e.clientY;
       this.wake();
       return;
     }
+    if (this.knitOn) return;
     if (this.editOn) return void this.editMove(e);
     // a finger on the ground that moves: the view slides over the country (in the shop it stays on the foxes)
     if (p.down && !p.fox && !p.owner && !this.showcaseOn) {
@@ -1654,6 +1881,11 @@ export class World {
     if (this.editOn) return void this.editUp(e, cancelled);
     if (!p.down) return;
     p.down = false;
+    if (this.knitOn) {
+      if (!p.pan && !cancelled && p.fox) this.petAt(e, p.fox);
+      p.pan = false;
+      return;
+    }
     if (p.pan) {
       // she lets the ground go: with a push it glides on a little
       p.pan = false;
@@ -1663,6 +1895,13 @@ export class World {
     }
     if (this.photoOn || cancelled || p.fox || p.owner || !this.lead || performance.now() - p.t > 600 || Math.hypot(e.clientX - p.x, e.clientY - p.y) > 12) return;
     const ray = this.cast(e);
+    // a flower of the song garden: it bounces, and the app says which song it is
+    const flower = this.garden.hit(ray);
+    if (flower) {
+      this.garden.poke(flower);
+      if (this.host.onFlower) this.host.onFlower(flower.id);
+      return;
+    }
     // the mailbox with its flag up: off goes a fox to fetch what is in it
     const box = this.things.mailbox.object.position;
     if (this.mail === 'box' && ray.distanceSqToSegment(_v.set(box.x, 0.05, box.z), _w.set(box.x, 0.42, box.z)) < 0.03) {
@@ -1705,6 +1944,7 @@ export class World {
 
   /** `id` = the fox it is about (a pat, a new outfit, an arrival); otherwise the one she is with — or all of them. */
   act(name, id) {
+    if (this.gazing && name !== 'depart') return; // (looking up at the moon, nobody jumps for joy over an achievement)
     if (name === 'depart') {
       // off on an expedition
       const fox = this.byId(id);
@@ -2237,6 +2477,16 @@ export class World {
    * keep is the cover's own, as soon as the app has listened to it (host.beats) — until then an
    * even 108 to the minute.
    */
+  /**
+   * The song garden as the app has it (js/garden.js): [{ id, kind, color, minor, size, fresh }], the oldest first. A
+   * new flower opens the first time she sees it — and the fox she is with goes over to have a sniff.
+   */
+  setGarden(list) {
+    if (!this.garden.set(list)) return;
+    const f = this.stage && this.garden.fresh[0];
+    if (f && this.lead && this.lead.brain.free && !this.gazing) this.lead.brain.do('comeTo', f.x + (this.env.bounds.cx - f.x) * 0.12, f.z + (this.env.bounds.cz - f.z) * 0.12 + 0.05);
+  }
+
   setTune(tune) {
     let T = this.tune;
     if (!tune) {
@@ -2502,7 +2752,7 @@ export class World {
    */
   hail(line, bye, now = false) {
     const b = this.owner.brain;
-    if (this.gifting || this.hailing || this.photoOn || this.editOn || this.showcaseOn || this.state.mood === 'sleepy' || this.serving || this.pitching) return false;
+    if (this.gifting || this.hailing || this.gazing || this.photoOn || this.editOn || this.showcaseOn || this.state.mood === 'sleepy' || this.serving || this.pitching) return false;
     if (now) this.lookBack();
     else if (!b.idle || this.free || this.zoom > 1.6 || (this.outside(this.lead) > 0 && !this.foxes.some(HIDING))) return false; // (under cover out there, the view shows them all: her too)
     this.hailing = { bye, now };
@@ -2517,6 +2767,61 @@ export class World {
     this.hailing = null;
     const b = this.owner.brain;
     if (b.doing === 'hailYou') b.script = null;
+  }
+
+  // ---------------------------------------------------------------- looking up at the night sky
+
+  /**
+   * She looks up at the sky — `why`: 'moon', she asked to (the app's 🌙 button); 'present', Lorelei is showing her the
+   * full moon (present: 'gaze'); null, back down. The camera goes low behind the family and tilts up towards the moon
+   * (gazeCamera), and they look up at it with her: the foxes that are awake sit in a row facing it, Lorelei stands by
+   * them (brain.js, keeper.js: moonGaze — while she tells her story, she and the foxes look up where they are).
+   * → false if it cannot be just now (pictures are being taken, the shop is open).
+   */
+  gaze(why = null) {
+    if (why === this.gazing) return true;
+    if (why && (this.photoOn || this.editOn || this.showcaseOn || !this.env)) return false;
+    if (why) {
+      if (!this.gazing) this.gazeCard = { right: 0, bottom: 0 };
+      this.gazeSession++; // (our constellations are laid out afresh for it: heavens.js, frame)
+    }
+    this.gazing = why;
+    if (why) {
+      this.lookBack();
+      this.hush();
+      this.aimGaze();
+      if (why === 'moon') {
+        // (one that is busy comes when it is done — brain.js: choose — and one out in the country comes home for it)
+        let place = 0;
+        for (const f of this.foxes) if (!f.brain.asleep && f.brain.heedful) f.brain.do('moonGaze', place++);
+        const her = this.owner.brain;
+        if (!her.asleep && !['presentIt', 'hailYou', 'serve', 'tossBall', 'poseForPicture'].includes(her.doing)) her.do('moonGaze');
+      }
+    } else {
+      for (const f of this.foxes) if (f.brain.doing === 'moonGaze') f.brain.script = null;
+      if (this.owner.brain.doing === 'moonGaze') this.owner.brain.script = null;
+    }
+    this.wake();
+    return true;
+  }
+
+  /** Where the family looks up from — round Lorelei while she tells it, otherwise the middle of the yard — and which way: to the moon (with none up, the south, where it goes over). */
+  aimGaze() {
+    if (!this.env) return;
+    const m = this.heavens.sky && this.heavens.sky.moon;
+    const b = this.env.bounds;
+    const her = this.gazing === 'present' ? this.owner.anim.pos : null;
+    const was = this.gazeView;
+    this.gazeView = {
+      x: was && this.gazeK > 0 ? was.x : her ? her.x : b.cx,
+      z: was && this.gazeK > 0 ? was.z : her ? her.z : b.cz,
+      az: m && m.up && m.id !== 'new' ? m.az : 0,
+    };
+  }
+
+  /** Where the card over the sky reaches to, `{ right, bottom }` (px): our constellations keep out of its way. */
+  setGazeCard(rect) {
+    this.gazeCard = { right: rect.right || 0, bottom: rect.bottom || 0 };
   }
 
   // ---------------------------------------------------------------- Lorelei's present
@@ -2541,13 +2846,17 @@ export class World {
    * and:
    *   'tree'     "…and the tree": a hand towards it, and its lights flare up
    *   'wish'     a wish: her hands together, stars falling round everyone
+   * …and on the night of the full moon (js/moon.js):
+   *   'gaze'     "look!": the view turns up to the moon, and she and the foxes look up at it
+   *   'howl'     the foxes sing to it, noses to the sky
+   *   'wish'     as at Christmas — and under the sky, a falling star
    *   'end'    that was it
    */
   present(step, arg) {
     if (step === 'call') {
       this.endPresent();
       this.hailing = null; // (she was waiting to be heard: now she is)
-      this.gifting = { step, t: 0, ready: false, speaking: false, shown: 0, down: false, at: V(), lid: 0, fox: null, hops: 0 };
+      this.gifting = { step, t: 0, ready: false, speaking: false, shown: 0, down: false, at: V(), lid: 0, fox: null, hops: 0, howls: 0 };
       this.lookBack();
       this.owner.brain.do('presentIt', arg);
       // (whoever is awake comes to look on, from either side of her)
@@ -2575,9 +2884,14 @@ export class World {
         // her hand towards the tree, and its lights flare up, a shower of sparkles off its star
         this.treeFlash = 1;
         if (this.tree) this.fx.emit('✨', this.tree.star.getWorldPosition(V()), { n: 10, spread: 0.3, rise: 0.4, life: 1.4, size: 0.13, drift: 0.3 });
+      } else if (step === 'gaze') {
+        this.gaze('present');
+      } else if (step === 'howl') {
+        g.howls++;
       } else if (step === 'wish') {
-        // a wish: stars falling all round — over her, and over every fox that is looking on
-        g.hops++;
+        // a wish: stars falling all round — over her, and over every fox that is looking on (and in the sky, a falling star)
+        if (this.gazing) this.heavens.shoot();
+        else g.hops++;
         this.fx.emit('⭐', this.owner.anim.headPoint(V()).add(V(0, 0.3, 0)), { n: 6, spread: 0.45, rise: 0.15, life: 2, size: 0.13, drift: 0.3 });
         for (const f of this.foxes) if (f.brain.doing === 'lookOn') this.fx.emit('✨', f.anim.headPoint(V()), { n: 3, spread: 0.18, rise: 0.4, life: 1.3, size: 0.11 });
       } else if (step === 'costume' || step === 'treat' || step === 'trick') {
@@ -2605,6 +2919,7 @@ export class World {
   }
 
   endPresent() {
+    if (this.gazing === 'present') this.gaze(null);
     if (!this.gifting) return;
     this.gifting = null;
     this.spawn = null;
@@ -3298,7 +3613,7 @@ export class World {
       anim.twitchT = anim.blinkT = 99;
       for (let i = 0; i < 80; i++) anim.update(1 / 30);
       const accs = worn.map((a) => makeAccessory(a, rig)).filter(Boolean);
-      accs.forEach((a) => rig.bones[a.bone].add(a.object));
+      dress(rig, accs);
       scene.background = new THREE.Color(bg);
       scene.environment = this.scene.environment;
       scene.environmentIntensity = 0.5;
@@ -3340,5 +3655,82 @@ export class World {
     if (this.stage) this.draw();
     this.thumbs.set(key, url);
     return url;
+  }
+
+  /**
+   * The fox `id` on its own, the whole of it, in `pose` — with nothing behind it: a canvas `size` px square that is
+   * see-through round the fox (for pictures drawn elsewhere: js/dream.js). It is drawn twice, over black and over white;
+   * how much the white shows through says how much of each pixel the fox covers — the fine strands of its fur too.
+   * `mood`: its face ({ eyes, mouth }); `yaw`: which way it is turned (0 = towards you).
+   */
+  cutout(id, { pose = 'sit', worn = [], grown = 0, size = 512, yaw = 0.5, mood = null } = {}) {
+    this.grace();
+    const r = this.renderer;
+    const keep = { w: this.canvas.width, h: this.canvas.height, ratio: r.getPixelRatio() };
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(26, 1, 0.2, 40);
+    const rig = buildFox(id, { grown });
+    const anim = new FoxAnimator(rig);
+    anim.yaw = yaw;
+    anim.snap();
+    anim.setPose(pose, 30);
+    anim.twitchT = anim.blinkT = 99;
+    if (mood) Object.assign(anim.mood, mood);
+    for (let i = 0; i < 80; i++) anim.update(1 / 30);
+    const accs = worn.map((a) => makeAccessory(a, rig)).filter(Boolean);
+    dress(rig, accs);
+    scene.environment = this.scene.environment;
+    scene.environmentIntensity = 0.5;
+    const hemi = new THREE.HemisphereLight('#ffffff', '#e8d9f4', 2.0);
+    const sun = new THREE.DirectionalLight('#fff3e2', 2.0);
+    sun.position.set(-2, 4, 4);
+    scene.add(rig.group, hemi, sun);
+    rig.group.updateMatrixWorld(true);
+    // all of it in the picture, from a little above
+    const box = new THREE.Box3().setFromObject(rig.group);
+    const centre = box.getCenter(V());
+    const reach = (0.56 * box.getSize(V()).length()) / Math.sqrt(3) + 0.02;
+    const dist = reach / Math.sin((13 * Math.PI) / 180);
+    camera.position.copy(centre).add(V(0, 0.32, 1).normalize().multiplyScalar(dist));
+    camera.lookAt(centre);
+    rig.tuneFur((size * 2) / (2 * dist * Math.tan((13 * Math.PI) / 180)));
+    // (drawn at twice the size and scaled down, as the portraits are: soft fur, not speckled)
+    r.setPixelRatio(1);
+    r.setSize(size * 2, size * 2, false);
+    const shot = (bg) => {
+      scene.background = new THREE.Color(bg);
+      r.render(scene, camera);
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const g = c.getContext('2d');
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(this.canvas, 0, 0, size, size);
+      return g.getImageData(0, 0, size, size);
+    };
+    const dark = shot('#000000');
+    const light = shot('#ffffff');
+    const out = document.createElement('canvas');
+    out.width = out.height = size;
+    const og = out.getContext('2d');
+    const img = og.createImageData(size, size);
+    const a = dark.data;
+    const b = light.data;
+    const px = img.data;
+    for (let i = 0; i < px.length; i += 4) {
+      const cover = 1 - (b[i] - a[i] + b[i + 1] - a[i + 1] + b[i + 2] - a[i + 2]) / 765;
+      if (cover <= 0.004) continue;
+      const k = Math.min(1, cover);
+      px[i] = Math.min(255, a[i] / k);
+      px[i + 1] = Math.min(255, a[i + 1] / k);
+      px[i + 2] = Math.min(255, a[i + 2] / k);
+      px[i + 3] = Math.round(k * 255);
+    }
+    og.putImageData(img, 0, 0);
+    accs.forEach((acc) => disposeTree(acc.object));
+    rig.dispose();
+    r.setPixelRatio(keep.ratio);
+    r.setSize(keep.w / keep.ratio, keep.h / keep.ratio, false);
+    if (this.stage) this.draw();
+    return out;
   }
 }

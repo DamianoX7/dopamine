@@ -96,6 +96,8 @@ export const POSES = {
     ffx: 0.07, ffz: 0.21, hfx: 0.115, hfz: 0.16,
   }),
 };
+// sitting with its nose up, looking at the moon (brain.js: moonGaze)
+POSES.gaze = { ...POSES.sit, nrx: -0.1, hdx: -0.2, earB: 0.05 };
 const POSE_KEYS = Object.keys(BASE);
 
 // Gaits: which part of the stride each foot is on the ground for. Order: FL, HL, FR, HR.

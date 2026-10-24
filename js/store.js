@@ -106,6 +106,21 @@ function defaultState() {
     lp: {}, // her albums pressed into records (js/lp.js): album id → { color, at }
     halloween: { year: 0 }, // the last Halloween she played trick or treat with Lorelei (js/halloween.js)
     christmas: { year: 0 }, // …and the last Christmas Lorelei gave her a present (js/christmas.js)
+    // the moon (js/moon.js): the last full moon's night she made a wish, and the night she was last told of one; her
+    // wishes ({ night, text, at } — text '' when she kept it to herself); how often she has looked up at the night sky
+    moon: { night: '', hailed: '', wishes: [], looked: 0 },
+    // the foxes' dreams (js/dream.js): the last night's dream she heard, the morning she was told of one, and the dream
+    // diary (night → { fox, title, lines, art, moon, seed, at })
+    dreams: { seen: '', hailed: '', list: {} },
+    // the song garden (js/garden.js): what was heard of each cover (id → { bpm, tonic, mode }), and the flowers she has
+    // seen open
+    garden: { traits: {}, seen: [] },
+    // our constellations (js/stars.js): the stars she has seen come out, when she first tapped one, and the nights of the
+    // year she has had in the foxes' world (id → day: halloween2026 → '2026-10-31')
+    stars: { seen: [], tapped: 0, nights: {} },
+    // the sweaters she knitted for the foxes, with a picture of hers on each (js/knit.js): { id, n, chart (in letters),
+    // base, trim (yarns), fit ('back' | 'all'), rev, at } — and how many she has made (the first one's yarn was free)
+    knit: { list: [], made: 0 },
     opening: { seen: false, greeted: false }, //           the rooms that open on a day of their own (js/opening.js): has she stood before them shut — and been told that they opened?
     // season: 'auto' = the foxes' world follows the calendar; or 'spring', 'summer', 'autumn', 'winter' (js/weather.js)
     settings: { soundEnabled: true, theme: 'pink', lateNight: 'auto', reduceMotion: false, foxFullscreen: true, season: 'auto' },
@@ -157,7 +172,9 @@ function upgradeState(s) {
   if (!p.names[p.species]) p.names[p.species] = p.name || defaultName;
   p.name = p.names[p.species];
   if (p.name !== defaultName) p.named = true; // she chose that name herself
-  p.foxes.forEach((id) => (p.outfits[id] = (p.outfits[id] || []).filter((a) => p.owned.includes(a) && a !== 'mic')));
+  // (…and a sweater she knitted, while she still has it)
+  const knits = new Set(((s.knit && s.knit.list) || []).map((k) => k.id));
+  p.foxes.forEach((id) => (p.outfits[id] = (p.outfits[id] || []).filter((a) => (p.owned.includes(a) && a !== 'mic') || knits.has(a))));
   p.things = p.things.filter((id) => p.owned.includes(id));
   // only things she has stand in the yard, each of them once
   p.yard = p.yard.filter((it, i) => it && p.decor.includes(it.id) && p.yard.findIndex((x) => x && x.id === it.id) === i);

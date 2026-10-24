@@ -166,6 +166,10 @@ const CoverHost = {
   beats(id) {
     return this.api ? this.api.beats(id) : null;
   },
+  /* …and how fast it goes, and in what key: a promise (js/garden.js). */
+  traits(id) {
+    return this.api && this.api.traits ? this.api.traits(id).catch(() => null) : Promise.resolve(null);
+  },
 
   /* Fill <span data-cover-art="<id>"> placeholders with the cover's artwork, and show which cover is playing. */
   hydrateArt(root) {

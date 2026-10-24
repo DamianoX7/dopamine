@@ -40,6 +40,7 @@ class CoatBuilder {
     this.comb = [];
     this.core = [];
     this.count = 0;
+    this.lofts = []; // the lofts that are a part of the body clothes go over (`part`): where their rings are in the mesh
   }
 
   vert(p, color, weights, fur, comb, core) {
@@ -68,6 +69,8 @@ class CoatBuilder {
    * Keys are smoothed with a Catmull-Rom spline (`sub` rings per key).
    * `color(info)` and `fur(info, base)` are asked for every vertex; info = { v, s, c, P } with
    * v = 0…1 along the path and s / c = sine / cosine of the angle around it (s = 1 is "up").
+   * `part` names a part of the body that clothes go over ('torso', 'legF'): its rings are noted
+   * (ring r, column j is vertex base + r·segs + j; ring r is key r / sub).
    */
   loft(keys, o) {
     const segs = o.segs || 12;
@@ -108,6 +111,7 @@ class CoatBuilder {
 
     const R = rings.length;
     const base = this.count;
+    if (o.part) this.lofts.push({ part: o.part, base, segs, sub, rings: R });
     const t = V();
     const u = V();
     const s = V();
@@ -190,6 +194,7 @@ class CoatBuilder {
     g.setAttribute('aFur', new THREE.Float32BufferAttribute(this.fur, 1));
     g.setAttribute('aComb', new THREE.Float32BufferAttribute(this.comb, 3));
     g.setAttribute('aCore', new THREE.Float32BufferAttribute(this.core, 3));
+    g.setAttribute('aCover', new THREE.Float32BufferAttribute(new Float32Array(this.count), 1)); // (how much a sweater presses the fur down here: knit.js)
     g.setIndex(this.idx);
     g.computeVertexNormals();
     return g;
@@ -202,8 +207,10 @@ const FUR_VERTEX_HEAD = /* glsl */ `
 attribute float aFur;
 attribute vec3 aComb;
 attribute vec3 aCore;
+attribute float aCover;
 uniform float uShell;
 uniform float uFurLen;
+uniform float uCover;
 uniform float uComb;
 uniform vec3 uSway;
 uniform vec3 uFurSun;
@@ -214,8 +221,9 @@ varying float vFurK;
 
 // Each shell is the coat pushed out a little further along its normals (and combed along the
 // body); the fragment shader then keeps fewer and fewer "strands" the further out a shell is.
+// (Under a sweater the fur lies flat: knit.js says where — aCover — and uCover whether one is worn.)
 const FUR_VERTEX_BODY = /* glsl */ `
-float furH = uShell * uFurLen * aFur;
+float furH = uShell * uFurLen * aFur * (1.0 - uCover * aCover);
 transformed += normal * furH + (aComb * uComb + uSway) * (furH * uShell);
 vFurP = position - aComb * (dot(position, aComb) * 0.72); // squash the noise along the lie of the fur → long strands
 vFurK = aFur;
@@ -505,6 +513,7 @@ export function buildFox(speciesId, opts = {}) {
         sub: 3,
         comb: -1,
         droop: 0.3,
+        part: 'torso',
         color: (i) => {
           col.copy(C.coat).lerp(C.back, smooth(0.5, 1, i.s) * 0.6); //             a darker saddle along the spine
           col.lerp(C.belly, smooth(-0.15, -0.7, i.s)); //                           pale underside
@@ -544,7 +553,7 @@ export function buildFox(speciesId, opts = {}) {
           { c: V(j.fU.x, 0.022, z0 + 0.036), rx: r(0.026), ry: r(0.034), ryB: r(0.024), w: { [Pw]: 1 }, fur: 0.12 },
           { c: V(j.fU.x, 0.004, z0 + 0.038), rx: r(0.022), ry: r(0.03), ryB: r(0.02), w: { [Pw]: 1 }, fur: 0.1 },
         ],
-        { segs: 10, sub: 2, comb: 1, color: legColor }
+        { segs: 10, sub: 2, comb: 1, color: legColor, part: 'legF' }
       );
       coat.blob(V(j.fU.x, 0.016, z0 + 0.054), r(0.027), r(0.016), r(0.034), { w: { [Pw]: 1 }, furLen: 0.12, color: pawColor });
 
@@ -741,6 +750,7 @@ export function buildFox(speciesId, opts = {}) {
     uTipColor: { value: C.tip.clone() },
     uTipAmt: { value: sp.tipAmt },
     uWet: { value: 0 }, //     how wet the coat is: 0 … 1 (the world keeps that — rain, puddles, a good shake)
+    uCover: { value: 0 }, //   1 while it wears a sweater: the fur under it lies flat (aCover: knit.js)
   };
   const shells = [];
   for (let i = 0; i < FUR_SHELLS; i++) {
@@ -861,6 +871,8 @@ export function buildFox(speciesId, opts = {}) {
       ...(part ? part.dims : null), // (a head of its own knows these better)
     },
     furUniforms,
+    coat: geometry, //  (the coat, as it is at rest — what a sweater is knitted to fit: knit.js)
+    lofts: coat.lofts,
     /**
      * How large it is drawn (device pixels to a unit of the world): its fur is drawn in soft tufts three pixels
      * or so wide whatever that is — finer strands only shimmer — and from afar it is less deep.

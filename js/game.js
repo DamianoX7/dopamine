@@ -64,6 +64,17 @@ const ACHIEVEMENTS = [
   { id: 'hundred_days', emoji: '💯', name: '백일', desc: '우리가 만난 지 100일째 되는 날을 함께 맞아요.', gift: true, test: () => Present.due() },
   { id: 'halloween', emoji: '🎃', name: '트릭 오어 트릿', desc: '핼러윈에 로렐라이와 사탕 놀이를 해요.', test: (s) => s.halloween.year > 0 },
   { id: 'christmas', emoji: '🎄', name: '메리 크리스마스', desc: '크리스마스에 로렐라이와 소원을 빌어요.', test: (s) => s.christmas.year > 0 },
+  { id: 'moon_gaze', emoji: '🌙', name: '달 구경', desc: '여우 세상의 밤하늘을 올려다봐요.', test: (s) => s.moon.looked >= 1 },
+  { id: 'full_moon', emoji: '🌕', name: '보름달 소원', desc: '보름달 뜨는 밤에 로렐라이와 소원을 빌어요.', test: (s) => s.moon.wishes.length >= 1 },
+  { id: 'moon_year', emoji: '🌝', name: '열두 번의 보름달', desc: '보름달에 소원을 열두 번 빌어요.', test: (s) => s.moon.wishes.length >= 12 },
+  { id: 'star_night', emoji: '🌌', name: '별 헤는 밤', desc: '밤하늘에서 우리 별자리의 별을 눌러 그날을 떠올려요.', test: (s) => !!s.stars.tapped },
+  { id: 'star_sky', emoji: '🌠', name: '별이 빛나는 밤', desc: '우리 별자리에 별이 서른 개 떠요.', test: () => Stars.count() >= 30 },
+  { id: 'dream_first', emoji: '💭', name: '꿈 이야기', desc: '여우가 꾼 꿈 이야기를 처음 들어요.', test: (s) => Object.keys(s.dreams.list).length >= 1 },
+  { id: 'dream_week', emoji: '🛌', name: '꿈 일기장', desc: '여우의 꿈 이야기를 일곱 번 들어요.', test: (s) => Object.keys(s.dreams.list).length >= 7 },
+  { id: 'garden_10', emoji: '💐', name: '꽃밭', desc: '노래 정원에 꽃이 열 송이 피어요.', test: () => Garden.count() >= 10 },
+  { id: 'garden_kinds', emoji: '🌈', name: '다섯 가지 꽃', desc: '노래 정원에 다섯 가지 꽃이 모두 피어요.', test: () => Garden.kinds() >= 5 },
+  { id: 'knit_first', emoji: '🧶', name: '한 땀 한 땀', desc: '그림을 그려 여우에게 스웨터를 떠 줘요.', test: (s) => s.knit.made >= 1 },
+  { id: 'knit_family', emoji: '🧣', name: '패밀리룩', desc: '여우 세 마리가 내가 뜬 스웨터를 입어요.', test: (s) => s.pet.out.filter((id) => (s.pet.outfits[id] || []).some((a) => /^knit/.test(a))).length >= 3 },
   { id: 'radio_fm', emoji: '📻', name: '도파민 FM', desc: '여우 라디오로 내 노래를 세 곡 들어요.', test: (s) => (s.statistics.radio || 0) >= 3 },
   { id: 'four_cut', emoji: '🎞️', name: '인생네컷', desc: '여우들과 네 컷 사진을 찍어요.', test: (s) => (s.statistics.fourCuts || 0) >= 1 },
   { id: 'lp_press', emoji: '💿', name: '레코드 프레스', desc: '앨범을 LP로 구워요.', test: (s) => Object.keys(s.lp).length >= 1 },
@@ -349,6 +360,7 @@ const Game = {
   onRelease(c) {
     const count = Music.released().length;
     Diary.add('covers', c.title);
+    Garden.planted(c); // (its flower in the foxes' yard: js/garden.js)
     const rare = Math.random() < 0.07;
     if (rare) {
       (State.coverMeta[c.id] || (State.coverMeta[c.id] = {})).rare = true;

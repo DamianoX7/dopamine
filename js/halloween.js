@@ -155,6 +155,7 @@ const Halloween = {
   async give() {
     const p = State.pet;
     State.halloween.year = this.year() || new Date().getFullYear();
+    Stars.keep('halloween', State.halloween.year); // (a star of its own in the night sky: js/stars.js)
     COSTUMES.forEach((id) => !p.owned.includes(id) && p.owned.push(id));
     Game.reward({ coins: HALLOWEEN.coins });
     Store.saveNow();
@@ -179,12 +180,12 @@ const Halloween = {
   /* She has come into the foxes' world: if Lorelei has her game still to play, she calls before long. */
   arrive() {
     clearTimeout(this.timer);
-    if (!this.waiting() || this.rehearsing || Present.rehearsing || Meet.rehearsing || Chat.rehearsing || Christmas.rehearsing) return; // (he is looking at how something will be: the real one keeps)
+    if (!this.waiting() || this.rehearsing || Present.rehearsing || Meet.rehearsing || Chat.rehearsing || Christmas.rehearsing || Moon.rehearsing) return; // (he is looking at how something will be: the real one keeps)
     const ov = FoxRoom.ov;
     const tryIt = () => {
       if (FoxRoom.ov !== ov || !this.waiting()) return;
       // (not over a letter she is reading, the shop, the camera — nor while the hundredth day's present is still to come)
-      if (!this.playing && !OwnerSays.on && !Present.waiting() && !Chat.calling && !Chat.playing && UI.top() === ov && !FoxRoom.tab && !FoxRoom.photoOn) return void this.begin();
+      if (!this.playing && !OwnerSays.on && !Present.waiting() && !Chat.calling && !Chat.playing && UI.top() === ov && !FoxRoom.tab && !FoxRoom.photoOn && !FoxRoom.gazeOn) return void this.begin();
       this.timer = setTimeout(tryIt, 2000);
     };
     this.timer = setTimeout(tryIt, 2600);

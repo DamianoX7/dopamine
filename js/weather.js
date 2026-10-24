@@ -12,7 +12,8 @@
    The weather changes every few minutes: clear, clouded over, rain —
    snow in winter and in the arctic, blowing sand in the desert. At
    Christmas, where it is winter, it snows more often than not
-   (js/christmas.js).
+   (js/christmas.js); on the night of the full moon the sky is clear,
+   or nearly (js/moon.js).
    Nothing of it is saved. It is worked out from the clock, so her
    phone and her computer have the same sky.
 
@@ -59,6 +60,7 @@ const ODDS = {
   dry: { clear: 70, wind: 24, rain: 6 },
   polar: { clear: 40, cloudy: 16, snow: 44 },
   white: { clear: 24, cloudy: 12, snow: 64 }, // (a winter's Christmas Eve and Christmas Day)
+  moonlit: { clear: 84, cloudy: 16 }, //          (the night of the full moon, everywhere: nothing falls on it)
 };
 
 const SPELL = 10 * 60000; // the sky is thrown afresh this often (two throws alike: it simply stays as it is)
@@ -108,7 +110,8 @@ const Weather = {
   now(scene = State.pet.scene) {
     const t = this.time();
     const season = this.seasonIn(scene);
-    const odds = ODDS[(CLIMATES[scene] || {}).odds || (season === 'winter' && Christmas.year(new Date(t)) ? 'white' : season)];
+    const white = season === 'winter' && Christmas.year(new Date(t));
+    const odds = ODDS[!white && Moon.fullDark(t) ? 'moonlit' : (CLIMATES[scene] || {}).odds || (white ? 'white' : season)];
     const n = Math.floor(t / SPELL);
     const kind = this.roll(n, odds);
     let from = n;
@@ -158,7 +161,7 @@ const Weather = {
     const season = this.seasonDef(sky.season);
     const climate = CLIMATES[scene];
     const def = SKIES[sky.kind];
-    const emoji = sky.kind === 'clear' && document.body.classList.contains('late-night') ? '🌙' : def.emoji;
+    const emoji = sky.kind === 'clear' && Moon.dark() ? Moon.emoji() : def.emoji; // (at night: tonight's moon — stars while it is down)
     const puddles = sky.kind !== 'rain' && sky.wet > 0.25;
     if (short) return `<span aria-hidden="true">${season.emoji}${emoji}</span><span class="sr-only">${season.name}, ${def.name}</span>`;
     return `<span aria-hidden="true">${season.emoji}</span> ${climate ? climate.label : season.name} <i aria-hidden="true">·</i> <span aria-hidden="true">${emoji}</span> ${puddles ? '비 갠 뒤' : def.name}`;

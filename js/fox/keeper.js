@@ -84,6 +84,7 @@ export class Keeper extends Brain {
     if (w.showcaseOn) return ['standBy'];
     if (w.tune && w.tune.on) return [st.mood === 'sleepy' ? 'sleep' : 'swayAlong'];
     if (st.mood === 'sleepy') return ['sleep'];
+    if (w.gazing === 'moon') return ['moonGaze'];
     const sky = w.sky;
     if (sky.sand > 0.25) return ['braveWind'];
     const wet = sky.rain > 0.2 || sky.wet > 0.4; // (nobody kneels in a puddle)
@@ -589,9 +590,9 @@ export class Keeper extends Brain {
     while (w.gifting === g && g.step !== 'end') {
       const dt = yield;
       t += dt;
-      // she keeps facing whoever she is talking to; her mouth goes while she speaks
-      const off = wrapAngle(this.toCamera() - a.yaw);
-      if (Math.abs(off) > 0.45) a.yaw += clamp(off, -2 * dt, 2 * dt);
+      // she keeps facing whoever she is talking to (or, while they look up at it, the moon: world.gaze); her mouth goes while she speaks
+      const off = wrapAngle((w.gazing ? this.moonward() : this.toCamera()) - a.yaw);
+      if (Math.abs(off) > (w.gazing ? 0.1 : 0.45)) a.yaw += clamp(off, -2 * dt, 2 * dt);
       a.mood.mouth = g.speaking ? 0.18 + 0.55 * Math.abs(Math.sin(t * 12)) : 0;
       a.mood.smile = 1;
       if (g.step !== was) {
@@ -689,8 +690,8 @@ export class Keeper extends Brain {
           this.lookAtYou(1);
         }
       } else if (g.step === 'wish') {
-        // her hands together and her eyes shut: a wish
-        a.setPose(g.t < 2.6 ? 'clap' : 'stand', 6);
+        // her hands together and her eyes shut: a wish (under the moon she kneels again after it)
+        a.setPose(g.t < 2.6 ? 'clap' : w.gazing ? 'sit' : 'stand', 6);
         a.mood.eyes = g.t > 0.3 && g.t < 2.4 ? 'happy' : 'open';
         this.lookAtYou(1);
       } else if (g.step === 'hat' || g.step === 'treat' || g.step === 'trick') {
@@ -700,6 +701,15 @@ export class Keeper extends Brain {
         const k = g.t > 0.4 && g.t < 2 ? Math.max(0, Math.sin(g.t * 15)) : 0;
         a.add.aLo = a.add.aRo = 0.16 * k;
         this.lookAtYou(1);
+      } else if (g.step === 'gaze') {
+        // "look!": a hand up towards the moon — then down on her knees with the foxes, looking at it (she is twice
+        // their height: standing, she would be all there is to see)
+        a.setPose(g.t < 2.2 ? 'show' : 'sit', 5);
+        a.mood.eyes = g.t > 0.5 && g.t < 1.9 ? 'happy' : 'open';
+      } else if (g.step === 'howl') {
+        // the foxes sing to it: she listens, smiling
+        a.setPose('sit', 5);
+        a.mood.eyes = g.t > 0.8 && g.t < 4 ? 'happy' : 'open';
       } else if (g.step === 'wave') {
         if (g.t < 1.7) {
           a.setPose('wave', 8);
@@ -710,12 +720,38 @@ export class Keeper extends Brain {
           a.setPose('stand', 5);
         }
       }
+      if (w.gazing) this.lookAtMoon(0.9); // (whatever she does meanwhile, under the moon her eyes are on it)
     }
     a.still();
     a.mood.mouth = 0;
     a.mood.eyes = 'open';
     a.setPose('stand', 5);
     yield* this.wait(0.4);
+  }
+
+  /** She looks up at the night sky (world.gaze): Lorelei comes and stands at the end of the foxes' row, and looks up at the moon with them. */
+  *moonGaze() {
+    const a = this.a;
+    const w = this.w;
+    const g = w.gazeView;
+    if (!g) return;
+    this.close = true;
+    const dx = Math.sin(g.az);
+    const dz = -Math.cos(g.az);
+    // (a little further off than the foxes, kneeling: she is twice as tall as they are)
+    const out = -0.46 - 0.16 * Math.min(4, w.foxes.length);
+    const to = w.clearOf(this.clampPoint(g.x + dz * -out + dx * 0.6, g.z + dx * out + dz * 0.6, 0.92), 0.3);
+    if (Math.hypot(to.x - a.pos.x, to.z - a.pos.z) > 0.2) yield* this.goTo(to.x, to.z, { speed: 'walk', stop: 0.1, timeout: 7 });
+    yield* this.turnTo(this.moonward() + 0.15, 4);
+    a.setPose('sit', 4);
+    this.lookAtMoon(0.9);
+    for (let t = 0; w.gazing; ) {
+      t += yield;
+      a.mood.smile = 1;
+      a.mood.eyes = t % 7 > 5.6 && t % 7 < 6.6 ? 'happy' : 'open';
+    }
+    a.mood.eyes = 'open';
+    a.setPose('stand', 4);
   }
 
   /** She is taking pictures: Lorelei stands behind the foxes — or beside the only one — and poses with them. */

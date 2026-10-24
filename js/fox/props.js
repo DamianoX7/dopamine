@@ -3,6 +3,7 @@
 // decor.js.)
 import * as THREE from '../vendor/three.module.min.js';
 import { Batch, V, TAU, lerp, rng, softDotTexture, paintTexture } from './kit.js';
+import { isKnit, makeKnit } from './knit.js';
 
 const Z = new THREE.Vector3(0, 0, 1);
 const _c = new THREE.Color();
@@ -1011,8 +1012,12 @@ function foxHat(id, rig) {
   return g;
 }
 
-/** Where each accessory sits: [bone, position in that bone's space, direction its +Z should face (or null)]. */
+/**
+ * Where each accessory sits: [bone, position in that bone's space, direction its +Z should face (or null)]. A sweater
+ * with a picture of hers (knit.js) is a skin of its own on all of the fox's bones: { object, bone: null, skinned }.
+ */
 export function makeAccessory(id, rig) {
+  if (isKnit(id)) return makeKnit(id, rig);
   const k = rig.headScale;
   const top = rig.dims.crown.y; // the top of the head: what sits on it sits lower on a flat-headed fox
   let object;
@@ -1053,4 +1058,10 @@ export function makeAccessory(id, rig) {
     if (o.isMesh) o.castShadow = true;
   });
   return { object, bone };
+}
+
+/** Put on what makeAccessory made: on its bone — or, a sweater, over the coat (whose fur then lies flat under it). */
+export function dress(rig, accs) {
+  accs.forEach((a) => (a.bone ? rig.bones[a.bone] : rig.group).add(a.object));
+  rig.furUniforms.uCover.value = accs.some((a) => a.skinned) ? 1 : 0;
 }

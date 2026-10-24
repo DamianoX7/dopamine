@@ -472,6 +472,20 @@ Views.me = {
         <a class="me-link card" href="#/diary"><span class="ml-icon" aria-hidden="true">📔</span><span class="ml-text"><b>일기장</b><small>${
           Object.keys(State.diary.pages).length ? `하루 끝 한 장 · ${Object.keys(State.diary.pages).length}장` : `${OPENS_AT}가 되면 오늘의 한 장이 열려요`
         }</small></span><span class="chev" aria-hidden="true">›</span></a>
+        ${
+          Opening.shut()
+            ? ''
+            : `<button class="me-link card" data-action="dream-list"><span class="ml-icon" aria-hidden="true">💭</span><span class="ml-text"><b>꿈 일기</b><small>${
+                Object.keys(State.dreams.list).length ? `여우들이 꾼 꿈 ${Object.keys(State.dreams.list).length}개` : '아침마다 여우가 지난밤 꾼 꿈 이야기를 들려줘요'
+              }</small></span><span class="chev" aria-hidden="true">›</span></button>`
+        }
+        ${
+          Opening.shut()
+            ? ''
+            : `<button class="me-link card" data-action="garden-sheet"><span class="ml-icon" aria-hidden="true">🌷</span><span class="ml-text"><b>노래 정원</b><small>${
+                Garden.count() ? `여우 마당에 핀 꽃 ${Garden.count()}송이` : '커버를 발매하면 여우 마당에 꽃이 피어요'
+              }</small></span><span class="chev" aria-hidden="true">›</span></button>`
+        }
         <a class="me-link card" href="#/me/letters"><span class="ml-icon" aria-hidden="true">💌</span><span class="ml-text"><b>편지</b><small>${Post.waiting().length ? `새 편지 ${Post.waiting().length}통이 도착했어요!` : `${Messages.all().length}개 중 ${Messages.collected().length}개 발견${Post.kept().length ? ` · 받은 편지 ${Post.kept().length}통` : ''}`}</small></span><span class="chev" aria-hidden="true">›</span></a>
         ${
           Opening.shut()
@@ -712,6 +726,18 @@ Views.me = {
         <p class="hint">${Christmas.note()}</p>
         <p class="hint">미리 보기는 마당이 크리스마스로 꾸며진 채 (계절이 바뀌는 곳이면 눈 오는 겨울로) 처음부터 끝까지 보여 주지만, 아무것도 저장되지 않아요. ${esc(josa(OWNER_NAME, '이/가'))} 하는 말은 <code>js/config.js</code>의 <code>christmasLines</code>로 바꿀 수 있어요.</p>
         <button class="btn soft" data-action="christmas-rehearse">👀 미리 보기</button>
+      </div>
+      <div class="card">
+        <h2 class="card-title">🌕 보름달</h2>
+        <p class="hint">${Moon.note()}</p>
+        <p class="hint">미리 보기는 다음 보름달 밤 9시 반의 하늘로 처음부터 끝까지 보여 주지만, 아무것도 저장되지 않아요. ${esc(josa(OWNER_NAME, '이/가'))} 하는 말은 <code>js/config.js</code>의 <code>moonLines</code>로 바꿀 수 있어요.</p>
+        <button class="btn soft" data-action="moon-rehearse">👀 미리 보기</button>
+      </div>
+      <div class="card">
+        <h2 class="card-title">💭 여우의 꿈</h2>
+        <p class="hint">${Dream.note()}</p>
+        <p class="hint">미리 보기는 오늘 지금까지 한 일로 꿈을 하나 만들어 보여 줘요. 아무것도 저장되지 않아요.</p>
+        <button class="btn soft" data-action="dream-rehearse">👀 미리 보기</button>
       </div>
       <div class="card">
         <h2 class="card-title">＋ 새 메시지</h2>
