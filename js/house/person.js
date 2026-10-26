@@ -46,6 +46,7 @@ export class Person {
     this.lastSay = -99;
     this.dance = 0; //       how much she is dancing (0 … 1)
     this.props = { L: null, R: null }; // what she has in her hands
+    this.walkSpeed = WALK; //  (out of doors, a little brisker)
   }
 
   /** Give her a body (a rig as Lorelei's): the animator moves it. Where she was, she stays. */
@@ -381,12 +382,12 @@ export class Person {
     const want = Math.atan2(dx, dz);
     const off = Math.abs(angle(want - a.yaw));
     this.turnTo(want, dt);
-    const speed = WALK * Math.max(0, Math.cos(Math.min(off, Math.PI / 2))) ** 2;
+    const speed = (this.walkSpeed || WALK) * Math.max(0, Math.cos(Math.min(off, Math.PI / 2))) ** 2;
     const step = Math.min(dist, speed * dt);
     a.pos.x += (dx / dist) * step;
     a.pos.z += (dz / dist) * step;
     a.speed = speed;
-    if (t.age > 25) return true; // (she cannot get there: never mind)
+    if (t.age > (t.max || 40)) return true; // (she cannot get there: never mind)
     return false;
   }
 

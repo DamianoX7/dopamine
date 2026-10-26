@@ -9,9 +9,13 @@
 // And she orders food (js/delivery.js): out comes her phone; when the courier knocks (courier.js)
 // she goes to the door — out of bed if need be — takes it from him, and sits down to eat it, a
 // mouthful at a time: the straw to her lips, the chopsticks from the bowl to her mouth.
+//
+// And she goes out (town.js): to the door and out of it, into the street round the corner — where the street tells her
+// what to do (its planFor, its ownTask) — and home again with what she bought, which she puts away in the fridge.
 import { buildMe } from './me.js';
 import { Person, damp } from './person.js';
 import { makeFood, makeUtensil, makePhone } from './food.js';
+import { Cooking } from './kitchen.js';
 import { disposeTree } from '../fox/kit.js';
 import { V } from './shapes.js';
 
@@ -46,16 +50,29 @@ export class Resident extends Person {
     this.hint = -99; //      when she last said she was hungry, or that it was taking long
     this.reachR = V(); //    where her hands go (eating, ordering)
     this.reachL = V();
+    this.apron = null; //    (cooking: an apron over her clothes — its colour)
+    this.cooking = null; //  …and how it is going (kitchen.js)
+    this.baseLook = null;
+    this.apronOn = '';
   }
 
-  /** Dress her as `look` says (she is built again only when it changes). → true if she was dressed anew. */
+  /** Dress her as `look` says (she is built again only when it changes — or her apron goes on or off). → true if she was dressed anew. */
   setLook(look) {
+    this.baseLook = look;
     const key = JSON.stringify(look);
-    if (key === this.lookKey) return false;
+    const changed = key !== this.lookKey;
+    if (!changed && (this.apron || '') === this.apronOn) return false;
     const first = !this.lookKey;
     this.lookKey = key;
-    this.setRig(buildMe(look));
-    return !first;
+    this.apronOn = this.apron || '';
+    this.setRig(buildMe(this.apron ? { ...look, apron: this.apron } : look));
+    return changed && !first;
+  }
+
+  /** An apron on (`color`) — or off again (null). */
+  wearApron(color) {
+    this.apron = color || null;
+    if (this.baseLook) this.setLook(this.baseLook);
   }
 
   asleepNow() {
@@ -135,6 +152,88 @@ export class Resident extends Person {
     }
   }
 
+  /** She cooks `recipe` (js/town.js): to the kitchen, her apron on, the pan on the hob… (kitchen.js). → false if there is no kitchen. */
+  cook(recipe) {
+    if (this.cooking) this.cooking.abandon();
+    this.endPhone();
+    const c = new Cooking(this, recipe);
+    if (!c.begin()) return false;
+    this.cooking = c;
+    return true;
+  }
+
+  /** Something out of the fridge, to eat as it is (`id`: snacks.js): to the fridge for it — a cup of noodles to the kettle — then where she eats. */
+  eatSnack(id) {
+    this.endPhone();
+    const w = this.world;
+    const fridge = w.spotOf('fridge') || w.spotOf('kitchen');
+    const kettle = id === 'cupramen' && w.spotOf('kitchen');
+    const spot = this.mealSpot();
+    const meal = { meal: id, source: 'snack' };
+    const eat = spot.seat
+      ? [{ do: 'sit', seat: spot.seat, t: 600, line: null, ...meal }]
+      : spot.kneel
+        ? [{ do: 'walk', to: spot.kneel.at }, { do: 'face', at: spot.kneel.face }, { do: 'eat', kneel: true, ...meal }]
+        : [...(spot.stand ? [{ do: 'walk', to: spot.stand }] : []), { do: 'face' }, { do: 'eat', ...meal }];
+    this.tasks = [
+      { do: 'say', line: 'fridge' },
+      ...(fridge ? [{ do: 'walk', to: fridge.at }, { do: 'look', at: fridge.face, t: 1.4, line: null, pose: 'bend' }] : []),
+      ...(kettle ? [{ do: 'walk', to: kettle.at }, { do: 'face', at: kettle.face }, { do: 'pose', pose: 'pour', t: 1.6 }] : []),
+      ...eat,
+    ];
+    const t = this.task;
+    if (this.abed && t && t.do === 'lie') t.wake = true;
+    else if (this.seat && t && t.do === 'sit') t.t = 0;
+    else {
+      this.task = null;
+      this.anim.look = null;
+      this.anim.lookW = 0;
+      this.anim.still();
+      this.anim.setPose('stand', 6);
+    }
+  }
+
+  /** She goes out (world.js goOut): up from what she was doing, to the door, and out of it — and the street is shown. */
+  leaveHouse() {
+    const door = this.world.room.doorway();
+    this.endPhone();
+    this.tasks = [{ do: 'say', line: 'go_out' }, { do: 'walk', to: door.inside.clone() }, { do: 'face', at: door.outside.clone() }, { do: 'door', open: true }, { do: 'walk', to: door.outside.clone().add(V(0.35, 0, 0)), direct: true }, { do: 'out' }, { do: 'wait', t: 5 }];
+    const t = this.task;
+    if (this.abed && t && t.do === 'lie') t.wake = true;
+    else if (this.seat && t && t.do === 'sit') t.t = 0;
+    else {
+      this.task = null;
+      const a = this.anim;
+      a.look = null;
+      a.lookW = 0;
+      a.still();
+      a.setPose('stand', 6);
+    }
+  }
+
+  /** …and back in at the door (the street has her no more): what she bought goes into the fridge (or by the kitchen). */
+  comeIn() {
+    const door = this.world.room.doorway();
+    const a = this.anim;
+    this.on = true;
+    this.rig.group.visible = true;
+    this.seat = this.abed = null;
+    a.pos.copy(door.outside).add(V(0.35, 0, 0));
+    a.yaw = -Math.PI / 2;
+    a.pitch = 0;
+    a.air = 0;
+    a.look = null;
+    a.lookW = 0;
+    a.still();
+    a.setPose('stand', 30);
+    a.snap();
+    const bag = this.props.L && this.props.L.object.userData.shopBag;
+    const spot = bag && (this.world.spotOf('fridge') || this.world.spotOf('kitchen'));
+    this.tasks = [{ do: 'door', open: true }, { do: 'wait', t: 0.3 }, { do: 'walk', to: door.inside.clone(), direct: true }, { do: 'door', open: false }, { do: 'say', line: 'home' }];
+    if (bag) this.tasks.push(...(spot ? [{ do: 'walk', to: spot.at }, { do: 'look', at: spot.face, t: 2.2, line: 'put_away', pose: 'bend' }] : []), { do: 'unbag' });
+    this.task = null;
+  }
+
   /** Lorelei is in — past the door, and has said hello to whoever is looking on — and the girl has not been to say hello to her yet. */
   guestToMeet() {
     const g = this.world.guest;
@@ -157,7 +256,7 @@ export class Resident extends Person {
 
   /** Is she busy with something to eat — the courier at the door, or eating it? */
   busyEating() {
-    return !!(this.door || (this.task && this.task.meal) || this.tasks.some((x) => x.meal));
+    return !!(this.door || this.cooking || (this.task && this.task.meal) || this.tasks.some((x) => x.meal));
   }
 
   /** Lorelei has come in: whatever she was doing (unless she is asleep, or being dressed), she leaves it to go and say hello. */
@@ -344,7 +443,7 @@ export class Resident extends Person {
     if (!t.food) {
       const bag = this.drop('R');
       if (bag) disposeTree(bag.object);
-      const f = (t.food = makeFood(t.meal));
+      const f = (t.food = makeFood(t.meal, { burnt: !!t.burnt }));
       if (!f) return true;
       if (f.style === 'bowl') {
         this.hold('L', f.object);
@@ -352,7 +451,8 @@ export class Resident extends Person {
         this.hold('R', t.ut.object);
       } else this.hold('R', f.object);
       t.n = 0;
-      t.ph = 'rest';
+      t.ph = f.wait ? 'steep' : 'rest'; // (a cup of noodles stands with its lid on for its three minutes first)
+      if (f.wait) f.lid(0);
       t.pk = 0;
       t.wait = 1.3;
       t.aim = 0;
@@ -361,7 +461,7 @@ export class Resident extends Person {
       a.look = null;
       a.lookW = 0;
       if (w.fx) for (let i = 0; i < 4; i++) w.fx.emit('✨', a.pos.clone().add(V((Math.random() - 0.5) * 0.4, 0.5 + Math.random() * 0.5, (Math.random() - 0.5) * 0.3)), { size: 0.09, rise: 0.25, life: 1.1 });
-      this.say('unpack');
+      this.say(t.source && t.source !== 'delivery' ? (t.burnt ? 'eat_burnt' : `eat_${t.meal}`) : 'unpack');
       return false;
     }
     const f = t.food;
@@ -378,7 +478,23 @@ export class Resident extends Person {
     // a little past her wrist: js/fox/lorelei.js, solveArm)
     const palm = _e.copy(wrist).sub(this.rig.bones.foreR.getWorldPosition(_r)).normalize().multiplyScalar(0.04 * S).add(wrist);
     const toward = (mark, to) => target.copy(palm).sub(mark.getWorldPosition(_r)).add(to);
-    if (t.ph === 'rest') {
+    // (something hot: it steams)
+    if ((f.hot || f.wait) && w.fx && Math.random() < dt * (t.ph === 'steep' ? 4 : 1.2)) w.fx.puff((f.bite || f.top).getWorldPosition(V()).add(V(0, 0.05, 0)));
+    if (t.ph === 'steep') {
+      target.copy(rest);
+      if (t.pk > f.wait) {
+        t.ph = 'open';
+        t.pk = 0;
+        this.say('cup_ready');
+      }
+    } else if (t.ph === 'open') {
+      target.copy(rest);
+      f.lid(Math.min(1, t.pk / 0.6));
+      if (t.pk > 0.8) {
+        t.ph = 'rest';
+        t.pk = 0;
+      }
+    } else if (t.ph === 'rest') {
       target.copy(rest);
       if (t.pk > t.wait) {
         t.ph = bowl ? 'dip' : 'up';
@@ -409,7 +525,7 @@ export class Resident extends Person {
           t.n++;
           f.left(1 - t.n / f.bites);
           if (bowl) t.ut.bite.visible = false;
-          if (t.n === 1 || (t.n === Math.ceil(f.bites / 2) && Math.random() < 0.8)) this.say(`eat_${f.id}`);
+          if ((t.n === 1 && (!t.source || t.source === 'delivery')) || (t.n === Math.ceil(f.bites / 2) && Math.random() < 0.8)) this.say(t.burnt ? 'eat_burnt' : `eat_${f.id}`);
           if (w.fx && t.n === 2) w.fx.emit(f.id === 'malatang' || f.id === 'tteokbokki' ? '🔥' : '💗', this.mouth(V()).addScaledVector(UP, 0.06), { size: 0.08, rise: 0.25, life: 1.2 });
           t.ph = 'down';
           t.pk = 0;
@@ -427,7 +543,7 @@ export class Resident extends Person {
           t.smile = true;
           this.say('done');
           if (w.fx) w.fx.emit('💗', a.pos.clone().addScaledVector(UP, 1.15), { size: 0.12, rise: 0.3, life: 1.6 });
-          w.host.onDelivery('done', { id: f.id });
+          w.host.onMeal(t.source || 'delivery', f.id);
           setTimeout(() => (a.mood.smile = 0), 1800);
           if (t.kneel) a.setPose('stand', 4); // (and up again)
           return true;
@@ -452,7 +568,21 @@ export class Resident extends Person {
   }
 
   own(t, dt) {
+    if (this.world.ownTask) {
+      const r = this.world.ownTask(this, t, dt); // (out in the street: what is done only there)
+      if (r !== undefined) return r;
+    }
     if (t.do === 'eat') return !t.meal; // (eating standing up: see update)
+    if (t.do === 'out') {
+      this.world.enterTown();
+      return true;
+    }
+    if (t.do === 'cook') return !this.cooking || this.cooking.update(dt);
+    if (t.do === 'unbag') {
+      const p = this.drop('L');
+      if (p) disposeTree(p.object);
+      return true;
+    }
     if (t.do !== 'twirl') return undefined;
     const a = this.anim;
     if (!t.from) {
@@ -479,6 +609,7 @@ export class Resident extends Person {
 
   plan() {
     const w = this.world;
+    if (w.planFor) return w.planFor(this); // (out in the street: town.js)
     if (this.showcase) {
       this.tasks.push({ do: 'face' }, { do: 'wait', t: 1.5 });
       return;

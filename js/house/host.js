@@ -46,6 +46,8 @@ host.register({
   page: (canvas) => world && world.setDiaryPage(canvas),
   /** Where something new could go — { x, z, r } or { wall, u, y } — or null if there is no room for it. */
   findSpot: (id) => (world ? world.findSpot(id) : null),
+  /** …against a wall, its back to it (a kitchen) — or null. */
+  findWallSpot: (id) => (world ? world.findWallSpot(id) : null),
   /** A quarter turn for a thing on the floor: its new place, or null if there is no room to turn it. */
   turn: (uid) => (world ? world.turn(uid) : null),
   /** Where a thing is on the screen (px of the stage), for the buttons that float by it. */
@@ -64,10 +66,31 @@ host.register({
   deliver: (o) => (world ? world.deliver(o) : false),
   doorBusy: () => !!(world && world.doorBusy()),
   eating: () => !!(world && world.stage && world.me.busyEating()),
+  /** Out of the door (js/town.js): she goes out (→ false if she cannot now); where to on the street; is she in the middle
+   *  of something there (what: 'till', 'eat', 'cafe', 'sing', 'home' — or null); at the store's till with what she has
+   *  paid for, eating at its window, ordering at the café, singing at the karaoke (and its end), on a swing; a word from her. */
+  goOut: () => !!(world && world.stage && world.goOut()),
+  townGo: (place) => !!(world && world.where === 'town' && world.town.go(place)),
+  townBusy: () => (world && world.where === 'town' ? world.town.busy : null),
+  townCheckout: (items) => !!(world && world.where === 'town' && world.town.checkout(items)),
+  townEatHere: (ids) => !!(world && world.where === 'town' && world.town.eatHere(ids)),
+  townCafe: (o) => !!(world && world.where === 'town' && world.town.cafeOrder(o)),
+  townSing: (song) => !!(world && world.where === 'town' && world.town.sing(song)),
+  townSingEnd: () => world && world.town && world.town.singEnd(),
+  townSwing: () => !!(world && world.where === 'town' && world.town.swingNow()),
+  townSay: (line) => world && world.where === 'town' && world.town.me && world.town.me.say(line),
+  /** The kitchen: she cooks `recipe` (→ false: no kitchen), does a step's act, how hot and how done it is, the end of it;
+   *  something out of the fridge to eat. */
+  cookStart: (r) => !!(world && world.stage && world.me.cook(r)),
+  cookAct: (act, item, n, step, final) => world && world.me.cooking && world.me.cooking.act(act, item, n, step, final),
+  cookLevel: (heat, done) => world && world.me.cooking && world.me.cooking.level(heat, done),
+  cookEnd: (r) => world && world.me.cooking && world.me.cooking.end(r),
+  eatSnack: (id) => world && world.stage && world.me.eatSnack(id),
   /** Pictures for the shop: a thing on its own; a wallpaper's or a floor's swatch. */
   thumb: (id) => (ensure() ? world.thumb(id) : ''),
   swatch: (kind, id) => (ensure() ? world.swatch(kind, id) : ''),
   foodThumb: (id) => (ensure() ? world.foodThumb(id) : ''),
+  ingThumb: (id) => (ensure() ? world.ingThumb(id) : ''),
   /** The room as it is now, a picture (a canvas). */
   capture: (long) => (world ? world.capture(long) : null),
 });

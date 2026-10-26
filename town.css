@@ -1,0 +1,579 @@
+/* ==================================================================
+   🏘️ 우리 동네 & 🍳 요리 (js/town.js) — the street's buttons over the
+   house's view, the shops' sheets, the kitchen's, and the little game
+   of cooking along the bottom of the view.
+   ================================================================== */
+
+/* ---------- going out and coming in: a soft fade over the view ---------- */
+.house-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: #fff3f8;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.32s ease;
+}
+.house-stage.is-fading::before {
+  opacity: 1;
+}
+
+/* ---------- the house's buttons, or the street's ---------- */
+.house-room .town-acts {
+  display: none;
+}
+.house-room.in-town .town-acts {
+  display: flex;
+}
+.house-room.in-town .house-hud .fh-actions:not(.town-acts),
+.house-room.in-town .fox-cam.is-light,
+.house-room.in-town .fox-cam.is-food,
+.house-room.in-town .fox-cam.is-cook,
+.house-room.in-town [data-house-gift],
+.house-room.in-town [data-house-tip] {
+  display: none;
+}
+.house-room .fox-cam.is-cook {
+  top: calc(var(--safe-t) + 280px);
+}
+.house-room .fh-act.is-out {
+  position: relative;
+  background: linear-gradient(135deg, #e8fff6, #fff6e2);
+}
+/* (new: a dot until she has been out) */
+.house-room .fh-act.is-out.is-new::after {
+  content: '';
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ff4f8b;
+  box-shadow: 0 0 0 2px #fff;
+}
+.house-room .town-acts .fh-act.is-home {
+  background: linear-gradient(135deg, #fff0f6, #ffe6c4);
+}
+.house-room .town-acts .fh-act.on {
+  box-shadow:
+    0 10px 24px -12px rgba(40, 10, 50, 0.7),
+    inset 0 0 0 2.5px #36c2a6;
+}
+/* (six buttons along the bottom of a phone held upright: a little smaller) */
+@media (max-width: 420px) {
+  .house-room .house-hud .fh-actions:not(.town-acts) {
+    gap: 4px;
+  }
+  .house-room .house-hud .fh-actions:not(.town-acts) .fh-act span {
+    font-size: 22px;
+  }
+  .house-room .house-hud .fh-actions:not(.town-acts) .fh-act b {
+    font-size: 11px;
+  }
+}
+
+/* who is speaking, on the street */
+.house-bubble.is-clerk[data-who]::before {
+  color: #1f9a82;
+}
+.house-bubble.is-barista[data-who]::before {
+  color: #8e5b3b;
+}
+
+/* ---------- cooking: the game along the bottom of the view ---------- */
+.house-room.cook-on .house-hud .fh-actions,
+.house-room.cook-on .fox-cam,
+.house-room.cook-on .fh-mid {
+  display: none;
+}
+.cook-panel {
+  pointer-events: auto;
+  position: absolute;
+  left: max(12px, env(safe-area-inset-left, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+  bottom: calc(var(--safe-b) + 14px);
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 12px 14px 12px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #3a1f43;
+  box-shadow: 0 14px 30px -14px rgba(40, 10, 50, 0.8);
+  animation: cookIn 0.25s ease;
+}
+.cook-panel[hidden] {
+  display: none;
+}
+@keyframes cookIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+.cook-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.cook-head b {
+  font-size: 15.5px;
+  font-weight: 600;
+}
+.cook-dots {
+  display: flex;
+  gap: 5px;
+}
+.cook-dots i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #f2dbe6;
+}
+.cook-dots i.done {
+  background: #ff8fb2;
+}
+.cook-dots i.now {
+  background: #ff5f9e;
+  box-shadow: 0 0 0 3px #ffd6e6;
+}
+.cook-hint {
+  margin: 0;
+  font-size: 13.5px;
+  color: #6e5878;
+  text-align: center;
+}
+.cook-gauge {
+  position: relative;
+  height: 26px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ffe9c2 0%, #ffd27a 45%, #ff9f5a 80%, #a8522a 100%);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7);
+  overflow: hidden;
+}
+.cg-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(120, 220, 160, 0.55);
+  box-shadow:
+    inset 2px 0 0 #3fbf7a,
+    inset -2px 0 0 #3fbf7a;
+}
+.cg-mark {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: 0;
+  width: 6px;
+  margin-left: -3px;
+  border-radius: 3px;
+  background: #3a1f43;
+  box-shadow: 0 0 0 2px #fff;
+}
+.cg-label {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: rgba(58, 31, 67, 0.7);
+  pointer-events: none;
+}
+.cook-gauge.is-mash {
+  background: #fff0f6;
+}
+.cg-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: linear-gradient(90deg, #ff9fc2, #ff5f9e);
+  transition: width 0.12s ease;
+}
+.cg-time {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 4px;
+  width: 100%;
+  background: #36c2a6;
+}
+.cook-btn {
+  width: 100%;
+  font-size: 19px;
+  touch-action: manipulation;
+}
+.cook-btn:active {
+  transform: scale(0.97);
+}
+.cook-verdict {
+  min-height: 1.2em;
+  margin: -2px 0 0;
+  font-family: var(--font-hand);
+  font-size: 19px;
+  font-weight: 700;
+  text-align: center;
+  opacity: 0;
+}
+.cook-verdict.show {
+  animation: verdictIn 1s ease forwards;
+}
+.cook-verdict.is-perfect {
+  color: #19a36a;
+}
+.cook-verdict.is-good,
+.cook-verdict.is-early,
+.cook-verdict.is-late {
+  color: #e08a1a;
+}
+.cook-verdict.is-tooEarly,
+.cook-verdict.is-tooLate,
+.cook-verdict.is-slow {
+  color: #d9485f;
+}
+@keyframes verdictIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  40%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ---------- the shops' sheets ---------- */
+.town-sheet .store-tabs {
+  display: flex;
+}
+.town-sheet .store-tabs .seg-btn {
+  flex: 1;
+}
+.tab-dot {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #ff5f9e;
+  color: #fff;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 18px;
+}
+.store-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 8px;
+  max-height: 44vh;
+  padding: 2px;
+  overflow-y: auto;
+}
+.store-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 6px 4px 8px;
+  border-radius: 16px;
+  background: var(--surface-2);
+  text-align: center;
+}
+.store-item.on {
+  box-shadow: inset 0 0 0 2px #36c2a6;
+}
+.si-pic {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 82%;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 14px;
+  background: #fff0f6;
+  font-size: 34px;
+}
+.si-pic span {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 14px;
+}
+.si-pic img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.si-n {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #36c2a6;
+  color: #fff;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 22px;
+}
+.store-item b {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.si-desc {
+  font-size: 10.5px;
+  line-height: 1.2;
+  color: var(--ink-3);
+}
+.store-item small {
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+.si-step {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+.si-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #ffe0ee;
+  color: #d6337a;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
+}
+.si-btn.is-add {
+  background: #36c2a6;
+  color: #fff;
+}
+.si-btn:active,
+.si-pic:active {
+  transform: scale(0.92);
+}
+.store-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 6px 0 12px;
+  border-top: 1px solid rgba(60, 30, 60, 0.08);
+}
+.sb-basket {
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.store-bar .btn {
+  flex: none;
+}
+.store-leave {
+  align-self: center;
+  margin-top: -2px;
+  font-size: 13px;
+}
+/* her covers, to sing */
+.town-songs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.town-song {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 8px 8px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--surface-2);
+  color: var(--ink);
+  text-align: left;
+}
+.town-song:active {
+  transform: scale(0.98);
+}
+.ts-art {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #ffd0e0, #c9b6ff);
+}
+.ts-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.ts-text b {
+  overflow: hidden;
+  font-size: 14.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ts-text small {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.ts-go {
+  flex: none;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #ff5fa2;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* ---------- the kitchen: recipes, the fridge ---------- */
+.recipe-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 48vh;
+  overflow-y: auto;
+}
+.recipe {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 8px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--surface-2);
+  color: var(--ink);
+  text-align: left;
+}
+.recipe:disabled {
+  opacity: 1;
+}
+.recipe:disabled .rc-pic {
+  filter: grayscale(0.5);
+  opacity: 0.75;
+}
+.recipe.can {
+  box-shadow: inset 0 0 0 2px #ffb3cb;
+}
+.recipe:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.rc-pic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #fff0f6;
+  font-size: 30px;
+}
+.rc-pic img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.rc-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.rc-text b {
+  font-size: 15px;
+  font-weight: 600;
+}
+.rc-need {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.rc-ing {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(217, 72, 95, 0.4);
+  font-size: 13px;
+  opacity: 0.6;
+}
+.rc-ing.ok {
+  box-shadow: inset 0 0 0 1px rgba(25, 163, 106, 0.6);
+  opacity: 1;
+}
+.rc-text small {
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+.rc-go {
+  flex: none;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: var(--grad);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+.recipe:disabled .rc-go {
+  background: #ece4ea;
+  color: var(--ink-3);
+}
+.fridge-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.fridge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 13px;
+}
+.fridge-chip b {
+  color: #d6337a;
+}
+body.reduce-motion .cook-panel,
+body.reduce-motion .cook-verdict.show {
+  animation: none;
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cook-panel,
+  .cook-verdict.show {
+    animation: none;
+    opacity: 1;
+  }
+}

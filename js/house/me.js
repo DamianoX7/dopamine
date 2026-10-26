@@ -37,6 +37,7 @@ export const LOOK = {
   head: { kind: 'none', color: '#ff7fa8' }, //                               kind: none, ribbon, heart, blossom, headband, catears, beret, straw, santa (helmet: the courier's)
   glasses: { kind: 'none', color: '#5c4a58' }, //                            kind: none, round
   scarf: false,
+  apron: null, //                                                            a colour: an apron over it all (cooking; the girl at the till)
 };
 
 /** A look with nothing left out. */
@@ -639,6 +640,9 @@ export function buildMe(lookIn) {
   if (bottom === 'skirt' || bottom === 'dress' || bottom === 'midi') skirt(bottom);
   else trousers(bottom === 'shorts');
 
+  // ---- an apron over it all (when she cooks; the shop's, on the girl at the till)
+  if (look.apron) apron(C(look.apron));
+
   // ---- her legs, her socks, her shoes
   for (const side of ['L', 'R']) legAndShoe(side);
 
@@ -882,6 +886,68 @@ export function buildMe(lookIn) {
       [[0.433, 0.0005], [0.424, 0.004], [0.408, 0.0045], [0.398, 0.0015], [0.3955, -0.004]].map(([y, d]) => ({ c: V(0, y, HEM.z), rx: HEM.rx + d, ry: HEM.ry + d, ryB: HEM.ryB + d, w: { hips: 1 } })),
       { segs: 40, sub: 2, n: 2.2, arc: [A0, A1], mode: RIBS, tz: () => 110, color: (i) => col.copy(ink.top).lerp(ink.topDeep, 0.15 + 0.5 * smooth(0.5, 1, i.v)) }
     );
+  }
+
+  /*
+   * An apron: a bib over her chest on a strap round her neck, tied at the back of her waist, falling A-line to her knees
+   * over whatever she wears (clear of a skirt's flare), a pocket on the front. Only the front of her: an arc of a ring.
+   */
+  function apron(cloth) {
+    const deep = cloth.clone().lerp(C('#3a2a40'), 0.18);
+    const A0 = Math.PI / 2 - 0.95;
+    const A1 = Math.PI / 2 + 0.95;
+    const rows = [
+      [0.668, 0.034, 0.006, { chest: 1 }],
+      [0.635, 0.044, 0.006, { chest: 1 }],
+      [0.585, 0.052, 0.006, { chest: 1 }],
+      [0.535, 0.06, 0.007, { chest: 0.4, spine: 0.6 }],
+      [0.5, 0.074, 0.012, { spine: 0.5, hips: 0.5 }],
+      [0.455, 0.09, 0.022, { hips: 1 }],
+      [0.4, 0.108, 0.03, { hips: 0.7, thighL: 0.15, thighR: 0.15 }],
+      [0.335, 0.126, 0.036, { hips: 0.5, thighL: 0.25, thighR: 0.25 }],
+      [0.3, 0.134, 0.038, { hips: 0.45, thighL: 0.275, thighR: 0.275 }],
+    ];
+    skin.loft(
+      rows.map(([y, rx, pad, w]) => {
+        const [bx, by] = bodyAt(Math.max(0.42, y));
+        // (the bib lies on her top; below the waist it stands clear of a skirt — the widest — however it flares)
+        const rxx = y > 0.52 ? Math.max(rx, bx + 0.004) : Math.max(rx, bx + pad);
+        const ry = y > 0.52 ? by + pad : Math.max(by + pad, rx * 0.93);
+        return { c: V(0, y, 0.002), rx: rxx, ry, ryB: ry, w };
+      }),
+      {
+        segs: 30,
+        sub: 3,
+        n: 2.15,
+        open: true,
+        arc: [A0, A1],
+        color: (i) => col.copy(cloth).lerp(deep, clamp(0.35 * smooth(0.6, 0.95, Math.abs(Math.cos(i.a))) + 0.2 * smooth(0.3, -0.7, i.s), 0, 1)),
+      }
+    );
+    // the pocket on its front
+    skin.loft(
+      [0.44, 0.432, 0.392, 0.385].map((y, k) => {
+        const [bx, by] = bodyAt(0.44);
+        return { c: V(0, y, 0.002), rx: Math.max(0.09, bx + 0.022) + 0.004, ry: Math.max(by + 0.022, 0.084) + [0.001, 0.004, 0.004, 0.001][k], ryB: 0.05, w: { hips: 1 } };
+      }),
+      { segs: 14, sub: 2, n: 2.15, arc: [Math.PI / 2 - 0.42, Math.PI / 2 + 0.42], cap: 0.2, color: () => col.copy(deep) }
+    );
+    // the strap up round the back of her neck, and the ties round her waist with their bow
+    for (const sg of [-1, 1])
+      skin.loft(
+        [V(sg * 0.028, 0.668, bodyAt(0.668)[1] + 0.004), V(sg * 0.034, 0.7, 0.03), V(sg * 0.028, 0.722, -0.01), V(0, 0.73, -0.03)].map((p, k) => ({ c: p, rx: 0.0045, ry: 0.0045, w: k < 2 ? { chest: 1 } : { neck: 0.6, chest: 0.4 } })),
+        { segs: 6, sub: 3, cap: 0.5, color: () => col.copy(cloth) }
+      );
+    const [wx, wy, wb] = bodyAt(0.515);
+    skin.loft(
+      [0.522, 0.51].map((y) => ({ c: V(0, y, 0), rx: wx + 0.006, ry: wy + 0.008, ryB: wb + 0.006, w: { spine: 0.5, hips: 0.5 } })),
+      { segs: 30, sub: 1, n: 2.15, open: true, arc: [A1 - 0.1, A0 + TAU + 0.1], color: () => col.copy(cloth) }
+    );
+    for (const sg of [-1, 1])
+      skin.loft(
+        [V(0, 0.516, -wb - 0.008), V(sg * 0.02, 0.524, -wb - 0.016), V(sg * 0.03, 0.512, -wb - 0.014), V(sg * 0.012, 0.506, -wb - 0.01), V(sg * 0.016, 0.47, -wb - 0.02)].map((p) => ({ c: p, rx: 0.0055, ry: 0.004, w: { hips: 1 } })),
+        { segs: 8, sub: 3, cap: 0.6, color: () => col.copy(cloth) }
+      );
   }
 
   /* A skirt: short and pleated (checked, if she chose a check) — or long and flared, or the skirt of her dress. */

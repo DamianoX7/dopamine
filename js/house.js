@@ -17,7 +17,10 @@
    And she lives there herself: a girl she has made, named and dressed
    as she likes (js/avatar.js), who sleeps in the bed at night and goes
    about the house through the day — and orders in now and then: the
-   courier knocks with it (js/delivery.js).
+   courier knocks with it (js/delivery.js). She goes out, too: round the
+   corner are a convenience store, a café, a coin karaoke and a park —
+   and what she buys there to cook with, she cooks in the kitchen
+   (js/town.js).
 
    What she has and where it stands is State.house; the pictures and
    the records stay where they are kept (js/photos.js, the studio).
@@ -127,6 +130,9 @@ const HOUSE_TIPS = [
   '냉장고에는 업적마다 자석이 하나씩 붙어요',
   `가끔 ${josa(OWNER_NAME, '이/가')} 놀러 와요`,
   '🛵 버튼으로 배달 음식을 시켜 줄 수 있어요. 배달원이 문을 두드려요',
+  '🏘️ 동네 버튼을 누르면 편의점, 카페, 코인노래방, 공원에 갈 수 있어요',
+  '편의점에서 재료를 사 오면 🍳 부엌에서 요리할 수 있어요. 타이밍 맞추기!',
+  '코인노래방에서는 내 커버를 직접 불러요 🎤 마지막엔 점수도 나와요',
 ];
 
 /* What Lorelei says when she comes round — and about what she sees. ('{name}' = her nickname) */
@@ -278,8 +284,13 @@ const HouseHost = {
   onPlace: (uid, place) => House.placed(uid, place), // …and put it down somewhere else
   onRefuse: () => House.refused(), //                  …where it cannot stand
   onGuest: (what) => House.guestSaid(what), //         Lorelei: 'hello', 'wave', 'bye', 'leaving', 'gone'
-  line: (who, kind) => (who === 'guest' ? House.guestLine(kind) : who === 'rider' ? Delivery.riderLine(kind) : Avatar.line(kind)), // what Lorelei ('guest'), the girl ('me') or the courier ('rider') says about `kind`
-  onDelivery: (what, o) => Delivery.said(what, o), //  the courier: 'knock', 'handed', 'gone' — and 'done': she has eaten it
+  line: (who, kind) => (who === 'guest' ? House.guestLine(kind) : who === 'rider' ? Delivery.riderLine(kind) : who === 'clerk' || who === 'barista' ? TownLife.line(who, kind) : TownLife.meLine(kind)), // what Lorelei ('guest'), the girl ('me'), the courier ('rider') — or the girl at the store's till, the woman at the café — says about `kind`
+  onDelivery: (what, o) => Delivery.said(what, o), //  the courier: 'knock', 'handed', 'gone'
+  onMeal: (source, id) => (source === 'delivery' ? Delivery.said('done', { id }) : TownLife.ate(source, id)), // she has eaten it all: what the courier brought, what she bought, what she cooked
+  onTown: (what, o) => TownLife.said(what, o), //       out of the door: 'out', 'arrive', 'paid', 'singing', 'sung', 'home'
+  onTownTap: (kind) => TownLife.tapped(kind), //         …a tap on the street: a shop, her house, the swings…
+  onCook: (what) => TownLife.cookSaid(what), //          the kitchen: 'ready' (she is at the hob)
+  sound: (name) => Sfx.play(name),
   clock: () => CoverHost.clock(), //                   (where the song is, and its beat: she dances to it)
   beats: (id) => CoverHost.beats(id),
 };
@@ -347,6 +358,7 @@ const House = {
       giftKey: (this.giftWaiting() || {}).key || null,
       me: { look: Avatar.look3d(), showcase: HouseRoom.meOn },
       food: { order: (Delivery.pending() || {}).id || null },
+      shut: Opening.shut(), // (the coin karaoke on the street opens with the studio)
       calendar: this.calendar(today),
       magnets: Object.keys(State.achievements).length,
       tune: CoverHost.tune(),
@@ -395,7 +407,8 @@ const House = {
     if (kind === 'guest' || kind === 'me' || kind === 'rider') return; // (they turn and wave: the 3D side has done it)
     if (kind === 'door') {
       Sfx.play('tap');
-      return UI.toast(HouseHost.api && HouseHost.api.guestHere() ? `${josa(OWNER_NAME, '이/가')} 놀러 와 있어요 💗` : '현관문이에요. 가끔 누가 똑똑 두드려요 🚪', { icon: '🚪' });
+      if (HouseHost.api && HouseHost.api.guestHere()) return UI.toast(`${josa(OWNER_NAME, '이/가')} 놀러 와 있어요 💗`, { icon: '🚪' });
+      return UI.menu('🚪 현관문', [{ icon: '🏘️', label: '동네로 나가기', onClick: () => TownLife.goOut() }]);
     }
     if (kind === 'fixed') return UI.toast('우편함은 문 옆에 붙어 있어서 옮길 수 없어요', { icon: '📮' });
     const it = this.entry(uid);
@@ -427,11 +440,10 @@ const House = {
         if (Radio.on) Radio.stop();
         else Radio.start({ screen: false });
         return setTimeout(() => HouseHost.sync(), 300);
-      case 'fridge': {
-        const n = Object.keys(State.achievements).length;
-        Sfx.play('pop');
-        return UI.toast(n ? `업적 자석이 ${n}개 붙어 있어요! 🧲` : '업적을 달성하면 냉장고에 자석이 붙어요 🧲', { icon: '🧊' });
-      }
+      case 'fridge':
+        return TownLife.kitchenSheet('fridge');
+      case 'kitchen':
+        return TownLife.kitchenSheet('cook');
       case 'bed':
       case 'bed-star': {
         const h = new Date().getHours();
@@ -1151,19 +1163,22 @@ const House = {
     const h = State.house;
     const gift = this.giftWaiting();
     const mail = Post.waiting().length;
+    const fresh = h.made && !((h.town && h.town.outs) || (h.cook && Object.keys(h.cook.made || {}).length));
     const note = !h.made
       ? '새로 생겼어요! 우리 집에 들어가 볼까요?'
-      : gift
+      : fresh
+        ? '🏘️ 동네와 🍳 부엌이 새로 생겼어요!'
+        : gift
         ? `${gift.event.emoji} 문 앞에 ${gift.event.name} 선물이 와 있어요`
         : mail
           ? '💌 우편함에 편지가 와 있어요'
           : Moon.dark()
             ? `${Moon.emoji()} 창밖에 서울의 밤하늘이 보여요`
             : '오늘도 집에 들러 볼까요?';
-    return `<button class="card house-card ${!h.made || gift ? 'is-new' : ''}" data-action="house-open" aria-label="${esc(HOUSE_NAME)}에 들어가기">
+    return `<button class="card house-card ${!h.made || gift || fresh ? 'is-new' : ''}" data-action="house-open" aria-label="${esc(HOUSE_NAME)}에 들어가기">
       <span class="house-ico" aria-hidden="true">🏠</span>
       <span class="house-text"><b>${esc(HOUSE_NAME)}</b><small>${esc(note)}</small></span>
-      ${!h.made ? '<span class="chip chip-hot">NEW</span>' : ''}
+      ${!h.made || fresh ? '<span class="chip chip-hot">NEW</span>' : ''}
       <span class="chev" aria-hidden="true">›</span>
     </button>`;
   },
@@ -1198,6 +1213,8 @@ const HouseRoom = {
         <div class="fox-bubble house-bubble" data-house-bubble="guest" data-who="${esc(OWNER_NAME)}" hidden></div>
         <div class="fox-bubble house-bubble is-me" data-house-bubble="me" data-who="${esc(Avatar.name())}" hidden></div>
         <div class="fox-bubble house-bubble is-rider" data-house-bubble="rider" data-who="🛵 ${RIDER_NAME}" hidden></div>
+        <div class="fox-bubble house-bubble is-clerk" data-house-bubble="clerk" data-who="🏪 편의점 알바생" hidden></div>
+        <div class="fox-bubble house-bubble is-barista" data-house-bubble="barista" data-who="☕ 카페 사장님" hidden></div>
       </div>
       <div class="fox-hud house-hud">
         <div class="fh-top">
@@ -1217,13 +1234,16 @@ const HouseRoom = {
         <button class="fox-cam is-light" data-action="house-light" data-house-light aria-label="불 켜기 끄기"><span aria-hidden="true">💡</span></button>
         <button class="fox-cam is-home" data-action="house-home" aria-label="처음 보던 곳으로 돌아가기"><span aria-hidden="true">🔄</span></button>
         <button class="fox-cam is-food" data-action="house-food" aria-label="배달 시키기"><span aria-hidden="true">🛵</span></button>
+        <button class="fox-cam is-cook" data-action="house-kitchen" aria-label="부엌"><span aria-hidden="true">🍳</span></button>
         <div class="fh-actions">
           <button class="fh-act" data-action="house-lp"><span aria-hidden="true">💿</span><b>LP 듣기</b></button>
           <button class="fh-act" data-action="house-diary"><span aria-hidden="true">📔</span><b>일기장</b></button>
           <button class="fh-act" data-action="house-mailbox"><span aria-hidden="true">📮</span><b>우편함</b></button>
           <button class="fh-act is-me" data-action="house-me"><span aria-hidden="true">🙋‍♀️</span><b data-me-name>${esc(Avatar.name())}</b></button>
+          <button class="fh-act is-out ${(State.house.town && State.house.town.outs) ? '' : 'is-new'}" data-action="house-out"><span aria-hidden="true">🏘️</span><b>동네</b></button>
           <button class="fh-act is-shop" data-action="house-edit"><span aria-hidden="true">🛋️</span><b>꾸미기</b></button>
         </div>
+        ${TownLife.hudHtml()}
       </div>
       <div class="fox-drawer house-drawer" data-house-drawer hidden>
         <div class="fd-head">
@@ -1336,6 +1356,12 @@ const HouseRoom = {
       await sleep(700);
       if (this.ov !== ov) return;
       UI.toast(`${HOUSE_NAME}에 온 걸 환영해요! 물건을 눌러 보고, 🛋️ 꾸미기로 마음대로 바꿔 보세요`, { icon: '🏠', kind: 'gold', ms: 5600 });
+    } else if (!State.house.town.news) {
+      State.house.town.news = true;
+      Store.save();
+      await sleep(900);
+      if (this.ov !== ov) return;
+      UI.toast('새로 생겼어요! 🏘️ 동네에 나가 편의점·카페·노래방·공원에 가고, 🍳 부엌에서 요리도 해요', { icon: '🏘️', kind: 'gold', ms: 6000 });
     }
     if (House.guestDue()) House.guestTimer = setTimeout(() => House.knock(), (first ? 9000 : 6000) + Math.random() * 9000);
   },
@@ -1353,6 +1379,7 @@ const HouseRoom = {
     House.preview = null;
     clearInterval(this.skyTimer);
     Delivery.closed();
+    TownLife.closed();
     clearTimeout(House.guestTimer);
     House.guestTimer = 0;
     if (this.loop) this.loop();
@@ -1436,6 +1463,7 @@ const HouseRoom = {
    *  starts or stops, the 3D side is told (Lorelei dances while something is on). */
   tune(p = CoverHost.player()) {
     if (!this.ov) return;
+    TownLife.tune(p);
     House.recordState();
     this.tuneChip();
     const key = `${p.singleId || ''}:${!!p.playing}`;
@@ -1448,6 +1476,7 @@ const HouseRoom = {
 
   setEdit(on) {
     if (!this.ov) return;
+    if (on && (TownLife.out || TownLife.cooking)) return UI.toast(TownLife.out ? '동네에 나가 있어요. 집에 돌아와서 꾸며요 🏠' : '요리하는 중이에요 🍳', { icon: '🛋️' });
     if (on && this.meOn) this.setMe(false);
     this.editOn = !!on;
     if (!on) {
@@ -1471,7 +1500,8 @@ const HouseRoom = {
     const stage = $('[data-house-stage]', panel);
     const sr = stage.getBoundingClientRect();
     const bar = $('.house-hud .fh-top', panel);
-    const acts = $('.house-hud .fh-actions', panel);
+    const cook = $('[data-house-cook]', panel);
+    const acts = cook && !cook.hidden ? cook : $(TownLife.out ? '.house-hud .town-acts' : '.house-hud .fh-actions', panel);
     const top = bar ? bar.getBoundingClientRect().bottom - sr.top + 6 : 0;
     const low = acts && acts.offsetHeight ? sr.bottom - acts.getBoundingClientRect().top + 6 : 0;
     if (!this.editOn && !this.meOn) return HouseHost.api.inset({ top, low });
@@ -1567,7 +1597,8 @@ const HouseRoom = {
   setMe(on) {
     if (!this.ov) return;
     // (not while the courier is at the door, nor while she is eating: her hands are full)
-    if (on && HouseHost.api && HouseHost.api.eating()) return UI.toast(`${josa(Avatar.name(), '이/가')} 배달 음식을 받고 먹는 중이에요 😋 다 먹으면 꾸밀 수 있어요`, { icon: '🛵' });
+    if (on && TownLife.out) return UI.toast('동네에 나가 있어요. 집에 돌아와서 꾸며요 🏠', { icon: '🙋‍♀️' });
+    if (on && HouseHost.api && HouseHost.api.eating()) return UI.toast(TownLife.cooking ? `${josa(Avatar.name(), '이/가')} 요리하는 중이에요 🍳` : `${josa(Avatar.name(), '이/가')} 먹는 중이에요 😋 다 먹으면 꾸밀 수 있어요`, { icon: '🛵' });
     if (on && this.editOn) this.setEdit(false);
     this.meOn = !!on;
     if (!on) Avatar.trying = null;

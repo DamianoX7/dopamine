@@ -9,44 +9,11 @@
 // in the frame of the hand that holds it: +Y up, +Z the way she faces, the origin at her palm.
 import * as THREE from '../vendor/three.module.min.js';
 import { Batch, MAT, V, TAU, rng, paintTexture, heart } from './shapes.js';
+import { piece, mark, clear, bowlGeometry, eatAway } from './dishkit.js';
+import { SNACKS } from './snacks.js';
+import { MEALS } from './meals.js';
 
 const C = (hex) => new THREE.Color(hex);
-
-/* One small shape as a mesh of its own (so that it can come and go as she eats), in a shared material. */
-function piece(geometry, color, { at = [0, 0, 0], rot = [0, 0, 0], scale = 1, mat = 'paint', flat = false } = {}) {
-  const m = new Batch().add(geometry, { color, flat }).mesh(MAT[mat]);
-  m.position.set(...at);
-  m.rotation.set(...rot);
-  if (Array.isArray(scale)) m.scale.set(...scale);
-  else m.scale.setScalar(scale);
-  return m;
-}
-
-/* An empty point to find a place on the dish by (where it goes to her mouth; the top of the bowl; a chopstick's tip). */
-function mark(x, y, z) {
-  const o = new THREE.Object3D();
-  o.position.set(x, y, z);
-  return o;
-}
-
-/* Clear plastic: the cup, its lid. */
-function clear(opacity = 0.3) {
-  return new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.08, metalness: 0, transparent: true, opacity, depthWrite: false });
-}
-
-/* A bowl turned on a lathe: its outside up from `foot` to the rim, and its inside back down (radius, height pairs). */
-function bowlGeometry(profile, seg = 28) {
-  return new THREE.LatheGeometry(
-    profile.map(([r, y]) => new THREE.Vector2(r, y)),
-    seg
-  );
-}
-
-/* Pieces that are eaten one after another: of `list`, as many show as `k` (1 … 0) leaves. */
-function eatAway(list, k) {
-  const n = Math.ceil(list.length * Math.max(0, Math.min(1, k)) - 1e-6);
-  list.forEach((m, i) => (m.visible = i < n));
-}
 
 // ------------------------------------------------------------------ the dishes
 
@@ -383,14 +350,14 @@ function malatang() {
   };
 }
 
-const DISHES = { bubbletea, tanghulu, chicken, pizza, tteokbokki, malatang };
+const DISHES = { bubbletea, tanghulu, chicken, pizza, tteokbokki, malatang, ...SNACKS, ...MEALS };
 export const FOOD_IDS = Object.keys(DISHES);
 
-/** A dish (see above), or null if there is no such thing. */
-export function makeFood(id) {
+/** A dish (see above — and snacks.js, meals.js), or null if there is no such thing. `opts`: { burnt } for what she cooked. */
+export function makeFood(id, opts = {}) {
   const make = DISHES[id];
   if (!make) return null;
-  const f = make();
+  const f = make(opts);
   f.id = id;
   f.object.traverse((o) => {
     if (o.isMesh) o.castShadow = true;
@@ -400,20 +367,25 @@ export function makeFood(id) {
 }
 
 /**
- * What a dish in a bowl is eaten with: chopsticks or a pick — its tip, and the mouthful that goes up on it. `aim(k)`: how
- * it points, from down into the bowl (0) to back at her mouth (1).
+ * What a dish in a bowl (or on a plate) is eaten with: chopsticks, a pick, a spoon or a fork — its tip, and the mouthful
+ * that goes up on it. `aim(k)`: how it points, from down into the bowl (0) to back at her mouth (1).
  */
 export function makeUtensil(kind, morsel) {
   const object = new THREE.Group();
   const holder = new THREE.Group();
   holder.position.set(0.004, -0.004, 0.006);
   object.add(holder);
-  const len = kind === 'pick' ? 0.085 : 0.115;
+  const len = kind === 'pick' ? 0.085 : kind === 'spoon' || kind === 'fork' ? 0.1 : 0.115;
   if (kind === 'pick') holder.add(piece(new THREE.CylinderGeometry(0.0022, 0.0034, len, 6), '#ff8fb2', { at: [0, len / 2 - 0.012, 0], mat: 'gloss' }));
-  else for (const s of [-1, 1]) holder.add(piece(new THREE.CylinderGeometry(0.0016, 0.0026, len, 6), '#dcb684', { at: [s * 0.003, len / 2 - 0.015, 0], rot: [0, 0, s * 0.03], mat: 'wood' }));
+  else if (kind === 'spoon' || kind === 'fork') {
+    // a little steel spoon or fork, its handle flattened
+    holder.add(piece(new THREE.BoxGeometry(0.006, len * 0.72, 0.0022), '#d9dbe2', { at: [0, len * 0.36 - 0.014, 0], mat: 'metal' }));
+    if (kind === 'spoon') holder.add(piece(new THREE.SphereGeometry(0.0085, 12, 8, 0, TAU, 0, Math.PI / 2), '#e4e6ec', { at: [0, len - 0.02, 0.001], rot: [-Math.PI / 2, 0, 0], scale: [1, 1.35, 0.42], mat: 'metal' }));
+    else for (let i = 0; i < 4; i++) holder.add(piece(new THREE.BoxGeometry(0.0013, 0.016, 0.0013), '#e4e6ec', { at: [(i - 1.5) * 0.0025, len - 0.022, 0], mat: 'metal' }));
+  } else for (const s of [-1, 1]) holder.add(piece(new THREE.CylinderGeometry(0.0016, 0.0026, len, 6), '#dcb684', { at: [s * 0.003, len / 2 - 0.015, 0], rot: [0, 0, s * 0.03], mat: 'wood' }));
   const tip = mark(0, len - 0.015, 0);
   holder.add(tip);
-  // the mouthful: noodles hanging from the chopsticks, or a rice cake on the pick
+  // the mouthful: noodles hanging from the chopsticks, a rice cake on the pick, a spoonful, a forkful
   const bite = new THREE.Group();
   bite.position.copy(tip.position);
   if (morsel === 'noodles') {
@@ -421,7 +393,11 @@ export function makeUtensil(kind, morsel) {
       const pts = [V(0, 0, 0), V((i - 1) * 0.004, 0.006, 0.012), V((i - 1) * 0.006, 0.002, 0.026), V((i - 1) * 0.005, -0.004, 0.034)];
       bite.add(piece(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 10, 0.0016, 4), '#efe2c4', { mat: 'gloss' }));
     }
-  } else bite.add(piece(new THREE.CapsuleGeometry(0.0062, 0.02, 3, 8), ['#f06a46', '#f7a283'], { rot: [0, 0, Math.PI / 2], mat: 'gloss' }));
+  } else if (morsel === 'rice') bite.add(piece(new THREE.SphereGeometry(0.0075, 10, 6), '#e8743a', { at: [0, -0.004, 0.003], scale: [1, 0.6, 1.2] }));
+  else if (morsel === 'pudding') bite.add(piece(new THREE.SphereGeometry(0.0072, 10, 6), '#f6cf6a', { at: [0, -0.004, 0.003], scale: [1, 0.6, 1.2], mat: 'gloss' }));
+  else if (morsel === 'pancake') bite.add(piece(new THREE.CylinderGeometry(0.009, 0.009, 0.007, 3), (q, n) => (Math.abs(n.y) > 0.5 ? C('#c97a2c') : C('#f2c27a')), { at: [0, 0.006, 0], rot: [Math.PI / 2, 0, 0] }));
+  else if (morsel === 'roll') bite.add(piece(new THREE.CylinderGeometry(0.0095, 0.0095, 0.011, 14), '#ffcf4a', { rot: [0, 0, Math.PI / 2] }));
+  else bite.add(piece(new THREE.CapsuleGeometry(0.0062, 0.02, 3, 8), ['#f06a46', '#f7a283'], { rot: [0, 0, Math.PI / 2], mat: 'gloss' }));
   bite.visible = false;
   holder.add(bite);
   object.traverse((o) => {

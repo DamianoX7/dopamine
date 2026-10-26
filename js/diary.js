@@ -160,6 +160,15 @@ const Diary = {
     if (wear.length) add('👗', `${wear.length > 1 ? `‘${wear[0]}’ 외 ${wear.length - 1}개를` : quoted(wear[0], '을/를')} 새로 사서 입었어요`);
     const food = d.food || [];
     if (food.length) add('🛵', `${food.length > 1 ? `‘${food[0]}’ 외 ${food.length - 1}개를` : quoted(food[0], '을/를')} 배달시켜 먹었어요`);
+    const cooked = d.cook || [];
+    if (cooked.length) add('🍳', `${cooked.length > 1 ? `‘${cooked[0]}’ 외 ${cooked.length - 1}가지를` : quoted(cooked[0], '을/를')} 만들어 먹었어요`);
+    const shop = d.shop || [];
+    if (shop.length) add('🏪', `편의점에서 ${shop.length > 1 ? `‘${shop[0]}’ 외 ${shop.length - 1}개를` : quoted(shop[0], '을/를')} 샀어요`);
+    const cafe = d.cafe || [];
+    if (cafe.length) add('☕', `카페에서 ${cafe.length > 1 ? `‘${cafe[0]}’ 외 ${cafe.length - 1}잔을` : quoted(cafe[0], '을/를')} 마셨어요`);
+    const coin = d.coin || [];
+    if (coin.length) add('🎤', `코인노래방에서 ${coin.length > 1 ? `‘${coin[0]}’ 외 ${coin.length - 1}곡을` : quoted(coin[0], '을/를')} 불렀어요`);
+    else if (d.townOut && !shop.length && !cafe.length) add('🏘️', '동네에 산책 나갔어요');
     if (d.dream) add('💭', `${d.dream}의 꿈 이야기를 들었어요`);
     if (d.moon) add('🌕', '보름달에 소원을 빌었어요');
     else if (d.gazed) add('🌙', `여우들이랑 밤하늘의 ${josa(d.gazed, '을/를')} 올려다봤어요`);
