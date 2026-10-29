@@ -7,7 +7,7 @@
 // turns the street round, two bring it closer; a tap on the ground sends her there, a tap on a shop takes her in.
 //
 // Its light is the hour's, as the house's is: the real sun across the street (and its shadows), the evening, the night
-// with the lamps lit and the shops' windows bright — and Seoul's weather: rain, snow; the trees as the year has them.
+// with the lamps lit and the shops' windows bright — and Incheon's weather: rain, snow; the trees as the year has them.
 //
 // The town is the "world" the people in it see (person.js): it has their time, their camera, their way about (grid.js)
 // and the bubbles they speak in (the house's). What they do here that they do nowhere else is ownTask() below.
@@ -20,6 +20,7 @@ import { Fx } from './fx.js';
 import { V } from './shapes.js';
 import { makeFood } from './food.js';
 import { pose } from './person.js';
+import { Bus, BUS } from './bus.js';
 
 const FOV = 38;
 const YAW = -0.3; //        where the camera looks from at first: in front, a little to the left…
@@ -34,6 +35,12 @@ const ZOOM_MIN = 0.35;
 const ZOOM_MAX = 1.8;
 const TAP = 9;
 const WALK_OUT = 0.86; //   (out of doors she walks a little brisker than about the house)
+// the village bus (bus.js): how fast it goes along the street, how hard it brakes for the stop and pulls away from it;
+// how far it has gone again when the ride begins (js/bus.js: the screen of the ride covers the street)
+const BUS_TOP = 5.2;
+const BUS_BRAKE = 2.4;
+const BUS_PULL = 2.3;
+const BUS_AWAY = 6.5;
 const _v = V();
 const _w = V();
 const _c = new THREE.Color();
@@ -214,8 +221,8 @@ export class Town {
     map.group.traverse((o) => {
       if (o.isMesh && o.userData.tap) this.tapTargets.push(o);
     });
-    // what can stand between the camera and her: her cottage, the trees — it fades while it does
-    this.fadeables = [map.home.group, ...map.trees.map((t) => t.group)].map((group) => {
+    // what can stand between the camera and her: her cottage, the trees, the bus stop's roof — it fades while it does
+    this.fadeables = [map.home.group, ...map.trees.map((t) => t.group), map.stop.roof].map((group) => {
       const mats = new Set();
       const meshes = [];
       group.traverse((o) => {
@@ -234,6 +241,12 @@ export class Town {
     this.karaokeRoof.userData.tap = 'karaoke';
     scene.add(this.karaokeRoof);
     this.tapTargets.push(this.karaokeRoof);
+    // the village bus to the foxes: off the board until it is wanted (see coach)
+    this.bus = new Bus();
+    scene.add(this.bus.group);
+    this.bus.group.traverse((o) => o.isMesh && this.tapTargets.push(o));
+    this.coach = null; // …on its way: { phase: 'hold' | 'come' | 'stop' | 'go' | 'gone', x, v, door, t, to: 'fox' | 'town', boarded, off }
+    this.busLook = V(); // (where she looks while it comes)
   }
 
   get time() {
@@ -272,8 +285,9 @@ export class Town {
 
   // ---------------------------------------------------------------- shown, or not
 
-  /** The town is shown (`me`: the girl, out of her door): the street's people at their posts, the camera on her. */
-  show(me) {
+  /** The town is shown (`me`: the girl, out of her door — or, `by` 'bus', on the bus from the foxes' village): the
+   *  street's people at their posts, the camera on her. */
+  show(me, by = 'door') {
     this.me = me;
     me.world = this;
     this.scene.add(me.rig.group);
@@ -282,25 +296,43 @@ export class Town {
     this.barista.place();
     this.place = 'street';
     this.busy = null;
-    // she comes out of her front door
+    this.coach = null;
+    this.stray = null; //  (뭉치: whether it is out here this time is the app's to say — catAppear)
+    this.catTrust = 0;
     const H = this.places.home;
+    const B = this.places.bus;
     const a = me.anim;
-    a.pos.copy(H.inside);
-    a.yaw = 0; // (out of her door, towards the street)
     a.pitch = 0;
     a.air = 0;
     a.still();
     a.setPose('stand', 30);
-    a.snap();
     me.seat = me.abed = null;
-    me.tasks = [{ do: 'town', step: 'homeDoor', open: true }, { do: 'walk', to: H.outside.clone(), direct: true }, { do: 'town', step: 'homeDoor', open: false }, { do: 'walk', to: H.gate.clone() }, { do: 'say', line: 'out' }];
     me.task = null;
     this.homeDoor = 0;
     this.homeWant = 0;
-    // the camera: by her door, as it swings in
+    let at = H.gate;
+    if (by === 'bus') {
+      // she is on the bus: out of sight until it has stopped and its door is open — then she gets off (it waits off the
+      // board until the app says: busIn)
+      a.pos.copy(B.inside);
+      a.yaw = 0;
+      me.rig.group.visible = false;
+      me.tasks = [{ do: 'town', step: 'alight' }, { do: 'walk', to: B.wait.clone(), direct: true }, { do: 'town', step: 'seeOff' }, { do: 'face' }, { do: 'say', line: 'bus_home' }];
+      this.busy = 'bus';
+      this.coach = { phase: 'hold', x: this.busFrom(), v: BUS_TOP, door: 0, t: 0, to: 'town' };
+      this.bus.setSign('우리동네');
+      at = B.kerb;
+    } else {
+      // she comes out of her front door
+      a.pos.copy(H.inside);
+      a.yaw = 0; // (out of her door, towards the street)
+      me.tasks = [{ do: 'town', step: 'homeDoor', open: true }, { do: 'walk', to: H.outside.clone(), direct: true }, { do: 'town', step: 'homeDoor', open: false }, { do: 'walk', to: H.gate.clone() }, { do: 'say', line: 'out' }];
+    }
+    a.snap();
+    // the camera: by her door (or the stop), as it swings in
     const tall = this.camera.aspect < 0.78;
     Object.assign(this.view, { yaw: tall ? YAW_TALL : YAW, pitch: PITCH, zoom: ZOOM0 });
-    this.view.target.set(H.gate.x, 0.6, H.gate.z);
+    this.view.target.set(at.x, 0.6, at.z);
     Object.assign(this.cam, { yaw: this.view.yaw + 0.4, pitch: this.view.pitch - 0.1, zoom: ZOOM0 * 1.25 });
     this.cam.target.copy(this.view.target);
     this.follow = 0;
@@ -313,6 +345,9 @@ export class Town {
     this.barista.hide();
     this.stopSinging();
     this.busy = null;
+    this.coach = null;
+    this.bus.group.visible = false;
+    if (this.me) this.me.rig.group.visible = true; // (she was on the bus)
     this.me = null;
     for (const s of this.map.swings) {
       s.rider = null;
@@ -355,6 +390,9 @@ export class Town {
         : [{ do: 'walk', to: s.outside.clone() }, { do: 'face', at: s.door.clone().add(V(0, 1, 0)) }, { do: 'town', step: 'shut' }];
     } else if (place === 'park') {
       tasks = [{ do: 'walk', to: P.park.gate.clone() }, { do: 'walk', to: P.park.inside.clone() }, { do: 'town', step: 'arrive', place: 'park' }];
+    } else if (place === 'bus') {
+      // to the bus stop: there she looks down the road, where the bus comes from
+      tasks = [{ do: 'walk', to: P.bus.wait.clone() }, { do: 'face', at: P.bus.look.clone() }, { do: 'town', step: 'arrive', place: 'bus' }];
     } else if (place === 'street') {
       // out of the shop she is in (or just a step along the pavement)
       const shop = P[this.prevPlace];
@@ -463,6 +501,255 @@ export class Town {
     }
   }
 
+  // ---------------------------------------------------------------- the village bus
+
+  /** Where it comes from (off the board, to the left: it keeps to the right of the road, as at home) and goes to. */
+  busFrom() {
+    return BOARD.x0 - BUS.L / 2 - 0.1;
+  }
+
+  busTo() {
+    return BOARD.x1 + BUS.L / 2 + 0.1;
+  }
+
+  /** Where it stands at the stop: its door before the shelter. */
+  busStopX() {
+    return this.places.bus.doorX - (BUS.door.x0 + BUS.door.x1) / 2;
+  }
+
+  /** She takes the bus to the foxes' village: it is on its way at once; she waits for it at the kerb, gets on when its
+   *  door opens (her card to the reader: beep) — and off it goes, with her. The app is told once it has gone a way
+   *  (host.onTown('bus')): the ride itself is its. → false if she cannot now. */
+  busOut() {
+    const me = this.me;
+    if (!me || this.busy) return false;
+    const B = this.places.bus;
+    this.place = 'bus';
+    this.busy = 'bus';
+    this.follow = 0;
+    this.coach = { phase: 'come', x: this.busFrom(), v: BUS_TOP, door: 0, t: 0, to: 'fox' };
+    this.bus.setSign('여우마을');
+    this.world.sound('busCome');
+    this.send(me, [{ do: 'walk', to: B.wait.clone() }, { do: 'face', at: B.look.clone() }, { do: 'town', step: 'busWait' }, { do: 'walk', to: B.kerb.clone(), direct: true }, { do: 'town', step: 'board' }]);
+    return true;
+  }
+
+  /** The bus she is on (show: 'bus') comes along now (the app: the ride's screen has gone). */
+  busIn() {
+    const c = this.coach;
+    if (!c || c.phase !== 'hold') return false;
+    c.phase = 'come';
+    c.t = 0;
+    this.world.sound('busCome');
+    return true;
+  }
+
+  /** (The ride could not be: she is off it again, at the kerb — as if she had changed her mind.) */
+  busBack() {
+    const me = this.me;
+    this.coach = null;
+    this.bus.group.visible = false;
+    this.busy = null;
+    if (!me) return;
+    const B = this.places.bus;
+    me.rig.group.visible = true;
+    me.anim.pos.copy(B.kerb);
+    me.anim.air = 0;
+    me.anim.yaw = 0;
+    me.anim.setPose('stand', 30);
+    me.anim.snap();
+    me.task = null;
+    me.tasks = [{ do: 'face' }];
+    this.place = 'street';
+  }
+
+  /*
+   * The bus along the street: on its way to the stop (braking for it), standing there with its door open while she gets
+   * on (or off), pulling away — and off the board. It fades in where it comes onto the board, and out where it leaves.
+   */
+  updateCoach(dt) {
+    const c = this.coach;
+    const bus = this.bus;
+    if (!c || c.phase === 'hold') {
+      bus.group.visible = false;
+      return;
+    }
+    const lane = this.places.bus.lane;
+    const stopX = this.busStopX();
+    const v0 = c.v;
+    c.t += dt;
+    if (c.phase === 'come') {
+      // (only ever slower: as fast as it can go and still stop at the stop)
+      const left = stopX - c.x;
+      c.v = Math.min(c.v, BUS_TOP, Math.sqrt(2 * BUS_BRAKE * Math.max(0, left)) + 0.12);
+      c.x = Math.min(stopX, c.x + c.v * dt);
+      if (c.x >= stopX - 0.002) {
+        c.x = stopX;
+        c.v = 0;
+        c.phase = 'stop';
+        c.t = 0;
+        this.world.sound('busHiss');
+      }
+    } else if (c.phase === 'stop') {
+      // its door opens a moment after it stops; shuts when she is on (or off); and a moment later it pulls away
+      const done = c.to === 'fox' ? c.boarded : c.off;
+      const want = done ? 0 : c.t > 0.45 ? 1 : 0;
+      if (want !== c.want) {
+        c.want = want;
+        this.world.sound('busDoor');
+      }
+      c.door = clamp(c.door + (want ? 1 : -1) * dt * 1.9, 0, 1);
+      if (done && c.door <= 0) {
+        c.shut = (c.shut || 0) + dt;
+        if (c.shut > 0.35) {
+          c.phase = 'go';
+          c.t = 0;
+          this.world.sound('busGo');
+        }
+      }
+    } else if (c.phase === 'go') {
+      c.v = Math.min(BUS_TOP * 1.15, c.v + BUS_PULL * dt);
+      c.x += c.v * dt;
+      if (c.to === 'fox' && !c.told && c.x > stopX + BUS_AWAY) {
+        c.told = true;
+        this.host.onTown('bus');
+      }
+      if (c.x > this.busTo()) {
+        // off the board: gone (with her on it, the street waits for the ride to take her away)
+        this.coach = c.to === 'fox' ? { ...c, phase: 'gone' } : null;
+        bus.group.visible = false;
+        return;
+      }
+    } else return void (bus.group.visible = false); // ('gone')
+    bus.group.visible = true;
+    bus.group.position.set(c.x, 0, lane);
+    bus.setDoor(ease(c.door));
+    const L = BUS.L;
+    bus.setFade(Math.min(clamp((c.x + L / 2 - BOARD.x0) / L, 0, 1), clamp((BOARD.x1 - (c.x - L / 2)) / L, 0, 1)));
+    bus.update(dt, this.time, c.v * dt, (c.v - v0) / Math.max(dt, 1e-4), c.phase === 'stop');
+  }
+
+  // ---------------------------------------------------------------- 뭉치, the white stray (cat.js; the app's: js/cat.js)
+
+  /** Where it may be found: on the bench at the bus stop, on the park's bench, by the store's door, under the big tree,
+   *  by her own gate, on the park's grass. (`h`: how high up it is.) */
+  catSpots() {
+    const P = this.places;
+    return [
+      { at: V(-0.72, 0, 2.92), yaw: Math.PI + 0.3, h: 0.44 },
+      { at: V(-5.65, 0, 3.17), yaw: 0.25, h: 0.44 },
+      { at: P.store.outside.clone().add(V(0.8, 0, -0.12)), yaw: 0.4, h: 0 },
+      { at: V(8.7, 0, 4.25), yaw: -0.5, h: 0 },
+      { at: P.home.gate.clone().add(V(0.9, 0, 0.12)), yaw: 0.3, h: 0 },
+      { at: V(-6.7, 0, 4.4), yaw: 0.6, h: 0 },
+    ];
+  }
+
+  /** An open place on the ground near `p`. */
+  freeNear(p) {
+    const cell = this.grid.nearestOpen(p);
+    return cell ? this.grid.centre(...cell) : p.clone();
+  }
+
+  /** It is out on the street this time (the app has rolled for it): at its spot `i`; how far it trusts her (0 … 5). */
+  catAppear(i, trust) {
+    const cat = this.world.cat;
+    const s = this.catSpots()[i % 6];
+    this.stray = s;
+    this.catTrust = trust;
+    cat.setWorld(this);
+    cat.following = false;
+    cat.show(s.at, s.yaw, s.h, []);
+    return true;
+  }
+
+  /** …a meow, to be found by. */
+  catCall() {
+    const cat = this.world.cat;
+    if (cat.on && cat.world === this) cat.do([{ do: 'meow' }]);
+  }
+
+  /** What it does next, out here (cat.js asks): after her, taken home; wary of her if she comes near (and it does not
+   *  know her yet), glad of her if it does; otherwise at its spot — a loaf, a groom, a nap, a look about. */
+  planCat(cat) {
+    const T = cat.tasks;
+    const me = this.me;
+    const s = this.stray;
+    if (cat.following) return void T.push({ do: 'follow', until: () => !cat.following });
+    const d = me && me.on ? Math.hypot(me.pos.x - cat.pos.x, me.pos.z - cat.pos.z) : 99;
+    if (d < 1.4 && this.place !== 'cat' && this.catTrust < 2) return void T.push({ do: 'wary', t: 4, until: () => !this.me || Math.hypot(this.me.pos.x - cat.pos.x, this.me.pos.z - cat.pos.z) > 2 });
+    if (d < 1.6 && this.place !== 'cat' && this.catTrust >= 2 && !this.busy && cat.perch < 0.05 && Math.random() < 0.5) {
+      return void T.push({ do: 'walk', to: this.freeNear(me.pos.clone().add(V(0.3, 0, 0.2))), fast: true }, { do: 'rub', t: 3 });
+    }
+    if (!s) return void T.push({ do: 'sit', t: 3 });
+    if (Math.hypot(cat.pos.x - s.at.x, cat.pos.z - s.at.z) > 0.25 || Math.abs(cat.perch - s.h) > 0.05) {
+      if (s.h > 0.05) {
+        const below = this.freeNear(s.at.clone().add(V(Math.sin(s.yaw) * 0.45, 0, Math.cos(s.yaw) * 0.45)));
+        T.push({ do: 'walk', to: below }, { do: 'hop', to: s.at.clone(), h: s.h });
+      } else T.push({ do: 'walk', to: s.at.clone() });
+    }
+    const r = Math.random();
+    T.push(r < 0.3 ? { do: 'loaf', t: 6 + Math.random() * 8 } : r < 0.55 ? { do: 'groom', t: 3 + Math.random() * 3 } : r < 0.7 ? { do: 'sleep', t: 8 + Math.random() * 10 } : { do: 'sit', t: 4 + Math.random() * 5 });
+  }
+
+  /** She goes to it (a tap on it): down by it — it is wary of her, or comes to her. → false if she cannot now. */
+  catGo() {
+    const me = this.me;
+    const cat = this.world.cat;
+    if (!me || this.busy || !cat.on || cat.world !== this) return false;
+    const toHer = Math.atan2(me.pos.x - cat.pos.x, me.pos.z - cat.pos.z);
+    const kneel = this.freeNear(cat.pos.clone().add(V(Math.sin(toHer) * 0.46, 0, Math.cos(toHer) * 0.46)));
+    this.place = 'cat';
+    this.follow = 0;
+    this.busy = 'cat';
+    this.send(me, [{ do: 'walk', to: kneel }, { do: 'face', at: cat.pos.clone() }, { do: 'town', step: 'catNear' }]);
+    cat.do(this.catTrust < 2 ? [{ do: 'wary', t: 3.5 }] : [{ do: 'face', at: kneel }, { do: 'meow', line: 'hi' }, { do: 'sit', t: 3 }]);
+    return true;
+  }
+
+  /** She holds out a churu: it comes and licks it up. */
+  catFeed() {
+    const me = this.me;
+    const cat = this.world.cat;
+    if (!me || this.busy || !cat.on || cat.world !== this) return false;
+    this.busy = 'cat';
+    this.place = 'cat';
+    this.send(me, [{ do: 'face', at: cat.pos.clone() }, { do: 'feedCat', cat, t: 4.6, done: () => ((this.busy = null), this.host.onTown('catFed')) }]);
+    return true;
+  }
+
+  /** She strokes it: it leans into her hand. */
+  catPet() {
+    const me = this.me;
+    const cat = this.world.cat;
+    if (!me || this.busy || !cat.on || cat.world !== this) return false;
+    this.busy = 'cat';
+    this.place = 'cat';
+    const at = me.pos.clone();
+    cat.do([{ do: 'face', at }, { do: 'petted', t: 99 }]);
+    this.send(me, [{ do: 'face', at: cat.pos.clone() }, { do: 'petCat', cat, t: 3.6, done: () => ((this.busy = null), this.host.onTown('catPetted')) }]);
+    return true;
+  }
+
+  /** How far it trusts her now (it has been fed, stroked: js/cat.js). */
+  catTrustIs(n) {
+    this.catTrust = n;
+  }
+
+  /** She takes it home: "뭉치야, 우리 집에 가자!" — it comes along after her, home she goes, and in it comes behind her
+   *  (world.js backHome: catComeIn). */
+  catAdopt() {
+    const me = this.me;
+    const cat = this.world.cat;
+    if (!me || !cat.on || cat.world !== this) return false;
+    this.busy = null;
+    cat.following = true;
+    cat.do([{ do: 'meow', line: 'yes' }, { do: 'follow', until: () => !cat.following }]);
+    if (!this.go('home')) return false;
+    me.tasks.unshift({ do: 'say', line: 'cat_adopt' }, { do: 'wait', t: 1.4 });
+    return true;
+  }
+
   setKaraokeOpen(open) {
     if (open === this.karaokeOpen) return;
     this.karaokeOpen = open;
@@ -478,6 +765,11 @@ export class Town {
     const P = this.places;
     const r = Math.random();
     const near = (p) => me.pos.distanceTo(p) < 5;
+    const cat = this.world.cat;
+    if (this.place === 'cat' && cat.on && cat.world === this) {
+      // (by 뭉치, while she makes up her mind what to do: down by it, her eyes on it)
+      return void me.tasks.push({ do: 'look', at: cat.headPoint(V()).clone(), t: 3, line: null, pose: cat.perch > 0.2 ? 'bend' : 'pet' });
+    }
     if (this.place === 'store') {
       const b = P.store.browse[Math.floor(Math.random() * P.store.browse.length)];
       return void me.tasks.push({ do: 'walk', to: b.at.clone() }, { do: 'look', at: b.face, t: 3 + Math.random() * 3, line: b.line, pose: 'look' });
@@ -503,6 +795,15 @@ export class Town {
       const l = P.park.look[Math.floor(Math.random() * P.park.look.length)];
       this.last = l.line;
       return void me.tasks.push({ do: 'walk', to: l.at.clone() }, { do: 'look', at: l.face, t: 3 + Math.random() * 3, line: l.line, pose: l.line === 'park_pigeon' ? 'bend' : 'look' });
+    }
+    if (this.place === 'bus') {
+      // at the bus stop: an eye down the road, where it will come from — or a sit on the bench under the shelter
+      if (r < 0.35 && this.last !== 'busBench') {
+        this.last = 'busBench';
+        return void me.tasks.push({ do: 'sit', seat: P.street.bench[0], t: 6 + Math.random() * 5, line: 'bus_wait' });
+      }
+      this.last = 'busLook';
+      return void me.tasks.push({ do: 'walk', to: P.bus.wait.clone() }, { do: 'look', at: P.bus.look, t: 3 + Math.random() * 2, line: 'bus_wait', pose: 'look' });
     }
     // on the street: a look at something near, a sit on a bench, a little stroll — or she waits a moment
     const looks = P.street.look.filter((l) => near(l.at));
@@ -574,6 +875,20 @@ export class Town {
         return true;
       }
       return false;
+    }
+    if (step === 'busWait' || step === 'board' || step === 'alight' || step === 'seeOff') return this.busTask(p, t, dt);
+    if (step === 'catNear') {
+      // down by 뭉치: a word to it — and the app asks what she will do (js/cat.js)
+      const cat = this.world.cat;
+      if (!t.said) {
+        t.said = true;
+        a.setPose(cat.perch > 0.2 ? 'bend' : 'pet', 5);
+        p.say(this.catTrust < 1 ? 'cat_spot' : 'cat_hi');
+      }
+      if (t.age < 1.2) return false;
+      this.busy = null;
+      this.host.onTown('catNear');
+      return true;
     }
     if (step === 'till') return this.till(p, t, dt);
     if (step === 'stash') {
@@ -736,6 +1051,124 @@ export class Town {
       default:
         return true;
     }
+  }
+
+  /*
+   * On and off the bus: waiting for it at the kerb (her eyes on it as it comes, until it stands there with its door
+   * open); up its step, her card to the reader — beep — and in (out of sight: she goes where it goes); or, come home on
+   * it, out of its door and down onto the pavement — and from there she waves it off, until it has gone.
+   */
+  busTask(p, t, dt) {
+    const a = p.anim;
+    const c = this.coach;
+    const B = this.places.bus;
+    if (t.step === 'seeOff') {
+      if (!c || c.phase === 'gone') {
+        a.look = null;
+        a.lookW = 0;
+        a.still();
+        a.setPose('stand', 6);
+        this.busy = null;
+        return true;
+      }
+      this.busLook.set(c.x + 1.4, 1.0, B.lane);
+      a.look = this.busLook;
+      a.lookW = damp(a.lookW, 0.85, 4, dt);
+      p.turnTo(Math.atan2(this.busLook.x - a.pos.x, this.busLook.z - a.pos.z), dt);
+      if (c.phase === 'go' && !t.waved) {
+        t.waved = t.age;
+        a.setPose('wave', 7);
+      }
+      if (t.waved) {
+        const k = t.age - t.waved;
+        a.add.aRt = Math.sin(k * 11) * 0.25 * (k < 2.4 ? 1 : 0);
+        if (k > 2.4 && !t.down) {
+          t.down = true;
+          a.still();
+          a.setPose('stand', 6);
+        }
+      }
+      return t.age > 16;
+    }
+    if (t.step === 'busWait') {
+      if (!c) return true;
+      if (c.phase === 'come') {
+        this.busLook.set(c.x + 1, 0.9, B.lane);
+        a.look = this.busLook;
+        a.lookW = damp(a.lookW, 0.85, 4, dt);
+      }
+      if (!t.said && t.age > 0.6) {
+        t.said = true;
+        p.say('bus_wait');
+      }
+      if (c.phase === 'stop' && c.door > 0.85) {
+        a.look = null;
+        a.lookW = 0;
+        return true;
+      }
+      return t.age > 20; // (should it never come)
+    }
+    t.k = (t.k || 0) + dt;
+    if (t.step === 'board') {
+      if (!t.k0) {
+        t.k0 = 1;
+        t.from = a.pos.clone();
+      }
+      p.turnTo(Math.PI, dt);
+      if (t.k < 0.55) {
+        // up onto its step
+        const k = ease(t.k / 0.55);
+        a.pos.lerpVectors(t.from, B.step, k);
+        a.air = 0.07 * k;
+        a.speed = 0.45;
+        return false;
+      }
+      if (!t.beeped) {
+        t.beeped = true;
+        a.setPose('offer', 8);
+        this.world.sound('beep');
+        p.say('bus_card');
+      }
+      if (t.k < 1.15) return false;
+      if (!t.posed) {
+        t.posed = true;
+        a.setPose('stand', 6);
+      }
+      // …and in
+      const k = Math.min(1, (t.k - 1.15) / 0.5);
+      a.pos.lerpVectors(B.step, B.inside, k);
+      a.speed = 0.45;
+      if (k >= 1 && p.rig.group.visible) {
+        p.rig.group.visible = false;
+        this.world.hush('me');
+        if (c) c.boarded = true;
+      }
+      return false; // (on board: where the bus goes, she goes)
+    }
+    // ('alight') on the bus until its door is open
+    if (!t.out) {
+      if (c && !(c.phase === 'stop' && c.door > 0.85)) return false;
+      t.out = true;
+      t.k = 0;
+      p.rig.group.visible = true;
+      a.pos.copy(B.inside);
+      a.yaw = 0;
+      a.air = 0.07;
+      a.snap();
+      return false;
+    }
+    const k = Math.min(1, t.k / 1.0);
+    if (k < 0.4) a.pos.lerpVectors(B.inside, B.step, k / 0.4);
+    else {
+      const k2 = ease((k - 0.4) / 0.6);
+      a.pos.lerpVectors(B.step, B.kerb, k2);
+      a.air = 0.07 * (1 - k2);
+    }
+    a.speed = 0.45;
+    if (k < 1) return false;
+    a.air = 0;
+    if (c) c.off = true; // (its door shuts, and off it goes: she sees it off — busy until it has gone)
+    return true;
   }
 
   /* The café: she orders; the owner makes it at the machine, brings it over — she takes it to a table and drinks it. */
@@ -1013,7 +1446,7 @@ export class Town {
 
   // ---------------------------------------------------------------- the light of the hour, the weather, the year
 
-  /** As the house's apply(): the sky over Seoul, its weather, the season — and whether the karaoke is open yet. */
+  /** As the house's apply(): the sky over Incheon, its weather, the season — and whether the karaoke is open yet. */
   setLook(look) {
     const s = look.sky || {};
     const night = s.dark ? 1 : clamp(s.blue || 0, 0, 1);
@@ -1069,6 +1502,8 @@ export class Town {
     // the night: the lamps, the signs, the windows
     const on = night > 0.45 ? 1 : 0;
     this.lampsOn = on;
+    this.bus.setNight(on);
+    this.map.stop.redraw(look.shut ? look.opens || '' : '');
     this.map.lamps.forEach((l) => (l.glow.material.opacity = on * 0.55));
     for (const g of this.map.glows) {
       const k = g.base || 0;
@@ -1108,10 +1543,13 @@ export class Town {
 
   update(dt) {
     const t = this.time;
-    // the camera with her (unless she has just moved it herself)
+    this.updateCoach(dt);
+    // the camera with her (unless she has just moved it herself) — or with the bus she is on
     this.follow = Math.max(0, this.follow - dt);
+    const c = this.coach;
+    const riding = c && c.boarded && (c.phase === 'stop' || c.phase === 'go');
     if (this.me && this.follow <= 0) {
-      const p = this.me.pos;
+      const p = riding ? _w.set(c.x + 1.2, 0, this.places.bus.lane) : this.me.pos;
       this.view.target.x = damp(this.view.target.x, p.x, 2.2, dt);
       this.view.target.z = damp(this.view.target.z, p.z, 2.2, dt);
       this.view.target.y = 0.6;
@@ -1144,6 +1582,8 @@ export class Town {
       who.light(_c, sun);
       who.update(dt);
     }
+    const cat = this.world.cat;
+    if (cat.on && cat.world === this) cat.update(dt); // (뭉치, the stray: cat.js)
     this.weather.update(dt, tg);
     this.falling.update(dt, t);
     this.fx.update(dt);
@@ -1172,7 +1612,7 @@ export class Town {
   seeThrough(dt) {
     const me = this.me;
     const cam = this.camera.position;
-    if (me) {
+    if (me && me.rig.group.visible) {
       const pts = [me.headPoint(_w).clone(), me.pos.clone().add(V(0, 0.3, 0))];
       for (const f of this.fadeables) {
         f.want = 1;
@@ -1183,7 +1623,7 @@ export class Town {
         }
         _ray.far = Infinity;
       }
-    }
+    } else for (const f of this.fadeables) f.want = 1; // (she is on the bus: nothing to see her through)
     for (const f of this.fadeables) {
       const k = damp(f.k, f.want, 8, dt);
       if (Math.abs(k - f.k) < 1e-4 && k === f.want) continue;
@@ -1337,7 +1777,7 @@ export class Town {
   /** What is under (x, y): { kind, point } — a shop, her house, the swings… one of the people — or the ground. */
   pick(x, y) {
     const ray = this.ray(x, y);
-    const people = [this.me, this.clerk, this.barista].filter((p) => p && p.on);
+    const people = [this.me, this.clerk, this.barista, this.world.cat].filter((p) => p && p.on && (p !== this.world.cat || p.world === this));
     const targets = [...this.tapTargets];
     for (const p of people) targets.push(...p.meshes());
     const hits = ray.intersectObjects(targets, false).filter((h) => this.visibleUp(h.object) && h.object.type !== 'Sprite' && h.object.type !== 'Line');

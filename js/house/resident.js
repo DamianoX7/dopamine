@@ -18,6 +18,7 @@ import { makeFood, makeUtensil, makePhone } from './food.js';
 import { Cooking } from './kitchen.js';
 import { disposeTree } from '../fox/kit.js';
 import { V } from './shapes.js';
+import { makeChuru } from './cat.js';
 
 const SLEEP_FROM = 23.5; // she goes to bed at half past eleven…
 const WAKE_AT = 7; //       …and is up at seven
@@ -252,6 +253,62 @@ export class Resident extends Person {
       if (t.do === 'sit') t.t = 0; // (and up again)
     }
     super.update(dt);
+  }
+
+  /**
+   * Down by 뭉치 (house world catPet, or the stray on the street), her hand over its head and down its back, again and
+   * again — standing, if it is up on something. When she is done, so is it (its 'petted').
+   */
+  petCat(t, dt) {
+    const a = this.anim;
+    const cat = t.cat;
+    if (!cat || !cat.on) return true;
+    if (!t.posed) {
+      t.posed = true;
+      a.setPose(cat.perch > 0.2 ? 'bend' : 'pet', 5);
+      if (t.line !== null) this.say(t.line || 'cat_pet');
+      if (this.world.frameCat) this.world.frameCat(cat); // (at home, the camera comes down to the two of them)
+    }
+    const head = cat.headPoint(_p);
+    const yaw = cat.anim.yaw;
+    const back = 0.5 - 0.5 * Math.cos(t.age * 4.2);
+    a.reach = { side: 'R', point: _q.set(head.x - Math.sin(yaw) * 0.07 * back, head.y + 0.012 - 0.012 * back, head.z - Math.cos(yaw) * 0.07 * back) };
+    a.mood.smile = 1;
+    if (t.age < t.t) return false;
+    a.reach = null;
+    a.setPose('stand', 5);
+    if (cat.task && cat.task.do === 'petted') cat.task.t = 0;
+    if (t.done) t.done();
+    return true;
+  }
+
+  /** Down by it, a churu (a stick of cat treat) held out to it — it comes and licks it up; she holds it for it. */
+  feedCat(t, dt) {
+    const a = this.anim;
+    const cat = t.cat;
+    if (!cat || !cat.on) return true;
+    if (!t.posed) {
+      t.posed = true;
+      a.setPose(cat.perch > 0.2 ? 'bend' : 'pet', 5);
+      this.hold('R', makeChuru());
+      this.say('cat_feed');
+      if (this.world.frameCat) this.world.frameCat(cat);
+      // where her hand will be: before her, low — and it comes to it
+      const f = V(Math.sin(a.yaw), 0, Math.cos(a.yaw));
+      t.hand = V(a.pos.x + f.x * 0.36, cat.perch + 0.16, a.pos.z + f.z * 0.36);
+      const stand = V(a.pos.x + f.x * 0.52, 0, a.pos.z + f.z * 0.52);
+      if (cat.perch > 0.2) cat.do([{ do: 'face', at: a.pos.clone() }, { do: 'eat', t: t.t - 0.6 }]);
+      else cat.do([{ do: 'walk', to: stand, direct: true, stop: 0.03 }, { do: 'face', at: a.pos.clone() }, { do: 'eat', t: t.t - 1.4 }]);
+    }
+    a.reach = { side: 'R', point: _q.copy(t.hand).add(_r.set(0, Math.sin(t.age * 3) * 0.006, 0)) };
+    a.mood.smile = 1;
+    if (t.age < t.t) return false;
+    a.reach = null;
+    const held = this.drop('R');
+    if (held) disposeTree(held.object);
+    a.setPose('stand', 5);
+    if (t.done) t.done();
+    return true;
   }
 
   /** Is she busy with something to eat — the courier at the door, or eating it? */
@@ -572,6 +629,8 @@ export class Resident extends Person {
       const r = this.world.ownTask(this, t, dt); // (out in the street: what is done only there)
       if (r !== undefined) return r;
     }
+    if (t.do === 'petCat') return this.petCat(t, dt);
+    if (t.do === 'feedCat') return this.feedCat(t, dt);
     if (t.do === 'eat') return !t.meal; // (eating standing up: see update)
     if (t.do === 'out') {
       this.world.enterTown();

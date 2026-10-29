@@ -27,6 +27,7 @@ import { makeFood } from './food.js';
 import { makeIngredient } from './meals.js';
 import { Fx } from './fx.js';
 import { Town } from './town.js';
+import { Cat } from './cat.js';
 
 const FOV = 32;
 const YAW = -0.62; //            where the camera stands at first: in front, a little to the left…
@@ -112,9 +113,11 @@ export class HouseWorld {
     this.guest = new Guest(this); //  Lorelei, when she comes round
     this.me = new Resident(this); //    …and the girl who lives here
     this.courier = new Courier(this); // …and at the door, now and then, the courier
+    this.cat = new Cat(this); //        …and 뭉치, the white cat: a stray on the street, then (taken home) hers (cat.js)
+    this.catHome = false; //            (whether it lives here: the app's — look.cat)
     this.food = null; //                 what she has ordered and is waiting for (the app's: { order })
     this.fx = new Fx(scene);
-    this.bubbles = { guest: { el: null, until: 0 }, me: { el: null, until: 0 }, rider: { el: null, until: 0 }, clerk: { el: null, until: 0 }, barista: { el: null, until: 0 } }; // what each of them says, over their head
+    this.bubbles = { guest: { el: null, until: 0 }, me: { el: null, until: 0 }, rider: { el: null, until: 0 }, clerk: { el: null, until: 0 }, barista: { el: null, until: 0 }, cat: { el: null, until: 0 } }; // what each of them says, over their head
     this.where = 'home'; //            …or 'town': she is out (and the street is shown)
     this.town = null; //               (built the first time she goes out)
     this.going = false; //             (on her way out of the door)
@@ -215,6 +218,7 @@ export class HouseWorld {
     Object.assign(this.cam, { yaw: this.view.yaw + 0.5, pitch: this.view.pitch - 0.12, zoom: 1.25 }); // (it swings in, as she arrives)
     this.cam.target.copy(this.view.target);
     this.me.enter();
+    this.catEnter();
     this.grace(1500);
     this.wake();
   }
@@ -231,6 +235,7 @@ export class HouseWorld {
     this.pinch = null;
     this.drag = null;
     this.guest.leave(true);
+    this.cat.hide();
     this.courier.vanish(true);
     if (this.where === 'town') this.backHome(true);
     if (this.me.cooking) this.me.cooking.abandon();
@@ -346,6 +351,11 @@ export class HouseWorld {
       if (this.stage && !this.me.on) this.me.enter();
     }
     this.setShowcase(!!(look.me && look.me.showcase));
+    const home = !!(look.cat && look.cat.adopted);
+    if (home !== this.catHome) {
+      this.catHome = home;
+      if (this.stage && this.where !== 'town' && home && !this.cat.on) this.catEnter();
+    }
     if (this.town) this.town.setLook(look);
   }
 
@@ -594,6 +604,12 @@ export class HouseWorld {
       who.light(_c, sun);
       who.update(dt);
     }
+    if (this.cat.on && this.cat.world === this) this.cat.update(dt);
+    // (she is done with 뭉치: the camera goes back — frameCat)
+    if (this.catFramed && !(this.me.task && (this.me.task.do === 'petCat' || this.me.task.do === 'feedCat'))) {
+      this.catFramed = false;
+      this.frameAt(null);
+    }
     this.makeRoom();
     // (being dressed: the camera stays with her)
     if (this.showcaseOn && this.me.on) this.view.target.set(this.me.pos.x, 0.62, this.me.pos.z);
@@ -781,7 +797,7 @@ export class HouseWorld {
     });
     if (this.parcel && this.parcel.visible) targets.push(this.parcel);
     targets.push(...this.room.taps.filter((m) => this.visibleUp(m)));
-    targets.push(...this.guest.meshes(), ...this.me.meshes(), ...this.courier.meshes());
+    targets.push(...this.guest.meshes(), ...this.me.meshes(), ...this.courier.meshes(), ...(this.cat.world === this ? this.cat.meshes() : []));
     const hits = ray.intersectObjects(targets, true).filter((h) => this.visibleUp(h.object) && h.object.type !== 'Sprite');
     // (one of the two — even half hidden, in bed, behind the sofa — or a fingertip from her: she is who was meant, not the furniture)
     if (!this.edit) {
@@ -819,8 +835,8 @@ export class HouseWorld {
     };
     let best = null;
     let bd = reach;
-    for (const who of [this.me, this.guest, this.courier]) {
-      if (!who.on || !who.rig) continue;
+    for (const who of [this.me, this.guest, this.courier, this.cat]) {
+      if (!who.on || !who.rig || (who === this.cat && who.world !== this)) continue;
       const [hx, hy] = onPage(who.headPoint(_w));
       const [fx, fy] = onPage(_v.copy(who.pos));
       const dx = hx - fx;
@@ -934,6 +950,7 @@ export class HouseWorld {
       this.courier.tapped();
       return this.host.onTap('rider');
     }
+    if (hit.kind === 'cat') return this.host.onTap('cat');
     this.host.onTap(hit.kind, hit.uid || null);
   }
 
@@ -1076,6 +1093,19 @@ export class HouseWorld {
     v.target.copy(d.was.target);
     v.yaw = d.was.yaw;
     v.pitch = d.was.pitch;
+  }
+
+  /** She is down by 뭉치, petting it or holding out a treat: the camera comes down close to the two of them, from its side
+   *  of them — where its face shows — and goes back when she is done (update), unless she has moved it meanwhile. */
+  frameCat(cat) {
+    if (this.showcaseOn || this.where === 'town' || !cat.on) return;
+    const v = this.view;
+    const look = cat.anim.yaw; // (it faces her)
+    // (almost from the side, a little before it: she is not in front of it then)
+    const yaw = [look + 1.35, look - 1.35].reduce((a, b) => (Math.abs(angle(a - v.yaw)) <= Math.abs(angle(b - v.yaw)) ? a : b));
+    const h = cat.headPoint(V());
+    this.frameAt(V(h.x * 0.65 + this.me.pos.x * 0.35, h.y, h.z * 0.65 + this.me.pos.z * 0.35), 0.26, { yaw, pitch: 0.52 });
+    this.catFramed = true;
   }
 
   /** Turn the thing a quarter round (on the spot — or as near to it as it fits). → its new place, or null. */
@@ -1595,6 +1625,134 @@ export class HouseWorld {
     });
   }
 
+  /* ----- 뭉치, at home (cat.js) ----- */
+
+  /** An open place on the floor near `p`. */
+  freeNear(p) {
+    const cell = this.nearestOpen(p);
+    return cell ? this.centre(...cell) : p.clone();
+  }
+
+  /** When the house is shown: where it is — asleep on her bed by her feet, if she is asleep in it; somewhere about
+   *  the room otherwise. */
+  catEnter() {
+    const cat = this.cat;
+    if (!this.catHome || !this.stage) return;
+    cat.setWorld(this);
+    const bed = this.bed();
+    if (bed && this.me.asleepNow && this.me.asleepNow()) {
+      const at = this.catOnBed(bed);
+      cat.show(at, bed.yaw + Math.PI * 0.6, bed.h, [{ do: 'sleep', until: () => !this.me.abed && !(this.me.task && this.me.task.do === 'lie') }]);
+      return;
+    }
+    const at = this.randomFree() || V(0, 0, 0);
+    cat.show(at, Math.random() * Math.PI * 2, 0, [{ do: 'stretch' }]);
+  }
+
+  /** On her bed, at her feet (the side away from where she gets in). */
+  catOnBed(bed) {
+    const f = bed.foot;
+    return V(f.x + Math.sin(bed.yaw + Math.PI / 2) * 0.18, 0, f.z + Math.cos(bed.yaw + Math.PI / 2) * 0.18);
+  }
+
+  /** Home with her for the first time (she has just taken it in, js/cat.js): in at the door behind her, a look round —
+   *  its new home — and a word. */
+  catComeIn() {
+    const cat = this.cat;
+    this.catHome = true;
+    cat.setWorld(this);
+    const door = this.room.doorway();
+    cat.show(door.outside.clone().add(V(0.25, 0, 0)), -Math.PI / 2, 0, [
+      { do: 'wait', t: 1.1 },
+      { do: 'walk', to: door.inside.clone().add(V(-0.35, 0, 0.2)), direct: true },
+      { do: 'sit', t: 1.6 },
+      { do: 'meow', line: 'new_home' },
+      { do: 'call', fn: () => this.host.onCat && this.host.onCat('home') },
+    ]);
+  }
+
+  /** She comes in at the door: it comes to meet her there. */
+  catGreet() {
+    const cat = this.cat;
+    if (!cat.on || cat.world !== this) return this.catEnter();
+    const door = this.room.doorway();
+    cat.do([{ do: 'walk', to: door.inside.clone().add(V(-0.45, 0, 0.15)), fast: true }, { do: 'meow', line: 'welcome', at: door.inside }, { do: 'rub', t: 3 }]);
+  }
+
+  /**
+   * What it does next, at home (cat.js asks when it has done all it was doing): asleep on her bed at her feet while she
+   * sleeps; otherwise a stroll, the window, a nap — on the floor, or up on her bed — a groom, a stretch, after her when
+   * she is on the move, round her legs now and then.
+   */
+  planCat(cat) {
+    const me = this.me;
+    const bed = this.bed();
+    const T = cat.tasks;
+    if (bed && me.on && (me.abed || (me.task && me.task.do === 'lie'))) {
+      const at = this.catOnBed(bed);
+      const there = Math.hypot(cat.pos.x - at.x, cat.pos.z - at.z) < 0.12 && cat.perch > 0.3;
+      if (!there) {
+        const below = this.freeNear(at.clone().add(V(Math.sin(bed.yaw + Math.PI / 2) * 0.45, 0, Math.cos(bed.yaw + Math.PI / 2) * 0.45)));
+        T.push({ do: 'walk', to: below }, { do: 'hop', to: at, h: bed.h });
+      }
+      T.push({ do: 'sleep', until: () => !(me.abed || (me.task && me.task.do === 'lie')) });
+      return;
+    }
+    const r = Math.random();
+    const spots = this.spots();
+    const win = spots.find((s) => s.kind === 'window');
+    const walking = me.on && me.task && me.task.do === 'walk';
+    if (walking && r < 0.3) return void T.push({ do: 'follow', t: 6 + Math.random() * 6 });
+    if (me.on && !walking && r < 0.4 && Math.hypot(me.pos.x - cat.pos.x, me.pos.z - cat.pos.z) < 2.5 && this.time - (this.catRubbed || -99) > 40) {
+      this.catRubbed = this.time;
+      return void T.push({ do: 'walk', to: this.freeNear(me.pos.clone().add(V(0.3, 0, 0.2))), fast: true }, { do: 'rub', t: 3.2 });
+    }
+    if (win && r < 0.55) return void T.push({ do: 'walk', to: win.at.clone() }, { do: 'look', at: win.face.clone(), t: 8 + Math.random() * 10 });
+    if (bed && r < 0.68) {
+      const at = this.catOnBed(bed);
+      const below = this.freeNear(at.clone().add(V(Math.sin(bed.yaw + Math.PI / 2) * 0.45, 0, Math.cos(bed.yaw + Math.PI / 2) * 0.45)));
+      return void T.push({ do: 'walk', to: below }, { do: 'hop', to: at, h: bed.h }, { do: 'sleep', t: 18 + Math.random() * 20 }, { do: 'stretch' });
+    }
+    if (r < 0.78) return void T.push({ do: 'groom', t: 3 + Math.random() * 3 });
+    if (r < 0.86) return void T.push({ do: 'loaf', t: 10 + Math.random() * 12 });
+    if (r < 0.9) return void T.push({ do: 'stretch' });
+    const p = this.randomFree();
+    if (p) T.push({ do: 'walk', to: p }, { do: 'sit', t: 3 + Math.random() * 4 });
+  }
+
+  /** She pets it (it was tapped — js/cat.js): she goes to it and strokes it, and it leans into her hand. → false if she
+   *  cannot now. */
+  catPet() {
+    const cat = this.cat;
+    const me = this.me;
+    if (!cat.on || cat.world !== this || !me.on || me.abed || me.seat || me.cooking || me.busyEating()) return false;
+    const toHer = Math.atan2(me.pos.x - cat.pos.x, me.pos.z - cat.pos.z);
+    const kneel = this.freeNear(cat.pos.clone().add(V(Math.sin(toHer) * 0.42, 0, Math.cos(toHer) * 0.42)));
+    me.tasks = [{ do: 'walk', to: kneel }, { do: 'face', at: cat.pos.clone() }, { do: 'petCat', cat, t: 3.6 }];
+    me.task = null;
+    cat.do([{ do: 'wait', t: 0.2 }, { do: 'face', at: kneel }, { do: 'petted', t: 99 }]);
+    return true;
+  }
+
+  /** She has come home on the bus (js/bus.js): the street at once — no door, no fade, the ride's screen is over it all —
+   *  with her on the bus, which comes along when the app says (town.busIn). */
+  arriveByBus() {
+    if (!this.stage || this.where === 'town') return false;
+    if (!this.town) {
+      this.town = new Town(this);
+      this.town.resize(this.stage.clientWidth, this.stage.clientHeight);
+      this.frameView();
+    }
+    if (this.look) this.town.setLook(this.look);
+    this.where = 'town';
+    this.going = false;
+    this.hush('me');
+    this.town.show(this.me, 'bus');
+    this.grace(2500);
+    this.host.onTown('out', 'bus');
+    return true;
+  }
+
   /** She is in at her own door: the house again — and she comes in. */
   enterHome() {
     this.fade(() => this.backHome(false));
@@ -1610,8 +1768,18 @@ export class HouseWorld {
     me.walkSpeed = undefined;
     this.scene.add(me.rig.group);
     this.hush('me');
-    if (quiet) return;
+    // 뭉치: come home with her, just taken in — or here already, and up to the door to meet her
+    const cat = this.cat;
+    const along = cat.on && cat.world === this.town && cat.following;
+    if (cat.world === this.town) cat.hide();
+    cat.following = false;
+    if (quiet) {
+      if (along) this.catHome = true;
+      return;
+    }
     me.comeIn();
+    if (along) this.catComeIn(true);
+    else if (this.catHome) this.catGreet();
     this.grace(1500);
     this.host.onTown('home');
   }
@@ -1685,6 +1853,7 @@ export class HouseWorld {
     this.placeBubble('guest', this.guest);
     this.placeBubble('me', this.me);
     this.placeBubble('rider', this.courier);
+    this.placeBubble('cat', this.cat);
     if (this.town) {
       this.placeBubble('clerk', this.town.clerk);
       this.placeBubble('barista', this.town.barista);
@@ -1713,7 +1882,7 @@ export class HouseWorld {
     const b = this.bubbles[who];
     if (!b.el || b.el.hidden) return;
     // (one in the house while the street is shown — or one on the street while the house is — is not there to speak)
-    const here = this.where === 'town' ? who === 'me' || who === 'clerk' || who === 'barista' : who !== 'clerk' && who !== 'barista';
+    const here = who === 'cat' ? person.world === (this.where === 'town' ? this.town : this) : this.where === 'town' ? who === 'me' || who === 'clerk' || who === 'barista' : who !== 'clerk' && who !== 'barista';
     if (this.time > b.until || !person.on || !here) return this.hush(who);
     const p = person.headPoint(_w).add(_v.set(0, person.abed ? 0.2 : 0.16, 0)).project(this.viewCamera);
     const W = this.stage.clientWidth;

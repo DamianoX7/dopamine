@@ -168,7 +168,10 @@ const Diary = {
     if (cafe.length) add('☕', `카페에서 ${cafe.length > 1 ? `‘${cafe[0]}’ 외 ${cafe.length - 1}잔을` : quoted(cafe[0], '을/를')} 마셨어요`);
     const coin = d.coin || [];
     if (coin.length) add('🎤', `코인노래방에서 ${coin.length > 1 ? `‘${coin[0]}’ 외 ${coin.length - 1}곡을` : quoted(coin[0], '을/를')} 불렀어요`);
-    else if (d.townOut && !shop.length && !cafe.length) add('🏘️', '동네에 산책 나갔어요');
+    else if (d.townOut && !shop.length && !cafe.length && !d.busRide) add('🏘️', '동네에 산책 나갔어요');
+    if (d.catHome) add('🐈', '길고양이 뭉치가 둘의 집 가족이 됐어요');
+    else if (d.catMeet) add('🐈', '동네에서 하얀 길고양이 뭉치를 만났어요');
+    if (d.busRide) add('🚌', d.busRide > 1 ? `506번 버스를 타고 여우 마을에 ${d.busRide}번 놀러 갔어요` : '506번 버스를 타고 여우 마을에 놀러 갔어요');
     if (d.dream) add('💭', `${d.dream}의 꿈 이야기를 들었어요`);
     if (d.moon) add('🌕', '보름달에 소원을 빌었어요');
     else if (d.gazed) add('🌙', `여우들이랑 밤하늘의 ${josa(d.gazed, '을/를')} 올려다봤어요`);

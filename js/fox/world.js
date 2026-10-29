@@ -19,7 +19,7 @@
 // of the yard, its lights twinkling; the foxes wear Santa hats and antlers, Lorelei a Santa hat and her scarf — and in
 // the evening the light goes blue. Through the year she dresses for the season of the place: cherry blossom in her
 // hair in spring, a straw hat in summer, a beret in autumn, a scarf in winter.
-// The sky is Seoul's (js/moon.js keeps it): the sun sets when it sets there, and the night is lit by tonight's moon.
+// The sky is Incheon's (js/moon.js keeps it): the sun sets when it sets there, and the night is lit by tonight's moon.
 // At night she can look up at it (gaze: heavens.js draws the sky) — and on the night of the full moon the foxes sing to it.
 // Round the back of the yard grows the song garden (garden.js): a flower for every cover she has released.
 import * as THREE from '../vendor/three.module.min.js';
@@ -28,6 +28,7 @@ import { FoxAnimator } from './animator.js';
 import { Brain, PAD, ASIDE } from './brain.js';
 import { buildLorelei, LoreleiAnimator } from './lorelei.js';
 import { Keeper } from './keeper.js';
+import { makeVisitor } from './visitor.js';
 import { buildHabitat } from './scenes.js';
 import { speciesOf } from './species.js';
 import { makeBowl, makeBall, makeBed, makeMic, makeMailbox, makeLetter, makeGift, makeAccessory, dress, makeRadio, makePresent, PAPER, makeOwnerHat, makeOwnerClothes, makeLantern, makeTree } from './props.js';
@@ -329,6 +330,7 @@ export class World {
     this.cover = null; //       the foxes' places out of the rain: { key, at: fox → place } (see coverFor)
     this.foxes = []; //   { id, rig, anim, brain, worn, accessories, baby, guest, wet } — in the app's order
     this.owner = null; // Lorelei, the girl they belong to: { id, rig, anim, brain } — a creature of the yard like them, but never one of `foxes`
+    this.visitor = null; // …and the girl from the house, while she is here: come on the bus (visitor.js — see visit)
     this.serving = 0; //  when she set off for the bowl with the food (there is nothing in it until she tips it in: fillBowl)
     this.pitching = 0; // …and when she drew back her arm with the ball (until it flies: throwBall)
     this.lead = null; //  the fox she is with: the camera stays near it, a tap on the ground calls it
@@ -337,6 +339,7 @@ export class World {
     this.env = null;
     this.thumbs = new Map();
     this.bubble = { el: null, until: 0, fox: null };
+    this.meBubble = { el: null, until: 0 }; // (hers, the girl from the house: she and Lorelei can speak at once)
     this.pointer = { down: false, x: 0, y: 0, t: 0, fox: null, lastPet: 0, lastX: 0, lastY: 0, pan: false };
     this.fingers = new Map(); // pointers that are down (two = pinch)
     this.pinch = null;
@@ -446,6 +449,7 @@ export class World {
       this.bubble.el.hidden = true;
       stage.appendChild(this.bubble.el);
     }
+    this.meBubble.el = stage.querySelector('[data-fox-me-bubble]');
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(stage);
     this.io = new IntersectionObserver((entries) => {
@@ -477,6 +481,8 @@ export class World {
     this.stage.classList.remove('is-night');
     this.stage = null;
     this.bubble.el = null;
+    this.unvisit(); // (she went home with the world)
+    this.meBubble.el = null;
     this.pointer.down = false;
     this.fingers.clear();
     this.pinch = null;
@@ -565,6 +571,8 @@ export class World {
       });
       if (show) this.owner.brain.do('standBy');
       else if (this.owner.brain.doing === 'standBy') this.owner.brain.script = null;
+      if (show) this.guestDo('standBy');
+      else this.guestStop('standBy');
       this.tuneShells();
     }
     if (edit !== this.editOn) {
@@ -1119,7 +1127,7 @@ export class World {
   }
 
   /**
-   * The light of the habitat as the sky over Seoul has it now (js/moon.js): its own by day; going gold as the sun goes
+   * The light of the habitat as the sky over Incheon has it now (js/moon.js): its own by day; going gold as the sun goes
    * down, then blue; and at night the moon's — as bright as tonight's moon is, and from its side of the sky while it is
    * up. (The sky dims and tints it for the weather, every frame: sky.js.)
    */
@@ -1189,6 +1197,14 @@ export class World {
     this.leaving.forEach((f) => f.brain.update(dt));
     const me = this.owner;
     me.brain.update(dt);
+    if (this.visitor) {
+      this.visitor.brain.update(dt);
+      if (this.visitor.gone) {
+        // (out of the yard and away to the bus: the app takes her home)
+        this.unvisit();
+        this.host.onVisit('gone');
+      }
+    }
     if (this.hailing && me.brain.doing !== 'hailYou') {
       // (called away while she waited to be heard — the shop was opened, a picture is being taken: the app tries again)
       this.hailing = null;
@@ -1208,6 +1224,13 @@ export class World {
     lit.uLight.value.lerp(_c.setScalar(Math.max(grey, 0.62)), 0.45); // (by night not as blue as the night is, nor as dark: she is still herself)
     lit.uSun.value = Math.min(1, (this.sun.intensity * (this.sun.color.r + this.sun.color.g + this.sun.color.b)) / 3 / 0.3); // (how much of a sun there is: under heavy cloud or the moon, less of a light side to her)
     me.anim.update(dt);
+    if (this.visitor) {
+      // (the girl from the house in the same light)
+      const vl = this.visitor.rig.light;
+      vl.uLight.value.copy(lit.uLight.value);
+      vl.uSun.value = lit.uSun.value;
+      this.visitor.anim.update(dt);
+    }
     if (this.spooky) me.hat.scale.y = 1 - 0.32 * me.anim.umb; // (under her umbrella, her hat's soft point gives)
     if (this.festive) me.clothes.santa.object.scale.y = 1 - 0.3 * me.anim.umb;
     // (one that has run off through the bushes is out of the picture — or, should it never get there, after a while)
@@ -1297,11 +1320,14 @@ export class World {
     this.offset.x = damp(this.offset.x, this.inset.right / 2, 7, dt);
     // (…and while Lorelei talks, above the window her words are in)
     this.offset.y = damp(this.offset.y, chat ? Math.min(90, 0.11 * h) : this.inset.bottom / 2 - (close || edit ? 0 : tall * 0.09 * h), 7, dt);
-    // (a fox that has left the yard for the country takes the view along, all the way)
+    // (a fox that has left the yard for the country takes the view along, all the way — and so does the girl from the
+    // house, coming in from the bus and going out to it: most of the way)
+    const v = this.visitor;
+    const guest = !close && !edit && !chat && !roam && !away && v && (v.brain.doing === 'comeIn' || v.brain.doing === 'goHome') ? v : null;
     const out = this.outside(who);
-    const follow = !who ? 0 : close || away ? 1 : edit ? 0 : clamp((this.state.reduce ? 0 : 0.3) + (this.yard - 1) * 0.6 + (this.zoomNow - 1) * 0.85 + out, 0, 1);
-    const aimX = away ? away.x : who ? who.anim.pos.x : b.cx;
-    const aimZ = away ? away.z : who ? who.anim.pos.z : b.cz;
+    const follow = guest ? 0.8 : !who ? 0 : close || away ? 1 : edit ? 0 : clamp((this.state.reduce ? 0 : 0.3) + (this.yard - 1) * 0.6 + (this.zoomNow - 1) * 0.85 + out, 0, 1);
+    const aimX = away ? away.x : guest ? guest.anim.pos.x : who ? who.anim.pos.x : b.cx;
+    const aimZ = away ? away.z : guest ? guest.anim.pos.z : who ? who.anim.pos.z : b.cz;
     if (chat) {
       // (on her, and on what she puts down before her)
       this.camTarget.x = damp(this.camTarget.x, me.anim.pos.x + Math.sin(me.anim.yaw) * 0.3, 3.4, dt);
@@ -1667,8 +1693,30 @@ export class World {
         B.anim.pos.z += nz * push * c;
       }
     }
-    // …nor through Lorelei, nor she through them — unless one of them has come to the other
-    const me = this.owner;
+    // …nor through Lorelei, nor she through them — unless one of them has come to the other (and so with the girl from
+    // the house, while she is here; the two of them do not walk through each other either)
+    for (const me of [this.owner, this.visitor]) if (me && !me.away) this.giveWay(me, list, gives);
+    const v = this.visitor;
+    const o = this.owner;
+    if (v && !v.away && v.anim.air <= 0.02 && o.anim.air <= 0.02) {
+      const dx = v.anim.pos.x - o.anim.pos.x;
+      const dz = v.anim.pos.z - o.anim.pos.z;
+      const d = Math.hypot(dx, dz) || 1e-3;
+      const pen = 0.2 * o.rig.size - d;
+      if (pen > 0) {
+        const vm = v.anim.speed > 0.05 || v.brain.loose ? 1 : 0;
+        const om = o.anim.speed > 0.05 || o.brain.loose ? 1 : 0;
+        const k = (pen * 0.4) / Math.max(1, vm + om);
+        v.anim.pos.x += (dx / d) * k * (vm || !om ? 1 : 0);
+        v.anim.pos.z += (dz / d) * k * (vm || !om ? 1 : 0);
+        o.anim.pos.x -= (dx / d) * k * om;
+        o.anim.pos.z -= (dz / d) * k * om;
+      }
+    }
+  }
+
+  /** (makeRoom: the foxes and one of the two girls) */
+  giveWay(me, list, gives) {
     const hers = me.anim.pos;
     const mine = me.anim.speed > 0.05 || me.brain.loose ? 1 : 0;
     for (const f of list) {
@@ -1704,6 +1752,7 @@ export class World {
 
   /** `fox` speaks (the one she is with, unless another is named). */
   say(text, ms = 2600, fox = null) {
+    if (fox && fox === this.visitor) return this.sayMe(text, ms);
     const el = this.bubble.el;
     if (!el || !text || this.gazing) return; // (no bubbles in the sky)
     this.bubble.fox = fox || this.lead;
@@ -1724,7 +1773,50 @@ export class World {
     this.bubble.until = 0;
   }
 
+  /** The girl from the house speaks: in a bubble of her own, her name over it. */
+  sayMe(text, ms = 2600) {
+    const el = this.meBubble.el;
+    if (!el || !text || this.gazing || !this.visitor) return;
+    el.dataset.who = this.host.visitName ? this.host.visitName() : '';
+    el.textContent = text;
+    el.hidden = false;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    this.meBubble.until = performance.now() + ms;
+    this.placeMeBubble();
+  }
+
+  hushMe() {
+    if (this.meBubble.el) this.meBubble.el.hidden = true;
+    this.meBubble.until = 0;
+  }
+
+  placeMeBubble() {
+    const el = this.meBubble.el;
+    if (!el || el.hidden) return;
+    const v = this.visitor;
+    if (!v || performance.now() > this.meBubble.until) return this.hushMe();
+    const p = this.project(v.anim.headPoint(_v));
+    const w = this.stage.clientWidth;
+    const half = el.offsetWidth / 2;
+    const x = clamp(p.x, half + 6, w - half - 6);
+    let y = Math.max(el.offsetHeight + 8, p.y - 14);
+    // (Lorelei talking at the same time, close by: hers goes up over the other)
+    const o = this.bubble.el;
+    if (o && !o.hidden) {
+      const r = o.getBoundingClientRect();
+      const s = this.stage.getBoundingClientRect();
+      const ox = r.left - s.left;
+      const oy = r.bottom - s.top;
+      if (x + half > ox - 4 && x - half < ox + r.width + 4 && y > oy - r.height - 6 && y - el.offsetHeight < oy) y = Math.max(el.offsetHeight + 8, oy - r.height - 8);
+    }
+    el.style.transform = `translate(${(x - half).toFixed(1)}px, ${(y - el.offsetHeight).toFixed(1)}px)`;
+    el.style.setProperty('--tail', `${clamp(p.x - (x - half), 14, el.offsetWidth - 14).toFixed(1)}px`);
+  }
+
   placeBubble() {
+    this.placeMeBubble();
     const el = this.bubble.el;
     if (!el || el.hidden) return;
     const fox = this.bubble.fox === this.owner || this.foxes.includes(this.bubble.fox) ? this.bubble.fox : this.lead;
@@ -1788,6 +1880,26 @@ export class World {
     return ray.distanceSqToSegment(_pa.setFromMatrixPosition(me.rig.bones.hips.matrixWorld), me.anim.headPoint(_pb)) < 0.024 * me.rig.size * me.rig.size;
   }
 
+  /** …or the girl from the house? (`k` < 1: right on her) */
+  visitorAt(ray, k = 1) {
+    const v = this.visitor;
+    if (!v || !v.rig.group.parent) return false;
+    return ray.distanceSqToSegment(_pa.setFromMatrixPosition(v.rig.bones.hips.matrixWorld), v.anim.headPoint(_pb)) < 0.024 * v.rig.size * v.rig.size * k;
+  }
+
+  /** She was tapped: she turns and waves, and says `line` — busy (or not in yet), she only says it. */
+  visitorHello(line) {
+    const v = this.visitor;
+    if (!v) return;
+    const b = v.brain;
+    if (b.idle || b.doing === 'helloYou' || b.doing === 'standBy') b.do('helloYou', line);
+    else if (line) {
+      this.sayMe(line, 2800);
+      v.anim.mood.smile = 1;
+    }
+    this.wake();
+  }
+
   /** She was tapped (or the app has something for her to say): she turns and waves — busy, she only says it. */
   ownerHello(line) {
     const b = this.owner.brain;
@@ -1829,11 +1941,16 @@ export class World {
     if (this.knitOn) return void Object.assign(p, { down: true, pan: false, owner: false, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY, t: performance.now(), fox: this.foxAt(this.cast(e)) });
     if (this.editOn) return void this.editDown(e);
     Object.assign(p, { down: true, pan: false, owner: false, x: e.clientX, y: e.clientY, t: performance.now(), fox: this.foxAt(this.cast(e)) });
+    if (p.fox && this.visitorAt(_ray.ray, 0.45)) p.fox = null; // (right on the girl from the house: her, not a fox at her feet)
     this.fling = null; // (a finger on the ground stops it gliding)
-    // a tap on Lorelei: she says hello
+    // a tap on Lorelei: she says hello (and so does the girl from the house)
     if (!p.fox && this.ownerAt(_ray.ray)) {
       p.owner = true;
       return void this.host.onOwner();
+    }
+    if (!p.fox && this.visitorAt(_ray.ray)) {
+      p.owner = true;
+      return void this.host.onVisitor();
     }
     // the fox with the letter hands it over, the one with a parcel gives her that; any other gets a pat
     if (p.fox && this.letter && this.letter.fox === p.fox) this.host.onLetter();
@@ -2508,6 +2625,7 @@ export class World {
       const what = this.state.mood === 'sleepy' ? 'lullaby' : 'party';
       this.foxes.forEach((f) => !f.brain.busyWith('fetchLetter') && !f.brain.busyWith(what) && f.brain.do(what));
       if (what === 'party' && this.owner.brain.idle) this.owner.brain.do('swayAlong');
+      if (what === 'party') this.guestDo('swayAlong', true);
     }
     this.wake();
   }
@@ -2597,6 +2715,7 @@ export class World {
     const sky = this.sky;
     // (Lorelei gets up off the wet ground)
     if (sky.raining && ['sitAwhile', 'petOne'].includes(this.owner.brain.doing)) this.owner.brain.reset();
+    if (sky.raining && this.visitor && ['sitAwhile', 'petOne'].includes(this.visitor.brain.doing)) this.visitor.brain.reset();
     for (const f of this.foxes) {
       const b = f.brain;
       const wants = sky.shelterFrom(f);
@@ -2688,8 +2807,91 @@ export class World {
     fox.brain.do('depart', this.gate());
     if (!this.showcaseOn && !this.photoOn) this.foxes.forEach((f) => f.brain.free && f.brain.do('seeOff', fox));
     if (this.owner.brain.idle) this.owner.brain.do('waveAt', fox); // Lorelei waves after it
+    if (this.visitor && this.visitor.brain.idle) this.visitor.brain.do('waveAt', fox); // …and so does the girl from the house
     this.stamp++;
     this.tuneShells();
+  }
+
+  // ---------------------------------------------------------------- the girl from the house, come on the bus
+
+  /**
+   * She has come on the bus (js/bus.js): she gets off out of sight and comes in through the gap in the bushes, the way
+   * the foxes go off exploring and come home (visitor.js). `look`: how she looks (js/avatar.js: look3d). → false if she
+   * cannot (she is here already).
+   */
+  visit(look) {
+    if (this.visitor || !this.env) return false;
+    const v = (this.visitor = makeVisitor(this, look));
+    v.anim.onStep = (p) => this.footfall(p, v);
+    this.scene.add(v.rig.group);
+    const gate = this.gate();
+    const from = v.brain.landAt(gate.x + Math.sin(gate.yaw) * 1.1, gate.z + Math.cos(gate.yaw) * 1.1);
+    v.anim.pos.set(from.x, 0, from.z);
+    v.anim.yaw = gate.yaw + Math.PI;
+    v.anim.snap();
+    v.brain.do('comeIn', gate);
+    this.stamp++; // (the line-ups are drawn afresh, with her in them)
+    this.wake();
+    return true;
+  }
+
+  /** She is in (visitor.js: comeIn): the foxes that are awake run to meet her, Lorelei waves to her and says hello. */
+  visitIn() {
+    const v = this.visitor;
+    if (!v) return;
+    if (!this.showcaseOn && !this.photoOn && !this.gazing && !this.editOn) {
+      for (const f of this.foxes) if (!f.brain.asleep && f.anim.air < 0.02 && (f.brain.free || f.brain.heedful)) f.brain.do('welcome', v);
+      if (this.owner.brain.idle) {
+        this.owner.brain.do('waveAt', v);
+        const line = this.host.visitOwnerLine ? this.host.visitOwnerLine('hello') : '';
+        if (line) this.say(line, 3400, this.owner);
+      }
+    }
+    this.host.onVisit('in');
+  }
+
+  /** The bus is coming for her: goodbye, and out the way she came (the foxes watch her go). → false if she is not here. */
+  visitLeave() {
+    const v = this.visitor;
+    if (!v || v.leaving) return false;
+    v.leaving = true;
+    v.brain.do('goHome', this.gate());
+    if (!this.showcaseOn && !this.photoOn) for (const f of this.foxes) if (f.brain.free) f.brain.do('seeOff', v);
+    if (this.owner.brain.idle) {
+      this.owner.brain.do('waveAt', v);
+      const line = this.host.visitOwnerLine ? this.host.visitOwnerLine('bye') : '';
+      if (line) setTimeout(() => this.visitor === v && this.say(line, 3000, this.owner), 1200);
+    }
+    this.wake();
+    return true;
+  }
+
+  /** (The girl from the house goes along with what the family does — the picture, the shop, a cover, the moon — once
+   *  she is in, and not on her way out to the bus. `idle`: only if she has nothing much else to do.) */
+  guestDo(name, idle = false) {
+    const v = this.visitor;
+    if (v && v.brain.came && !v.leaving && (!idle || v.brain.idle)) v.brain.do(name);
+  }
+
+  guestStop(name) {
+    const v = this.visitor;
+    if (v && v.brain.doing === name) v.brain.script = null;
+  }
+
+  /** …gone — or the world is no longer shown (she went home with it). */
+  unvisit() {
+    const v = this.visitor;
+    if (!v) return;
+    this.visitor = null;
+    // (nobody goes on following her, or looking at where she was)
+    for (const f of this.foxes) if (f.brain.target === v || f.brain.watch === v) f.brain.reset();
+    const o = this.owner.brain;
+    if (o.target === v || o.watch === v) o.reset();
+    v.rig.group.removeFromParent();
+    disposeTree(v.rig.umbrella); // (hers is from here: visitor.js)
+    v.rig.dispose();
+    this.hushMe();
+    this.stamp++;
   }
 
   /** A fox that was on its way out is wanted in the yard after all (she called it back at once): it turns round. */
@@ -2796,10 +2998,12 @@ export class World {
         for (const f of this.foxes) if (!f.brain.asleep && f.brain.heedful) f.brain.do('moonGaze', place++);
         const her = this.owner.brain;
         if (!her.asleep && !['presentIt', 'hailYou', 'serve', 'tossBall', 'poseForPicture'].includes(her.doing)) her.do('moonGaze');
+        this.guestDo('moonGaze');
       }
     } else {
       for (const f of this.foxes) if (f.brain.doing === 'moonGaze') f.brain.script = null;
       if (this.owner.brain.doing === 'moonGaze') this.owner.brain.script = null;
+      this.guestStop('moonGaze');
     }
     this.wake();
     return true;
@@ -3206,6 +3410,8 @@ export class World {
     this.lookBack();
     if (on) this.owner.brain.do('poseForPicture');
     else if (this.owner.brain.doing === 'poseForPicture') this.owner.brain.script = null;
+    if (on) this.guestDo('poseForPicture');
+    else this.guestStop('poseForPicture');
     if (on) {
       this.zoomKept = this.zoom;
       this.zoom = 1;
@@ -3257,7 +3463,7 @@ export class World {
    * until something changes.
    */
   lineUp(name, build) {
-    const key = `${this.lead ? this.lead.id : ''}|${this.focus ? this.focus.id : ''}|${this.foxes.length}|${this.stamp}|${this.yard}`;
+    const key = `${this.lead ? this.lead.id : ''}|${this.focus ? this.focus.id : ''}|${this.foxes.length}|${this.stamp}|${this.yard}|${this.visitor ? 1 : 0}`;
     const had = this.lines[name];
     if (had && had.key === key) return had.spots;
     const want = build();
@@ -3288,9 +3494,13 @@ export class World {
         const i = small.indexOf(f);
         return [f, b.cx + (i % 2 ? 1 : -1) * (0.3 + 0.6 * Math.floor(i / 2)), b.cz + 0.4];
       });
-      // Lorelei stands behind the middle of the row — or, where that is a single fox, beside it
+      // Lorelei stands behind the middle of the row — or, where that is a single fox, beside it — and the girl from the
+      // house, if she has come, beside her (on the single fox's other side)
       const row = big.length || small.length;
-      spots.push(row > 1 ? [this.owner, b.cx + (row % 2 ? 0 : big.length ? -0.3 : -0.21), b.cz - 0.68] : [this.owner, b.cx + 0.58, b.cz - 0.2]);
+      const ox = row > 1 ? b.cx + (row % 2 ? 0 : big.length ? -0.3 : -0.21) : b.cx + 0.58;
+      const oz = row > 1 ? b.cz - 0.68 : b.cz - 0.2;
+      spots.push([this.owner, ox, oz]);
+      if (this.visitor) spots.push(row > 1 ? [this.visitor, ox + 0.62, oz] : [this.visitor, b.cx - 0.58, oz]);
       return spots;
     });
     return spots.get(fox) || fox.anim.pos;
@@ -3322,10 +3532,13 @@ export class World {
       hi = Math.max(hi, p.x + 0.2 * f.rig.scale);
       z += p.z / this.foxes.length;
     }
-    // (…and Lorelei, who is a good deal taller than they are)
-    const hers = this.photoSpot(this.owner);
-    lo = Math.min(lo, hers.x - 0.24);
-    hi = Math.max(hi, hers.x + 0.24);
+    // (…and Lorelei, who is a good deal taller than they are — and the girl from the house, if she is in the picture)
+    for (const who of [this.owner, this.visitor]) {
+      if (!who || who.leaving || (who === this.visitor && who.brain.doing !== 'poseForPicture')) continue;
+      const hers = this.photoSpot(who);
+      lo = Math.min(lo, hers.x - 0.24);
+      hi = Math.max(hi, hers.x + 0.24);
+    }
     const w = this.stage.clientWidth;
     const h = this.stage.clientHeight;
     const F = this.finder; // (the photo booth's viewfinder: the family fills that instead of the view)

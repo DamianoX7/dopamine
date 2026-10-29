@@ -41,6 +41,8 @@ class CoatBuilder {
     this.core = [];
     this.count = 0;
     this.lofts = []; // the lofts that are a part of the body clothes go over (`part`): where their rings are in the mesh
+    this.welds = []; // pairs of vertices that are one point of the skin until a seam opens there (a mouth: cat.js)
+    this.normals = new Map(); // vertices shaded as the skin they lie on is, not as their own triangles are (cat.js)
   }
 
   vert(p, color, weights, fur, comb, core) {
@@ -197,6 +199,17 @@ class CoatBuilder {
     g.setAttribute('aCover', new THREE.Float32BufferAttribute(new Float32Array(this.count), 1)); // (how much a sweater presses the fur down here: knit.js)
     g.setIndex(this.idx);
     g.computeVertexNormals();
+    // (a seam's two sides are shaded as one skin, with no crease along it)
+    const n = g.attributes.normal;
+    for (const [a, b] of this.welds) {
+      const x = n.getX(a) + n.getX(b);
+      const y = n.getY(a) + n.getY(b);
+      const z = n.getZ(a) + n.getZ(b);
+      const l = Math.hypot(x, y, z) || 1;
+      n.setXYZ(a, x / l, y / l, z / l);
+      n.setXYZ(b, x / l, y / l, z / l);
+    }
+    for (const [i, v] of this.normals) n.setXYZ(i, v.x, v.y, v.z);
     return g;
   }
 }
@@ -536,6 +549,9 @@ export function buildFox(speciesId, opts = {}) {
       return paint('paw', i);
     };
     const r = (v) => v * kLR;
+    // (a kind may have furrier legs than a fox's: `legFur`)
+    const LF = sp.legFur || 1;
+    const lf = (keys) => (LF === 1 ? keys : keys.map((k) => ({ ...k, fur: Math.min(0.9, k.fur * LF) })));
     for (const side of ['L', 'R']) {
       const j = LJ[side];
       const U = `fU${side}`;
@@ -543,7 +559,7 @@ export function buildFox(speciesId, opts = {}) {
       const Pw = `fP${side}`;
       const z0 = zC;
       coat.loft(
-        [
+        lf([
           { c: V(j.fU.x, shoulderY + 0.055, z0 + 0.03), rx: r(0.04), ry: r(0.05), w: { chest: 0.7, [U]: 0.3 }, fur: 0.7 },
           { c: V(j.fU.x, shoulderY, z0 + 0.025), rx: r(0.044), ry: r(0.052), w: { chest: 0.4, [U]: 0.6 }, fur: 0.65 },
           { c: V(j.fU.x, lerp(shoulderY, elbowY, 0.5), z0 + 0.018), rx: r(0.038), ry: r(0.042), ryB: r(0.046), w: { [U]: 1 }, fur: 0.5 },
@@ -552,17 +568,17 @@ export function buildFox(speciesId, opts = {}) {
           { c: V(j.fU.x, 0.052, z0 + 0.03), rx: r(0.0215), ry: r(0.024), w: { [Lo]: 0.5, [Pw]: 0.5 }, fur: 0.16 },
           { c: V(j.fU.x, 0.022, z0 + 0.036), rx: r(0.026), ry: r(0.034), ryB: r(0.024), w: { [Pw]: 1 }, fur: 0.12 },
           { c: V(j.fU.x, 0.004, z0 + 0.038), rx: r(0.022), ry: r(0.03), ryB: r(0.02), w: { [Pw]: 1 }, fur: 0.1 },
-        ],
+        ]),
         { segs: 10, sub: 2, comb: 1, color: legColor, part: 'legF' }
       );
-      coat.blob(V(j.fU.x, 0.016, z0 + 0.054), r(0.027), r(0.016), r(0.034), { w: { [Pw]: 1 }, furLen: 0.12, color: pawColor });
+      coat.blob(V(j.fU.x, 0.016, z0 + 0.054), r(0.027), r(0.016), r(0.034), { w: { [Pw]: 1 }, furLen: 0.12 * LF, color: pawColor });
 
       const T = `hT${side}`;
       const Sh = `hS${side}`;
       const F = `hF${side}`;
       const Hp = `hP${side}`;
       coat.loft(
-        [
+        lf([
           { c: V(j.hT.x * 0.92, hipY + 0.05, zH - 0.01), rx: r(0.046), ry: r(0.07), w: { hips: 0.7, [T]: 0.3 }, fur: 0.75 },
           { c: V(j.hT.x, hipY - 0.01, zH), rx: r(0.052), ry: r(0.076), ryB: r(0.07), w: { hips: 0.35, [T]: 0.65 }, fur: 0.7 },
           { c: V(j.hT.x, lerp(hipY, kneeY, 0.55), zH + 0.03), rx: r(0.046), ry: r(0.058), w: { [T]: 1 }, fur: 0.6 },
@@ -573,10 +589,10 @@ export function buildFox(speciesId, opts = {}) {
           { c: V(j.hT.x, 0.04, zH - 0.026), rx: r(0.022), ry: r(0.026), ryB: r(0.023), w: { [F]: 0.5, [Hp]: 0.5 }, fur: 0.14 },
           { c: V(j.hT.x, 0.02, zH - 0.02), rx: r(0.026), ry: r(0.034), ryB: r(0.024), w: { [Hp]: 1 }, fur: 0.12 },
           { c: V(j.hT.x, 0.004, zH - 0.018), rx: r(0.022), ry: r(0.03), ryB: r(0.02), w: { [Hp]: 1 }, fur: 0.1 },
-        ],
+        ]),
         { segs: 10, sub: 2, comb: 1, color: (i) => (col.copy(C.coat).lerp(C.sock, smooth(0.42, 0.66, i.v)), paint('leg', i)) }
       );
-      coat.blob(V(j.hT.x, 0.016, zH - 0.002), r(0.027), r(0.016), r(0.034), { w: { [Hp]: 1 }, furLen: 0.12, color: pawColor });
+      coat.blob(V(j.hT.x, 0.016, zH - 0.002), r(0.027), r(0.016), r(0.034), { w: { [Hp]: 1 }, furLen: 0.12 * LF, color: pawColor });
     }
   }
 

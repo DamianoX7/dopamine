@@ -225,12 +225,12 @@ const Delivery = {
     if (kind === 'extra') {
       // (the dish, most often — the rain or the snow, the cold, the hour, when there is something to say about them)
       const w = House.weather();
-      const seoul = SeoulWeather.now();
+      const city = CityWeather.now();
       list = [...(f.extra || []), ...(f.extra || [])];
       if (w.kind === 'rain') list.push(...RIDER_LINES.rain, ...RIDER_LINES.rain);
       else if (w.kind === 'snow') list.push(...RIDER_LINES.snow, ...RIDER_LINES.snow);
-      else if (seoul && seoul.temp <= 5) list.push(...RIDER_LINES.cold);
-      else if (seoul && seoul.temp >= 28) list.push(...RIDER_LINES.hot);
+      else if (city && city.temp <= 5) list.push(...RIDER_LINES.cold);
+      else if (city && city.temp >= 28) list.push(...RIDER_LINES.hot);
       if (night) list.push(...RIDER_LINES.night, ...RIDER_LINES.night);
     }
     if (kind === 'bye' && night) list = RIDER_LINES.bye_night;

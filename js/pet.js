@@ -354,7 +354,7 @@ const FoxHost = {
       scene: p.scene,
       season: Weather.seasonIn(p.scene), // (the meadow and the farm follow the year; the other habitats are one season always)
       sky: Weather.now(p.scene), //         …and the weather there, right now
-      night: Moon.dark(), // (from dusk, by the sky over Seoul: js/moon.js — the foxes only sleep from midnight: mood)
+      night: Moon.dark(), // (from dusk, by the sky over Incheon: js/moon.js — the foxes only sleep from midnight: mood)
       mood: Pet.mood(),
       reduce: reducedMotion(),
     };
@@ -414,6 +414,11 @@ const FoxHost = {
   onMail: () => FoxRoom.mailButton(), //      the letter moved on (mailbox → on its way → in a fox's mouth)
   onLetter: (id) => Pet.takeLetter(id), // she tapped the fox that has it
   onGift: () => Pet.takeGift(), //         …or the one that is back from an expedition with a gift
+  onVisit: (what) => BusRide.visitSaid(what), //   the girl from the house, come on the bus: 'in' (met), 'gone' (off to the bus home)
+  onVisitor: () => BusRide.tapped(), //             …tapped
+  visitLine: (kind, id) => BusRide.line(kind, id), // what she says ('arrive', 'pet', 'bye'…; `id`: the fox it is about)
+  visitOwnerLine: (kind) => BusRide.ownerLine(kind), // …and what Lorelei says to her ('hello', 'bye')
+  visitName: () => Avatar.name(),
   onPresent: (what) => OwnerSays.heard(what), // Lorelei has come forward with what she has to say (js/present.js)
   onHail: (what) => Chat.heard(what), //         …or calls to be heard, and has waited in vain (js/chat.js)
   moodLine: () => Pet.moodLine(),
@@ -1675,6 +1680,7 @@ const FoxRoom = {
       <div class="fox-stage" data-fox-stage role="img" aria-label="여우들과 주인 ${esc(josa(OWNER_NAME, '이/가'))} 사는 곳. 바닥을 누르면 달려오고, 여우를 누르면 쓰다듬을 수 있어요.">
         <div class="fox-wait" aria-hidden="true"><span>🦊</span></div>
         <div class="fox-bubble" data-fox-bubble hidden></div>
+        <div class="fox-bubble is-me" data-fox-me-bubble hidden></div>
       </div>
       <div class="fox-hud">
         <div class="fh-top">
@@ -1699,6 +1705,7 @@ const FoxRoom = {
         <button class="fox-cam" data-action="fox-photo" aria-label="사진 찍기"><span aria-hidden="true">📷</span></button>
         <button class="fox-cam is-trip" data-action="fox-trip" data-fox-trip-btn aria-label="탐험 보내기"><span aria-hidden="true">🧭</span></button>
         <button class="fox-cam is-moon" data-action="fox-moon" data-fox-moon aria-label="밤하늘 보기" hidden><span aria-hidden="true">🌙</span></button>
+        <button class="fox-cam is-bus" data-action="fox-bus" data-fox-bus aria-label="버스 타고 동네로"><span aria-hidden="true">🚌</span></button>
         <button class="fox-sky" data-action="fox-sky" data-fox-sky aria-label="여우 세상의 계절과 날씨"></button>
         <div class="fh-actions">
           <button class="fh-act" data-action="pet-pet" data-sfx="none"><span aria-hidden="true">💗</span><b>쓰다듬기</b></button>
@@ -1757,8 +1764,10 @@ const FoxRoom = {
   },
 
   /* Enter the foxes' world. Called from a tap, so the browser lets the page go full screen.
-     (`early`: he is looking at how something will be, before it has opened for her — js/opening.js.) */
-  async open({ early = false } = {}) {
+     (`early`: he is looking at how something will be, before it has opened for her — js/opening.js.
+     `bus`: she has come on the bus from the town — js/bus.js: its ride is over this until it is here, and then the girl
+     from the house gets off and comes in.) */
+  async open({ early = false, bus = false } = {}) {
     if (this.ov) return;
     if (Opening.shut() && !early) return void Opening.tell();
     if (!early) Diary.note('visits');
@@ -1807,12 +1816,18 @@ const FoxRoom = {
     await sleep(260);
     splash.classList.add('is-done');
     setTimeout(() => splash.remove(), 520);
+    if (bus) {
+      // (the ride's screen is still over it: when it has gone, she gets off — js/bus.js)
+      BusRide.ready('fox');
+      await BusRide.landed();
+      if (this.ov !== ov) return;
+    }
     if (!ok) FoxHost.say(Pet.line('greet'), 3000);
     if (!Pet.portrait()) Pet.drawPortrait();
     let met = false;
     if (Meet.due()) {
-      // her first time here: Lorelei says hello and shows her round (js/meet.js)
-      await sleep(700);
+      // her first time here: Lorelei says hello and shows her round (js/meet.js) — once the girl off the bus is in
+      await sleep(bus ? 4200 : 700);
       if (this.ov !== ov) return;
       if (UI.top() === ov) met = await Meet.begin();
       if (this.ov !== ov) return;
@@ -1878,8 +1893,9 @@ const FoxRoom = {
     Halloween.left();
     Christmas.left();
     Moon.left();
+    BusRide.left('fox');
     FoxHost.unmount();
-    this.leaveFullscreen();
+    if (!BusRide.switching) this.leaveFullscreen(); // (on the bus to the town: it is full screen there too)
     Pet.refresh();
   },
 
@@ -2033,7 +2049,7 @@ const FoxRoom = {
 
   /*
      The season and the weather, written over the view — and passed on to the 3D side, which draws it; and the sky over
-     Seoul (js/moon.js): the evening, the night, the moon. When the sky changes while she is watching, she is told (the
+     Incheon (js/moon.js): the evening, the night, the moon. When the sky changes while she is watching, she is told (the
      foxes have their own say: js/fox/weatherlife.js).
   */
   sky() {

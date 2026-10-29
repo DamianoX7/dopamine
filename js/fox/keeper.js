@@ -28,6 +28,7 @@ export class Keeper extends Brain {
     this.tall = me.rig.size; // how large she is drawn: what she reaches, and how near she comes, goes by it
     this.stroking = false; // her hand is on the fox she knelt down by
     this.hello = 0; //      when she last said something to whoever is looking on
+    this.side = 1; //       where she stands by the others (1: on their left; a visitor from the house takes the other side, visitor.js)
   }
 
   /** The foxes' games are not for her. */
@@ -112,7 +113,7 @@ export class Keeper extends Brain {
     let top = 0;
     for (const f of this.w.foxes) {
       const b = f.brain;
-      if (b.asleep || b.stray || b.using || b.sheltered || f.anim.air > 0.02 || !(b.free || b.doing === 'strokedBy')) continue;
+      if (b.asleep || b.stray || b.using || b.sheltered || f.anim.air > 0.02 || !(b.free || (b.doing === 'strokedBy' && b.target === this.fox))) continue; // (not one the other girl is stroking)
       const v = (0.4 + Math.random()) / (0.6 + this.distTo(f));
       if (v > top) {
         top = v;
@@ -739,10 +740,10 @@ export class Keeper extends Brain {
     const dx = Math.sin(g.az);
     const dz = -Math.cos(g.az);
     // (a little further off than the foxes, kneeling: she is twice as tall as they are)
-    const out = -0.46 - 0.16 * Math.min(4, w.foxes.length);
+    const out = (-0.46 - 0.16 * Math.min(4, w.foxes.length)) * this.side;
     const to = w.clearOf(this.clampPoint(g.x + dz * -out + dx * 0.6, g.z + dx * out + dz * 0.6, 0.92), 0.3);
     if (Math.hypot(to.x - a.pos.x, to.z - a.pos.z) > 0.2) yield* this.goTo(to.x, to.z, { speed: 'walk', stop: 0.1, timeout: 7 });
-    yield* this.turnTo(this.moonward() + 0.15, 4);
+    yield* this.turnTo(this.moonward() + 0.15 * this.side, 4);
     a.setPose('sit', 4);
     this.lookAtMoon(0.9);
     for (let t = 0; w.gazing; ) {
@@ -804,7 +805,7 @@ export class Keeper extends Brain {
     const a = this.a;
     const w = this.w;
     const b = w.env.bounds;
-    const at = this.clampPoint(b.cx - 0.9, b.cz - 0.98, 0.95);
+    const at = this.clampPoint(b.cx - 0.9 * this.side, b.cz - 0.98, 0.95);
     if (Math.hypot(at.x - a.pos.x, at.z - a.pos.z) > 0.25) yield* this.goTo(at.x, at.z, { speed: 'trot', stop: 0.1, timeout: 6 });
     yield* this.turnTo(Math.atan2(b.cx - a.pos.x, b.cz + 0.1 - a.pos.z), 5);
     a.mood.smile = 1;
@@ -822,7 +823,7 @@ export class Keeper extends Brain {
     const a = this.a;
     const w = this.w;
     const radio = w.things.radio.object.position;
-    const at = this.clampPoint(radio.x - 0.75, radio.z - 0.06, 0.98);
+    const at = this.clampPoint(radio.x - 0.75 * this.side, radio.z - 0.06, 0.98);
     this.close = true;
     if (Math.hypot(at.x - a.pos.x, at.z - a.pos.z) > 0.2) yield* this.goTo(at.x, at.z, { speed: 'trot', stop: 0.09, timeout: 7 });
     yield* this.turnTo(this.toCamera(), 6);

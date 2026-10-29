@@ -577,3 +577,44 @@ body.reduce-motion .cook-verdict.show {
     opacity: 1;
   }
 }
+
+/* ---------- 뭉치, the white stray (js/cat.js) ---------- */
+.house-bubble.is-cat[data-who]::before {
+  color: #7a8aa8;
+}
+.cat-name-note {
+  margin: -4px 0 8px;
+  color: var(--ink-2);
+  font-size: 13px;
+  text-align: center;
+}
+.cat-trust {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 2px 0 6px;
+  font-size: 14px;
+}
+.cat-trust span {
+  color: var(--ink-2);
+}
+.cat-trust b {
+  font-size: 18px;
+  letter-spacing: 2px;
+}
+.cat-acts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 10px 0 4px;
+}
+.cat-acts .btn small {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+.cat-acts .btn.primary {
+  grid-column: 1 / -1;
+}

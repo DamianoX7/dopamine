@@ -1,0 +1,499 @@
+/* ==================================================================
+   🚌 506번 (js/bus.js) — the ride between 우리 동네 and the foxes'
+   village; the bus stop's sheet on the street; the bus button in the
+   foxes' world, and the bubble of the girl from the house there.
+   ================================================================== */
+
+/* ---------- the ride: over everything but the toasts ---------- */
+.overlay.is-ride {
+  z-index: 80;
+}
+.overlay.is-ride .ov-panel {
+  overflow: hidden;
+  background: #8fd3ff;
+  opacity: 0;
+  transform: none;
+  transition: opacity 0.42s ease;
+}
+.overlay.is-ride.open .ov-panel {
+  opacity: 1;
+}
+.overlay.is-ride.closing .ov-panel {
+  opacity: 0;
+  transform: none;
+  transition-duration: 0.5s;
+}
+.ride {
+  --sky1: #8fd3ff;
+  --sky2: #ffe6f0;
+  --hill1: #9fdc8f;
+  --hill2: #72c46a;
+  --hill3: #5aa860;
+  --ground: #8fcf72;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--sky1) 0%, var(--sky2) 60%);
+  color: #fff;
+  font-family: var(--font);
+  user-select: none;
+}
+.ride.is-dusk {
+  --sky1: #ff9f7a;
+  --sky2: #ffd9bf;
+  --hill1: #c7b46a;
+  --hill2: #a89a55;
+  --hill3: #8a8045;
+  --ground: #b9b26a;
+}
+.ride.is-night {
+  --sky1: #121738;
+  --sky2: #3b3a78;
+  --hill1: #2f5242;
+  --hill2: #264536;
+  --hill3: #1d382b;
+  --ground: #2c4a35;
+}
+/* the grass below the road */
+.ride::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 25%;
+  background: var(--ground);
+}
+.ride-sky,
+.ride-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.ride-layer span {
+  position: absolute;
+  left: 0;
+  line-height: 1;
+  will-change: transform;
+}
+/* the sun (the evening's low, the moon at night) */
+.ride-sun {
+  position: absolute;
+  top: 13%;
+  right: 13%;
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff6bf 0 52%, rgba(255, 238, 160, 0) 70%);
+}
+.ride.is-dusk .ride-sun {
+  top: 30%;
+  background: radial-gradient(circle, #ffd27a 0 50%, rgba(255, 170, 90, 0) 70%);
+}
+.ride.is-night .ride-sun {
+  width: 54px;
+  height: 54px;
+  background: radial-gradient(circle, #f4f2ff 0 50%, rgba(214, 220, 255, 0) 70%);
+}
+/* clouds by day, sparkles of stars by night, high up */
+.ride-sky .ride-layer span:nth-child(3n + 1) {
+  top: 9%;
+}
+.ride-sky .ride-layer span:nth-child(3n + 2) {
+  top: 21%;
+}
+.ride-sky .ride-layer span:nth-child(3n) {
+  top: 31%;
+}
+.ride:not(.is-night) .ride-sky .ride-layer span {
+  opacity: 0.92;
+  filter: drop-shadow(0 4px 6px rgba(80, 120, 160, 0.18));
+}
+.ride.is-night .ride-sky .ride-layer span {
+  color: #fff8d8;
+  text-shadow: 0 0 6px rgba(255, 244, 200, 0.9);
+  animation: rideTwinkle 2.4s ease-in-out infinite;
+}
+.ride.is-night .ride-sky .ride-layer span:nth-child(4n + 1) {
+  top: 16%;
+}
+.ride.is-night .ride-sky .ride-layer span:nth-child(4n + 3) {
+  top: 39%;
+}
+.ride.is-night .ride-sky .ride-layer span:nth-child(2n) {
+  animation-delay: -1.2s;
+}
+@keyframes rideTwinkle {
+  50% {
+    opacity: 0.35;
+  }
+}
+/* rolling hills, far off (a strip that slides, and comes round again every 400px) */
+.ride-hills {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 40%;
+  height: 22%;
+  overflow: hidden;
+}
+.ride-hills i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(100% + 400px);
+  background:
+    radial-gradient(110px 64px at 70px 100%, var(--hill2) 98%, transparent 100%),
+    radial-gradient(160px 92px at 250px 100%, var(--hill1) 98%, transparent 100%),
+    radial-gradient(90px 46px at 360px 100%, var(--hill3) 98%, transparent 100%),
+    linear-gradient(0deg, var(--hill1) 0 12%, transparent 12%);
+  background-size: 400px 100%;
+  background-repeat: repeat-x;
+  will-change: transform;
+}
+/* what goes by: houses, trees, the forest, the stream — and the foxes' village */
+.ride-mid span {
+  bottom: 40%;
+}
+.ride.is-night .ride-mid span,
+.ride.is-night .ride-near span {
+  filter: brightness(0.62) saturate(0.75);
+}
+.ride-near span {
+  bottom: 13%;
+}
+/* the road, its line going by */
+.ride-road {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 25%;
+  height: 15%;
+  overflow: hidden;
+  background: #6d6a74;
+  box-shadow:
+    inset 0 5px 0 #e4e0e6,
+    inset 0 -5px 0 #e4e0e6;
+}
+.ride.is-night .ride-road {
+  background: #45434e;
+}
+.ride-road i {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: calc(100% + 64px);
+  height: 4px;
+  margin-top: -2px;
+  background: repeating-linear-gradient(90deg, #f4f2f0 0 32px, transparent 32px 64px);
+  will-change: transform;
+}
+/* the bus, in the middle, bouncing along */
+.ride-bus {
+  --w: min(78vw, 420px);
+  position: absolute;
+  left: 50%;
+  bottom: 26.5%;
+  width: var(--w);
+  margin-left: calc(var(--w) / -2);
+  transform-origin: 50% 100%;
+  will-change: transform;
+}
+.ride-bus svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.ride.is-night .rb-glass {
+  fill: #ffcf8a;
+  opacity: 0.85;
+}
+.ride.is-night .rb-lamp {
+  filter: drop-shadow(0 0 6px #fff1b0) drop-shadow(0 0 14px #ffe08a);
+}
+/* rain on the window, or snow */
+.ride-weather {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.ride.is-rain .ride-weather {
+  background: repeating-linear-gradient(104deg, transparent 0 18px, rgba(230, 240, 255, 0.4) 18px 19.5px, transparent 19.5px 47px);
+  background-size: 120px 120px;
+  animation: rideRain 0.45s linear infinite;
+}
+@keyframes rideRain {
+  to {
+    background-position: -30px 120px;
+  }
+}
+.ride.is-snow .ride-weather {
+  background-image: radial-gradient(circle, #fff 0 2px, transparent 3px), radial-gradient(circle, rgba(255, 255, 255, 0.8) 0 1.5px, transparent 2.5px);
+  background-size: 70px 70px, 43px 43px;
+  animation: rideSnow 3s linear infinite;
+}
+@keyframes rideSnow {
+  to {
+    background-position: -70px 70px, -43px 86px;
+  }
+}
+
+/* where it goes: the LED over the windscreen, the line of its stops */
+.ride-top {
+  position: absolute;
+  top: calc(var(--safe-t) + 16px);
+  left: 50%;
+  width: min(calc(100% - 32px), 440px);
+  transform: translateX(-50%);
+}
+.ride-led {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-radius: 12px;
+  background: #16131a;
+  color: #ffab2e;
+  font-size: 19px;
+  text-shadow: 0 0 8px rgba(255, 171, 46, 0.75);
+  box-shadow:
+    inset 0 0 0 2px #3a3340,
+    0 12px 26px -14px rgba(0, 0, 0, 0.8);
+}
+.ride-led b {
+  padding: 1px 8px;
+  border-radius: 7px;
+  background: #3cbf9a;
+  color: #fff;
+  font-family: 'Fredoka', 'Jua', sans-serif;
+  font-weight: 700;
+  text-shadow: none;
+}
+.ride-led em {
+  margin-left: auto;
+  color: #ff5a5a;
+  font-style: normal;
+  text-shadow: 0 0 8px rgba(255, 70, 70, 0.8);
+  animation: rideBlink 1s steps(2, jump-none) infinite;
+}
+.ride-led em[hidden] {
+  display: none;
+}
+@keyframes rideBlink {
+  50% {
+    opacity: 0.35;
+  }
+}
+.ride-stops {
+  position: relative;
+  display: flex;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ride-stops::before {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: 12.5%;
+  right: 12.5%;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.7);
+}
+.ride-stops li {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  text-shadow: 0 1px 3px rgba(20, 10, 40, 0.55);
+}
+.ride-stops li i {
+  width: 15px;
+  height: 15px;
+  border: 3px solid #b9b2c6;
+  border-radius: 50%;
+  background: #fff;
+  transition: background 0.3s, border-color 0.3s;
+}
+.ride-stops li.past i {
+  border-color: #ffab2e;
+  background: #ffd68a;
+}
+.ride-stops li:last-child {
+  font-size: 14px;
+}
+.ride-stops li:last-child i {
+  border-color: #ff5fa2;
+}
+.ride-stops li.past:last-child i {
+  background: #ff9cc6;
+}
+
+/* what the bus says; the 하차벨 */
+.ride-say {
+  position: absolute;
+  left: max(16px, calc(50% - 290px));
+  right: max(98px, calc(50% - 290px));
+  bottom: calc(var(--safe-b) + 22px);
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(22, 19, 26, 0.72);
+  color: #ffd68a;
+  font-size: 14.5px;
+  line-height: 1.35;
+  text-align: center;
+}
+.ride-bell {
+  position: absolute;
+  right: 16px;
+  bottom: calc(var(--safe-b) + 14px);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  width: 70px;
+  height: 70px;
+  padding: 0;
+  border: 4px solid #fff;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ff8f8f, #e0283c 70%);
+  box-shadow: 0 10px 20px -8px rgba(80, 0, 20, 0.7);
+  color: #fff;
+  font-family: var(--font);
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+.ride-bell span {
+  font-size: 22px;
+}
+.ride-bell small {
+  margin-top: 2px;
+  font-size: 11px;
+}
+.ride-bell:active {
+  transform: scale(0.93);
+}
+.ride-bell.on {
+  animation: rideBell 0.9s ease-in-out infinite;
+}
+@keyframes rideBell {
+  50% {
+    box-shadow:
+      0 0 0 8px rgba(255, 80, 90, 0.35),
+      0 0 26px 6px rgba(255, 80, 90, 0.55);
+  }
+}
+body.reduce-motion .ride-bell.on,
+body.reduce-motion .ride-weather,
+body.reduce-motion .ride-sky .ride-layer span {
+  animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ride-bell.on,
+  .ride-weather,
+  .ride-sky .ride-layer span {
+    animation: none;
+  }
+}
+
+/* ---------- the bus stop on the street (js/town.js) ---------- */
+.house-room .town-acts .fh-act.is-bus {
+  background: linear-gradient(135deg, #e3fbf2, #dff1ff);
+}
+.bus-route {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 10px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #1b1820;
+}
+.br-no {
+  padding: 3px 10px;
+  border-radius: 9px;
+  background: #3cbf9a;
+  color: #fff;
+  font-family: 'Fredoka', 'Jua', sans-serif;
+  font-size: 19px;
+  font-weight: 700;
+}
+.br-to {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.br-to b {
+  color: #ffd68a;
+  font-size: 18px;
+}
+.br-to small {
+  color: #ffab2e;
+  font-size: 13px;
+}
+.bus-stops {
+  position: relative;
+  display: flex;
+  margin: 4px 0 6px;
+  padding: 0;
+  list-style: none;
+}
+.bus-stops::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 12.5%;
+  right: 12.5%;
+  height: 3px;
+  border-radius: 2px;
+  background: #d9e9e3;
+}
+.bus-stops li {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.bus-stops li::before {
+  content: '';
+  width: 13px;
+  height: 13px;
+  border: 3px solid #3cbf9a;
+  border-radius: 50%;
+  background: #fff;
+}
+.bus-stops li.here {
+  color: var(--ink);
+  font-weight: 700;
+}
+.bus-stops li.here::before {
+  background: #3cbf9a;
+}
+.bus-stops li:last-child::before {
+  border-color: #ff5fa2;
+}
+
+/* ---------- in the foxes' world: the bus home, her bubble ---------- */
+.fox-cam.is-bus {
+  top: calc(var(--safe-t) + 226px);
+  background: linear-gradient(135deg, #e3fbf2, #dff1ff);
+}
+.fox-cam.is-moon[hidden] ~ .fox-cam.is-bus {
+  top: calc(var(--safe-t) + 172px);
+}
+.fox-room.talk-on[data-point='camera'] .fox-cam.is-bus {
+  visibility: hidden;
+  animation: none;
+}
+.fox-bubble.is-me[data-who]::before {
+  color: #8a63d2;
+}

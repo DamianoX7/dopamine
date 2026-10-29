@@ -3,7 +3,7 @@
 // inside, facing the street — the café, the convenience store, the coin karaoke (townshops.js); on the near side the
 // park (swings, a slide, a bench, trees that follow the year), a bus stop, two vending machines, the courier's scooter
 // parked by the kerb, a garden with the neighbourhood's big tree; lamp posts, and the wires strung between the poles as
-// in any street in Seoul.
+// in any street in Incheon.
 //
 // buildTown() gives back { group, shops, walls (that fold), doors, grid (the ground as squares: grid.js), places
 // (where one goes and stands and sits, in the town's measure), trees, lamps, glows, taps, swings, pigeons, …}. The
@@ -31,6 +31,10 @@ const AT = {
   home: V(-7.8, 0, -4.7), // her cottage (turned to face the street: its door at x = -8.4)
 };
 const HOME = { w: 4.0, d: 2.8, h: 1.5, door: -8.4, doorW: 0.72 };
+// the bus (bus.js): the middle of the lane it keeps to, on the stop's side of the road — and where its door stands
+// when it stops, before the shelter
+export const LANE = 0.62;
+export const STOP_DOOR = -1.05;
 const PARK = { x0: -10.6, x1: -3.95, z0: 2.5, z1: 6.6, gate: [-8.9, -7.9] };
 
 /* Painted ground: grass, the pavement's bricks, the road. */
@@ -504,17 +508,94 @@ function scooter(group, x, z) {
   return g;
 }
 
-function busStop(P, x0, x1, z) {
+/* The board under the stop's sign: the stop's name, and the bus that stops here — when it comes (or, before the foxes'
+   village has opened, from when it will run: `when`). */
+function drawStopBoard(g, W, H, when) {
+  g.fillStyle = '#ffffff';
+  g.fillRect(0, 0, W, H);
+  g.fillStyle = '#36c2a6';
+  g.fillRect(0, 0, W, H * 0.3);
+  g.fillStyle = '#ffffff';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.font = `700 ${Math.round(H * 0.17)}px Jua, sans-serif`;
+  g.fillText('🚏 말랑공원 앞', W / 2, H * 0.16);
+  // the route: its number on a green tag, where it goes
+  g.fillStyle = '#3cbf9a';
+  g.beginPath();
+  g.roundRect(W * 0.06, H * 0.38, W * 0.3, H * 0.2, H * 0.05);
+  g.fill();
+  g.fillStyle = '#ffffff';
+  g.font = `700 ${Math.round(H * 0.15)}px Fredoka, Jua, sans-serif`;
+  g.fillText('506', W * 0.21, H * 0.485);
+  g.fillStyle = '#3a3340';
+  g.font = `700 ${Math.round(H * 0.14)}px Jua, sans-serif`;
+  g.fillText('여우마을 🦊', W * 0.67, H * 0.485);
+  // …and when it comes, in orange on black
+  g.fillStyle = '#1b1820';
+  g.fillRect(W * 0.06, H * 0.66, W * 0.88, H * 0.26);
+  g.fillStyle = '#ffab2e';
+  g.font = `700 ${Math.round(H * (when ? 0.12 : 0.15))}px Jua, sans-serif`;
+  g.fillText(when ? `${when} 첫차` : '곧 도착', W / 2, H * 0.795);
+}
+
+/* The bus stop: its shelter (a bench under a roof), and by the kerb its sign — a round plate with a bus on it, the board
+   of the bus that stops here. Those, and the shelter, can be tapped (`group`: where they go). → { roof (it fades while
+   she is under it), redraw(when) }. */
+function busStop(P, group, x0, x1, z) {
   const cx = (x0 + x1) / 2;
   const w = x1 - x0;
   for (const s of [-1, 1]) pole(P.get('metal'), [cx + s * (w / 2 - 0.05), 0, z + 0.3], [cx + s * (w / 2 - 0.05), 1.75, z + 0.3], 0.03, '#36c2a6', 6);
-  P.get('gloss').add(roundBox(w + 0.2, 0.06, 0.95, 0.03), { at: [cx, 1.78, z + 0.05], rot: [0.08, 0, 0], color: '#36c2a6' });
+  // (its roof on its own, with a material of its own: it fades while she waits under it — see town.js seeThrough)
+  const roof = new THREE.Mesh(roundBox(w + 0.2, 0.06, 0.95, 0.03), new THREE.MeshStandardMaterial({ color: '#36c2a6', roughness: 0.26 }));
+  roof.position.set(cx, 1.78, z + 0.05);
+  roof.rotation.x = 0.08;
+  roof.castShadow = roof.receiveShadow = true;
+  group.add(roof);
   P.get('metal').add(new THREE.BoxGeometry(w - 0.1, 0.05, 0.05), { at: [cx, 1.2, z + 0.32], color: '#36c2a6' });
   bench(P, cx, z + 0.05, Math.PI, w - 0.6);
   // the sign: a pole and a round plate
-  pole(P.get('metal'), [x0 - 0.25, 0, z - 0.2], [x0 - 0.25, 2.1, z - 0.2], 0.025, '#3a3a44', 6);
-  P.get('gloss').add(new THREE.CylinderGeometry(0.2, 0.2, 0.03, 20), { at: [x0 - 0.25, 2.05, z - 0.2], rot: [Math.PI / 2, 0, 0], color: '#36c2a6' });
-  P.get('paint').add(new THREE.CylinderGeometry(0.14, 0.14, 0.035, 20), { at: [x0 - 0.25, 2.05, z - 0.2], rot: [Math.PI / 2, 0, 0], color: '#ffffff' });
+  const sx = x0 - 0.25;
+  const sz = z - 0.2;
+  pole(P.get('metal'), [sx, 0, sz], [sx, 2.1, sz], 0.025, '#3a3a44', 6);
+  P.get('gloss').add(new THREE.CylinderGeometry(0.2, 0.2, 0.03, 20), { at: [sx, 2.05, sz], rot: [Math.PI / 2, 0, 0], color: '#36c2a6' });
+  P.get('paint').add(new THREE.CylinderGeometry(0.14, 0.14, 0.035, 20), { at: [sx, 2.05, sz], rot: [Math.PI / 2, 0, 0], color: '#ffffff' });
+  P.get('paint').add(roundBox(0.5, 0.39, 0.03, 0.01), { at: [sx, 1.45, sz + 0.012], color: '#36c2a6' });
+  const face = new THREE.Mesh(
+    new THREE.CircleGeometry(0.13, 24),
+    new THREE.MeshStandardMaterial({
+      map: canvasTex(128, 128, (c, Wc, Hc) => {
+        c.fillStyle = '#ffffff';
+        c.fillRect(0, 0, Wc, Hc);
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.font = `${Math.round(Hc * 0.62)}px sans-serif`;
+        c.fillText('🚌', Wc / 2, Hc * 0.54);
+      }),
+      roughness: 0.5,
+    })
+  );
+  face.position.set(sx, 2.05, sz + 0.019);
+  const tex = canvasTex(256, 192, (c, Wc, Hc) => drawStopBoard(c, Wc, Hc, ''));
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(0.46, 0.345), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 }));
+  board.position.set(sx, 1.45, sz + 0.029);
+  // (the shelter, as a box nobody sees: a tap on it is a tap on the stop)
+  const hit = new THREE.Mesh(new THREE.BoxGeometry(w + 0.6, 1.9, 1.3), new THREE.MeshBasicMaterial({ visible: false }));
+  hit.position.set(cx - 0.25, 0.95, z + 0.1);
+  for (const m of [face, board, hit]) {
+    m.userData.tap = 'bus';
+    group.add(m);
+  }
+  let shown = null;
+  return {
+    roof,
+    redraw(when) {
+      if (when === shown) return;
+      shown = when;
+      drawStopBoard(tex.image.getContext('2d'), tex.image.width, tex.image.height, when);
+      tex.needsUpdate = true;
+    },
+  };
 }
 
 // ================================================================== the whole town
@@ -724,7 +805,7 @@ export function buildTown() {
   for (let x = BOARD.x0 + 0.4; x < 9.6; x += 0.5) P.get('leaf').add(new THREE.IcosahedronGeometry(0.28, 1), { at: [x, 0.22, -7.6], scale: [1, 0.8, 0.8], color: ['#3f8a4c', '#6fbf6a'], flat: true });
 
   // ---- the near side of the street: the bus stop, the vending machines, the scooter, a garden with a bench
-  busStop(P, -2.5, 0.1, 2.85);
+  const stop = busStop(P, group, -2.5, 0.1, 2.85);
   vending(P, 1.25, 2.75, '#e8473a', 1);
   vending(P, 1.88, 2.75, '#4a7ad9', 2);
   const scoot = scooter(group, 3.35, 2.8);
@@ -871,7 +952,19 @@ export function buildTown() {
         { at: V(3.35, 0, 2.15), face: V(3.35, 0.5, 2.8), line: 'scooter' },
         { at: V(9.2, 0, 3.85), face: V(9.2, 1.8, 4.9), line: 'big_tree' },
         { at: V(-0.9, 0, -1.65), face: V(-0.95, 0.4, -2.0), line: 'cafe_sign' },
+        { at: V(-2.75, 0, 3.15), face: V(-2.75, 1.45, 2.68), line: 'bus_board' },
       ],
+    },
+    // the bus stop: where she waits (looking down the road, where it comes from), the kerb by its door when it stands
+    // here (`doorX`: along the road; `lane`: the middle of the bus, across it), the step up into it, and in
+    bus: {
+      wait: V(-1.5, 0, 1.85),
+      look: V(-9, 0.9, LANE),
+      doorX: STOP_DOOR,
+      lane: LANE,
+      kerb: V(STOP_DOOR, 0, 1.45),
+      step: V(STOP_DOOR, 0, 1.08),
+      inside: V(STOP_DOOR, 0, 0.78),
     },
   };
   for (const name in shops) {
@@ -883,7 +976,7 @@ export function buildTown() {
     }
     places[name] = sp;
   }
-  return { group, shops, home, places, grid, trees, lamps, glows, taps, swings, pigeons, mats, wires: wireGroup, scooter: scoot, grass, grassTex: tex.grass, snowTex: tex.snow };
+  return { group, shops, home, places, grid, trees, lamps, glows, taps, swings, pigeons, mats, wires: wireGroup, scooter: scoot, stop, grass, grassTex: tex.grass, snowTex: tex.snow };
 }
 
 export { AT as TOWN_AT, HOME as TOWN_HOME, PARK as TOWN_PARK, SEASON_COLORS };

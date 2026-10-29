@@ -40,7 +40,7 @@ const KNIT_YAW = Math.PI + 0.4; // the fox she knits a sweater for: its back to 
 const FREE = new Set(['wander', 'lookAbout', 'sitAwhile', 'lieAwhile', 'sniffAbout', 'groom', 'yawn', 'stretch', 'shake', 'mope', 'follow', 'visit', 'greetBack', 'snuggle', 'nuzzle', 'lookOn']);
 const RESTING = new Set(['sitAwhile', 'lieAwhile', 'groom', 'snuggle', 'sleep', 'mope', 'strokedBy']);
 // …and what it finishes first, whatever the weather does
-const INTENT = new Set(['fetchLetter', 'present', 'bringGift', 'eat', 'playBall', 'party', 'lullaby', 'strike', 'model', 'depart', 'alight', 'wake', 'petted', 'greet', 'arrive', 'unwrapped', 'lookOn', 'stepUp', 'sing', 'takeCover', 'moonGaze']);
+const INTENT = new Set(['fetchLetter', 'present', 'bringGift', 'eat', 'playBall', 'party', 'lullaby', 'strike', 'model', 'depart', 'alight', 'wake', 'petted', 'greet', 'arrive', 'unwrapped', 'lookOn', 'stepUp', 'sing', 'takeCover', 'moonGaze', 'welcome']);
 
 export class Brain {
   constructor(world, fox) {
@@ -224,12 +224,13 @@ export class Brain {
       add('snuggle', kid ? 1.3 : 0.5);
       add('pounceTail', (kid ? 0.9 : 0.12) * lively * still);
     }
-    // Lorelei: after her when she strolls about, up against her when she kneels down, over for a sniff at her hand
-    const her = w.owner;
-    if (her && her !== this.fox && !her.brain.asleep) {
+    // Lorelei: after her when she strolls about, up against her when she kneels down, over for a sniff at her hand —
+    // and the same with the girl from the house, while she is here (visitor.js)
+    for (const her of [w.owner, w.visitor]) {
+      if (!her || her === this.fox || her.brain.asleep || her.away) continue;
       if (her.brain.doing === 'amble') add('follow', kid ? 1.5 : 0.3, her);
       if (her.brain.doing === 'sitAwhile') add('snuggle', 1.4 * this.room(her), her);
-      add('nuzzle', 0.3 * this.room(her), her);
+      add('nuzzle', (her === w.visitor ? 0.45 : 0.3) * this.room(her), her);
     }
     // the things she has put in the yard, as long as no other fox has them
     for (const it of w.decor) {
@@ -290,8 +291,7 @@ export class Brain {
   crowded(p, but = null) {
     const mine = 0.26 * this.S;
     const c = [];
-    const her = this.w.owner;
-    if (her && her !== this.fox && her !== but && Math.hypot(p.x - her.anim.pos.x, p.z - her.anim.pos.z) < 0.16 + mine) return true; // (…or on top of Lorelei)
+    for (const her of [this.w.owner, this.w.visitor]) if (her && her !== this.fox && her !== but && Math.hypot(p.x - her.anim.pos.x, p.z - her.anim.pos.z) < 0.16 + mine) return true; // (…or on top of Lorelei, or the girl from the house)
     return this.w.foxes.some((f) => {
       if (f === this.fox || f === but) return false;
       this.w.shape(f, c);
@@ -754,9 +754,8 @@ export class Brain {
         mind(f.anim.pos.x - fs * 0.2, f.anim.pos.z - fc * 0.2, 0.13 * f.rig.scale, near);
         mind(f.anim.pos.x + fs * 0.3, f.anim.pos.z + fc * 0.3, 0.13 * f.rig.scale, near);
       }
-      // …and Lorelei
-      const her = w.owner;
-      if (her && her !== this.fox && her !== skip && her.anim.air < 0.02) mind(her.anim.pos.x, her.anim.pos.z, 0.16, near);
+      // …and Lorelei (and the girl from the house)
+      for (const her of [w.owner, w.visitor]) if (her && her !== this.fox && her !== skip && her.anim.air < 0.02) mind(her.anim.pos.x, her.anim.pos.z, 0.16, near);
       want += clamp(lean, -1.35, 1.35);
       const d = wrapAngle(want - a.yaw);
       const step = clamp(d, -turnRate * dt, turnRate * dt);
@@ -1375,6 +1374,7 @@ export class Brain {
    */
   *strokedBy(o) {
     const a = this.a;
+    this.target = o; // (hers: nobody else kneels down by it meanwhile)
     const hers = () => o.brain.doing === 'petOne' && o.brain.target === this.fox;
     a.speed = 0;
     a.setPose('sit', 6);
@@ -1416,6 +1416,31 @@ export class Brain {
     this.lookAt(o, 0.9);
     a.mood.wag = 1;
     yield* this.wait(rand(1.5, 2.5));
+  }
+
+  /** The girl from the house has come on the bus (visitor.js): it runs to meet her, tail going, jumps for joy at her
+   *  feet — and sits and looks up at her. Each in its own place round her, so that they do not land on one another. */
+  *welcome(o) {
+    const a = this.a;
+    const i = this.place();
+    const side = (i % 2 ? 1 : -1) * (0.45 + 0.4 * Math.floor(i / 2));
+    const gap = 0.3 * this.S + 0.32;
+    this.target = o;
+    yield* this.wait(0.1 + 0.2 * i);
+    this.lookAt(o, 0.8);
+    a.mood.tailUp = 0.3;
+    yield* this.goTo(0, 0, { speed: this.reduce ? 'trot' : 'run', stop: 0.12, timeout: 7, skip: o, moving: () => this.beside(o, side, gap) });
+    if (this.distTo(o) > gap + 0.6 * this.S) return; // (she had walked on)
+    yield* this.turnTo(this.angleTo(o), 7);
+    a.mood.tailUp = 0;
+    a.mood.wag = 1;
+    yield* this.hop(0.16);
+    a.setPose('sit', 5);
+    this.lookAt(o, 0.9);
+    for (let t = 0, end = rand(2, 3.2); t < end; ) {
+      t += yield;
+      a.mood.wag = 0.7 + 0.3 * Math.sin(t * 3);
+    }
   }
 
   /** Someone else is being petted: come and sit close, looking hopeful. */

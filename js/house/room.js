@@ -1,7 +1,7 @@
 // The house itself: one room on a slab, its floor, four walls, a door on the right with a
 // little porch outside it, and a window on the back wall. It is seen like a doll's house —
 // the walls on the side she looks from fold down out of the way (cut), so that whichever way
-// she turns it she looks in. Behind the window is Seoul: the sky as it is right now over the
+// she turns it she looks in. Behind the window is Incheon: the sky as it is right now over the
 // city (the sun, the evening, tonight's moon and its phase), its weather right now, the
 // season on the tree outside, the lights of the flats at night — painted on a canvas, seen
 // through the glass with a little depth to it. In the day a patch of sunlight comes in through
@@ -172,33 +172,40 @@ function paintView(g, W, H, v) {
     }
   }
   g.globalAlpha = 1;
-  // the city: hills, Namsan with its tower, rows of flats — their windows lit at night
+  // the city: low hills, Songdo's towers by the sea — the tallest, the Northeast Asia Trade Tower, its top cut on a
+  // slant — rows of flats; their windows lit at night
   const far = greyed(mix(mix('#a9b9dc', '#c99aa8', gold), '#272e5c', night));
   const near = greyed(mix(mix('#8ea2cf', '#b07f95', gold), '#1d2350', night));
   g.fillStyle = far;
   g.beginPath();
   g.moveTo(0, H * 0.7);
-  for (let x = 0; x <= W; x += W / 16) g.lineTo(x, H * 0.66 - Math.sin(x / W * 5.3 + 1) * H * 0.04 - (x > W * 0.55 && x < W * 0.8 ? Math.sin(((x - W * 0.55) / (W * 0.25)) * Math.PI) * H * 0.1 : 0));
+  for (let x = 0; x <= W; x += W / 16) g.lineTo(x, H * 0.67 - Math.sin(x / W * 5.3 + 1) * H * 0.03);
   g.lineTo(W, H);
   g.lineTo(0, H);
   g.fill();
-  // N Seoul Tower on the hill
-  const tx = W * 0.675;
-  const ty = H * 0.555;
-  g.fillStyle = far;
-  g.fillRect(tx - W * 0.004, ty - H * 0.16, W * 0.008, H * 0.17);
-  g.beginPath();
-  g.ellipse(tx, ty - H * 0.12, W * 0.016, H * 0.018, 0, 0, TAU);
-  g.fill();
-  g.fillRect(tx - W * 0.0015, ty - H * 0.22, W * 0.003, H * 0.07);
-  if (night > 0.4) {
-    g.fillStyle = `rgba(255, 140, 190, ${night})`;
+  const base = H * 0.68;
+  const tower = (x, w, h, slant = 0) => {
     g.beginPath();
-    g.ellipse(tx, ty - H * 0.12, W * 0.012, H * 0.01, 0, 0, TAU);
+    g.moveTo(x - w / 2, base);
+    g.lineTo(x - w * 0.42, base - h);
+    g.lineTo(x + w * 0.42, base - h + slant);
+    g.lineTo(x + w / 2, base);
+    g.closePath();
     g.fill();
-    g.fillStyle = '#ff5f8f';
+    return base - h;
+  };
+  g.fillStyle = mix(far, near, 0.25);
+  for (const [dx, w, h] of [[-0.075, 0.03, 0.15], [-0.045, 0.024, 0.19], [0.04, 0.028, 0.17], [0.07, 0.022, 0.13], [0.1, 0.03, 0.1]]) tower(W * (0.675 + dx), W * w, H * h);
+  const tx = W * 0.675;
+  g.fillStyle = far;
+  const peak = tower(tx, W * 0.038, H * 0.27, H * 0.035);
+  if (night > 0.4) {
+    // its windows, and the red light on its top
+    g.fillStyle = `rgba(255, 226, 170, ${0.7 * night})`;
+    for (let y = peak + H * 0.04; y < base - H * 0.02; y += H * 0.022) for (const k of [-0.25, 0, 0.25]) if (rnd() < 0.55) g.fillRect(tx + k * W * 0.03 - 1.5, y, 3, 2);
+    g.fillStyle = '#ff4f5f';
     g.beginPath();
-    g.arc(tx, ty - H * 0.22, 2.4, 0, TAU);
+    g.arc(tx - W * 0.012, peak, 2.4, 0, TAU);
     g.fill();
   }
   const lights = night > 0.35;

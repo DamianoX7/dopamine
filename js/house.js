@@ -8,8 +8,8 @@
    pictures hang in the frames on the walls, her diary lies open on the
    desk, his letters come to the mailbox by the door, the calendar on
    the wall counts their days, the fridge wears a magnet for every
-   achievement — and through the window is Seoul as it is right now:
-   its sky (js/moon.js) and its weather (SeoulWeather, below). She arranges it herself: furniture, wallpaper, the floor,
+   achievement — and through the window is Incheon as it is right now:
+   its sky (js/moon.js) and its weather (CityWeather, below). She arranges it herself: furniture, wallpaper, the floor,
    bought with her coins, moved about a square at a time. On a day
    worth remembering a present waits by the door. And now and then
    Lorelei knocks, and comes in for a while.
@@ -122,7 +122,7 @@ const HOUSE_TIPS = [
   '액자를 누르면 사진첩의 사진을 걸 수 있어요',
   '책상 위 일기장을 누르면 일기장이 열려요',
   '편지가 오면 문 옆 우편함 깃발이 올라가요',
-  '창밖은 지금 서울 하늘이에요. 날씨도, 해 지는 시간도, 오늘 밤 달 모양도 진짜예요',
+  '창밖은 지금 인천 하늘이에요. 날씨도, 해 지는 시간도, 오늘 밤 달 모양도 진짜예요',
   '해가 비치는 날엔 창문으로 들어온 햇빛이 바닥에 내려앉아요',
   '🛋️ 꾸미기에서 가구를 사고, 끌어서 옮길 수 있어요',
   '문 옆 스위치를 누르면 불을 끄고 켤 수 있어요',
@@ -175,15 +175,15 @@ const GUEST_EVERY = 90 * 60000; // she comes at most this often…
 const GUEST_DAY = 2; //            …and at most this many times a day
 
 /* ------------------------------------------------------------------
-   SeoulWeather — the weather outside the window is Seoul's, right now:
+   CityWeather — the weather outside the window is Incheon's, right now:
    asked of Open-Meteo (free, no key; nothing of hers is sent — only
-   where Seoul is), every 20 minutes while the house is open. When it
+   where Incheon is), every 20 minutes while the house is open. When it
    cannot be had, the window shows the weather of her world instead
    (js/weather.js).
    ------------------------------------------------------------------ */
-const SEOUL_URL = 'https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.978&current=temperature_2m,weather_code,precipitation&timezone=Asia%2FSeoul';
+const CITY_URL = 'https://api.open-meteo.com/v1/forecast?latitude=37.4563&longitude=126.7052&current=temperature_2m,weather_code,precipitation&timezone=Asia%2FSeoul';
 /* WMO weather codes → what the window shows, what it is called, its emoji */
-const SEOUL_CODES = [
+const CITY_CODES = [
   [[0], 'clear', '맑음', '☀️'],
   [[1], 'clear', '대체로 맑음', '🌤️'],
   [[2], 'cloudy', '구름 조금', '⛅'],
@@ -197,11 +197,11 @@ const SEOUL_CODES = [
   [[95, 96, 99], 'rain', '천둥번개', '⛈️'],
 ];
 
-const SeoulWeather = {
+const CityWeather = {
   data: null, // { kind, level, name, emoji, temp, at }
   loading: null,
 
-  /** Seoul's weather as it was last heard (within the hour) — or null. */
+  /** Incheon's weather as it was last heard (within the hour) — or null. */
   now() {
     return this.data && Date.now() - this.data.at < 3600000 ? this.data : null;
   },
@@ -212,12 +212,12 @@ const SeoulWeather = {
     if (this.data && Date.now() - this.data.at < 20 * 60000) return Promise.resolve(false);
     const ctl = window.AbortController ? new AbortController() : null;
     const timer = setTimeout(() => ctl && ctl.abort(), 6000);
-    this.loading = fetch(SEOUL_URL, ctl ? { signal: ctl.signal } : {})
+    this.loading = fetch(CITY_URL, ctl ? { signal: ctl.signal } : {})
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
         const c = j && j.current;
         if (!c || typeof c.weather_code !== 'number') return false;
-        const row = SEOUL_CODES.find((x) => x[0].includes(c.weather_code)) || SEOUL_CODES[2];
+        const row = CITY_CODES.find((x) => x[0].includes(c.weather_code)) || CITY_CODES[2];
         const falls = row[1] === 'rain' || row[1] === 'snow';
         this.data = { kind: row[1], level: falls ? clamp(0.4 + (c.precipitation || 0) * 0.5, 0.4, 1) : 0, wet: 0, name: row[2], emoji: row[3], temp: Math.round(c.temperature_2m), at: Date.now() };
         return true;
@@ -284,10 +284,11 @@ const HouseHost = {
   onPlace: (uid, place) => House.placed(uid, place), // …and put it down somewhere else
   onRefuse: () => House.refused(), //                  …where it cannot stand
   onGuest: (what) => House.guestSaid(what), //         Lorelei: 'hello', 'wave', 'bye', 'leaving', 'gone'
-  line: (who, kind) => (who === 'guest' ? House.guestLine(kind) : who === 'rider' ? Delivery.riderLine(kind) : who === 'clerk' || who === 'barista' ? TownLife.line(who, kind) : TownLife.meLine(kind)), // what Lorelei ('guest'), the girl ('me'), the courier ('rider') — or the girl at the store's till, the woman at the café — says about `kind`
+  line: (who, kind) => (who === 'guest' ? House.guestLine(kind) : who === 'rider' ? Delivery.riderLine(kind) : who === 'cat' ? CatLife.line(kind) : who === 'clerk' || who === 'barista' ? TownLife.line(who, kind) : TownLife.meLine(kind)), // what Lorelei ('guest'), the girl ('me'), the courier ('rider') — or the girl at the store's till, the woman at the café — says about `kind`
   onDelivery: (what, o) => Delivery.said(what, o), //  the courier: 'knock', 'handed', 'gone'
   onMeal: (source, id) => (source === 'delivery' ? Delivery.said('done', { id }) : TownLife.ate(source, id)), // she has eaten it all: what the courier brought, what she bought, what she cooked
   onTown: (what, o) => TownLife.said(what, o), //       out of the door: 'out', 'arrive', 'paid', 'singing', 'sung', 'home'
+  onCat: (what) => CatLife.said(what), //               뭉치: 'home' (in at the door with her, just taken home)
   onTownTap: (kind) => TownLife.tapped(kind), //         …a tap on the street: a shop, her house, the swings…
   onCook: (what) => TownLife.cookSaid(what), //          the kitchen: 'ready' (she is at the hob)
   sound: (name) => Sfx.play(name),
@@ -358,29 +359,31 @@ const House = {
       giftKey: (this.giftWaiting() || {}).key || null,
       me: { look: Avatar.look3d(), showcase: HouseRoom.meOn },
       food: { order: (Delivery.pending() || {}).id || null },
-      shut: Opening.shut(), // (the coin karaoke on the street opens with the studio)
+      shut: Opening.shut(), // (the coin karaoke on the street opens with the studio — and the bus to the foxes runs from then)
+      opens: Opening.shut() ? BusRide.firstBus() : '',
+      cat: { adopted: CatLife.adopted() }, // (뭉치 lives here: js/cat.js)
       calendar: this.calendar(today),
       magnets: Object.keys(State.achievements).length,
       tune: CoverHost.tune(),
       radio: Radio.on,
       sky: Moon.now(),
       weather: this.weather(),
-      season: Weather.calendar(), // (Seoul's: the calendar's)
+      season: Weather.calendar(), // (Incheon's: the calendar's)
       reduce: reducedMotion(),
     };
   },
 
-  /** The weather outside the window: Seoul's, if it could be had — otherwise her world's (the meadow follows the year). */
+  /** The weather outside the window: Incheon's, if it could be had — otherwise her world's (the meadow follows the year). */
   weather() {
-    return SeoulWeather.now() || Weather.now('meadow');
+    return CityWeather.now() || Weather.now('meadow');
   },
 
-  /** "☁️ 서울 15° · 흐림" — over the view (her world's weather, if Seoul's could not be had). */
+  /** "☁️ 인천 15° · 흐림" — over the view (her world's weather, if Incheon's could not be had). */
   skyChip() {
-    const w = SeoulWeather.now();
+    const w = CityWeather.now();
     if (!w) return Weather.chipHtml('meadow');
     const emoji = w.kind === 'clear' && Moon.dark() ? Moon.emoji() : w.emoji;
-    return `<span aria-hidden="true">${emoji}</span> 서울 ${w.temp}° <i aria-hidden="true">·</i> ${esc(w.name)}`;
+    return `<span aria-hidden="true">${emoji}</span> 인천 ${w.temp}° <i aria-hidden="true">·</i> ${esc(w.name)}`;
   },
 
   /** The page of the calendar on the wall: this month, today, the days worth remembering in it, and how many days it has been. */
@@ -405,6 +408,7 @@ const House = {
     if (kind === 'switch') return this.switchLight();
     if (kind === 'gift') return this.openGift();
     if (kind === 'guest' || kind === 'me' || kind === 'rider') return; // (they turn and wave: the 3D side has done it)
+    if (kind === 'cat') return CatLife.tapped(); // (뭉치: she goes and strokes it — js/cat.js)
     if (kind === 'door') {
       Sfx.play('tap');
       if (HouseHost.api && HouseHost.api.guestHere()) return UI.toast(`${josa(OWNER_NAME, '이/가')} 놀러 와 있어요 💗`, { icon: '🚪' });
@@ -799,16 +803,16 @@ const House = {
   windowCard() {
     Sfx.play('pop');
     const s = Moon.now();
-    const seoul = SeoulWeather.now();
+    const city = CityWeather.now();
     const w = this.weather();
     const sky = SKIES[w.kind] || SKIES.clear;
-    const name = seoul ? seoul.name : sky.name;
+    const name = city ? city.name : sky.name;
     const sun = Moon.riseSet('sun');
-    const now = seoul ? `지금 서울은 ${josa(name, '이에요/예요')} (${seoul.temp}°).` : `지금 창밖은 ${josa(name, '이에요/예요')}.`;
+    const now = city ? `지금 인천은 ${josa(name, '이에요/예요')} (${city.temp}°).` : `지금 창밖은 ${josa(name, '이에요/예요')}.`;
     let text;
     if (s.dark) text = `${now} ${Moon.describe()}`;
     else text = `${now}${sun.set ? ` 오늘 해는 ${Moon.clock(sun.set)}에 져요.` : ''}${s.gold > 0.3 ? ' 노을이 지고 있어요 🌇' : ''}`;
-    UI.alert({ icon: s.dark ? Moon.emoji() : seoul ? seoul.emoji : sky.emoji, title: s.dark ? '창밖은 서울의 밤하늘' : '창밖은 지금 서울 하늘', text });
+    UI.alert({ icon: s.dark ? Moon.emoji() : city ? city.emoji : sky.emoji, title: s.dark ? '창밖은 인천의 밤하늘' : '창밖은 지금 인천 하늘', text });
   },
 
   /* ----- arranging ----- */
@@ -1173,7 +1177,7 @@ const House = {
         : mail
           ? '💌 우편함에 편지가 와 있어요'
           : Moon.dark()
-            ? `${Moon.emoji()} 창밖에 서울의 밤하늘이 보여요`
+            ? `${Moon.emoji()} 창밖에 인천의 밤하늘이 보여요`
             : '오늘도 집에 들러 볼까요?';
     return `<button class="card house-card ${!h.made || gift || fresh ? 'is-new' : ''}" data-action="house-open" aria-label="${esc(HOUSE_NAME)}에 들어가기">
       <span class="house-ico" aria-hidden="true">🏠</span>
@@ -1215,6 +1219,7 @@ const HouseRoom = {
         <div class="fox-bubble house-bubble is-rider" data-house-bubble="rider" data-who="🛵 ${RIDER_NAME}" hidden></div>
         <div class="fox-bubble house-bubble is-clerk" data-house-bubble="clerk" data-who="🏪 편의점 알바생" hidden></div>
         <div class="fox-bubble house-bubble is-barista" data-house-bubble="barista" data-who="☕ 카페 사장님" hidden></div>
+        <div class="fox-bubble house-bubble is-cat" data-house-bubble="cat" data-who="🐈 뭉치" hidden></div>
       </div>
       <div class="fox-hud house-hud">
         <div class="fh-top">
@@ -1283,8 +1288,9 @@ const HouseRoom = {
     </div>`;
   },
 
-  /** Into the house. (From a tap: the browser lets the page go full screen.) */
-  async open() {
+  /** Into the house. (From a tap: the browser lets the page go full screen.) `bus`: she has come home on the bus from the
+   *  foxes' village (js/bus.js) — the street is shown at once, and when the ride's screen has gone the bus brings her. */
+  async open({ bus = false } = {}) {
     if (this.ov) return;
     if (State.settings.foxFullscreen) FoxRoom.enterFullscreen();
     this.editOn = false;
@@ -1318,22 +1324,23 @@ const HouseRoom = {
     if (this.ov !== ov) return;
     HouseHost.stage = stage;
     HouseHost.api.mount(stage);
+    if (bus) HouseHost.api.arriveByBus();
     this.inset();
     House.sendAll();
     this.refresh();
     this.onResize = () => requestAnimationFrame(() => this.inset());
     window.addEventListener('resize', this.onResize);
-    const seoul = () =>
-      SeoulWeather.load().then((fresh) => {
+    const city = () =>
+      CityWeather.load().then((fresh) => {
         if (!fresh || this.ov !== ov) return;
         HouseHost.sync();
         this.refresh();
       });
-    seoul();
+    city();
     this.skyTimer = setInterval(() => {
       HouseHost.sync();
       this.refresh();
-      seoul();
+      city();
     }, 20000);
     this.loop = Loop.add(() => this.frame());
     bar.style.width = '88%';
@@ -1344,6 +1351,13 @@ const HouseRoom = {
     await sleep(240);
     splash.classList.add('is-done');
     setTimeout(() => splash.remove(), 520);
+    if (bus) {
+      // (the ride's screen is still over the street: when it has gone, the bus comes along with her on it)
+      BusRide.ready('town');
+      await BusRide.landed();
+      if (this.ov !== ov) return;
+      HouseHost.api.townBusIn();
+    }
     Game.checkAchievements();
     if (!Avatar.me().named) {
       // (the girl who lives here: she gives her a name before anything else)
@@ -1388,7 +1402,7 @@ const HouseRoom = {
     this.onResize = null;
     if (HouseHost.api) HouseHost.api.unmount();
     HouseHost.stage = null;
-    FoxRoom.leaveFullscreen();
+    if (!BusRide.switching) FoxRoom.leaveFullscreen(); // (on the bus to the foxes: it is full screen there too)
     if (Router.is('home')) Router.refresh();
   },
 

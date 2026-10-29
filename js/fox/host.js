@@ -36,7 +36,7 @@ host.register({
   sync: (look) => world && world.apply(look || host.look()),
   /** The weather as it is now (the app keeps the clock): { kind, level, wet … } — see js/weather.js. */
   weather: (sky) => world && world.setWeather(sky),
-  /** The sky over Seoul as it is now (the app keeps it): the sun, the evening, the moon — see js/moon.js (Moon.now). */
+  /** The sky over Incheon as it is now (the app keeps it): the sun, the evening, the moon — see js/moon.js (Moon.now). */
   heavens: (sky) => world && world.setHeavens(sky),
   /** Look up at the night sky ('moon'), or back down (null). → false if it cannot be just now. */
   gaze: (why) => !!world && world.gaze(why),
@@ -48,6 +48,12 @@ host.register({
   hush: () => world && world.hush(),
   /** Lorelei turns to whoever is looking on, waves and says `line`. */
   owner: (line) => world && world.ownerHello(line),
+  /** The girl from the house, come on the bus (js/bus.js): in she comes (`look`: js/avatar.js look3d); goodbye, and out to
+   *  the bus (→ false if she is not here); tapped: a wave and `line`; is she here? */
+  visit: (look) => !!(world && world.stage && world.visit(look)),
+  visitLeave: () => !!(world && world.visitLeave()),
+  visitHello: (line) => world && world.visitorHello(line),
+  visiting: () => !!(world && world.visitor),
   /** Lorelei would like a word: she comes forward, calls `line` and waits to be tapped (`bye`: what she says if she is not; `now`: whatever she is doing). → false if she cannot just now. */
   hail: (line, bye, now) => !!(world && world.hail(line, bye, now)),
   unhail: () => world && world.unhail(),

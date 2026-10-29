@@ -7,6 +7,7 @@
 // info.P is the place in the model and, on the head, info.H the place in the head's own space.
 
 import { ANIMUD } from './animud.js';
+import { MUNGCHI } from './cat.js';
 
 const RED = {
   size: 1,
@@ -297,6 +298,8 @@ export const SPECIES = {
 
   // Animud: not a kind of fox, but a fox of her own making (animud.js). It is a gift, and has no kits.
   animud: make(ANIMUD),
+  // (not a fox at all: the white cat of the street, that she can take home — js/cat.js)
+  mungchi: make(MUNGCHI),
 };
 
 // A kit of any kind ("<id>-baby"): small, with a cub's big head and eyes, short muzzle, rounder

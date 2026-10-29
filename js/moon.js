@@ -2,7 +2,7 @@
 /* ==================================================================
    🌙 The moon — the real one, over the foxes' world.
 
-   The sky over the foxes is the sky over Seoul. The sun goes down
+   The sky over the foxes is the sky over Incheon. The sun goes down
    when it goes down there: the light turns gold, then blue, and from
    dusk it is night in the foxes' world — the lamps are lit, the
    fireflies are out (the foxes themselves stay up until midnight, as
@@ -22,9 +22,9 @@
    again under the moon.
    ================================================================== */
 
-// where the sky is (Seoul); the sun this many degrees under the horizon: night — and this high over it: the light begins
+// where the sky is (Incheon); the sun this many degrees under the horizon: night — and this high over it: the light begins
 // to turn gold; what she is given for a wish; how long a wish may be
-const MOON = { lat: 37.5665, lng: 126.978, dark: -4, gold: 8, coins: 30, wish: 60 };
+const MOON = { lat: 37.4563, lng: 126.7052, dark: -4, gold: 8, coins: 30, wish: 60 };
 const SYNODIC = 29.530588853; // days from one full moon to the next, on the average
 
 /* What the moon is called, by how much of it is lit — and whether it is growing. */
@@ -66,7 +66,7 @@ const MOON_LINES = {
   bye: ['오늘 밤 달이 참 예쁘다. 잘 자, {nick}! 🌙'],
 };
 
-/* The sky's arithmetic: where the sun and the moon stand, seen from Seoul (after Meeus, Astronomical Algorithms — the larger terms only). */
+/* The sky's arithmetic: where the sun and the moon stand, seen from Incheon (after Meeus, Astronomical Algorithms — the larger terms only). */
 const Astro = (() => {
   const RAD = Math.PI / 180;
   const TILT = 23.4397 * RAD; // of the earth's axis
@@ -539,7 +539,7 @@ const Moon = {
     const next = this.nextFull();
     const when = next.night === this.night() ? '오늘 밤' : `${this.date(next.night)} 밤`;
     const done = State.moon.night === this.night() ? ' 오늘 밤 소원은 벌써 빌었어요 🌕 (이 기기 기준)' : '';
-    return `여우 세상의 하늘은 서울의 진짜 하늘이에요. 해가 지면 밤이 되고, 달은 실제 모양 그대로 실제 시각에 떠요. 보름달 뜨는 밤에 여우 세상에 들어가면 ${her} 불러서 여우들이 달에게 노래하고, 같이 소원을 빌어요 — 끝나면 코인 ${MOON.coins}개. 다음 보름달은 ${when}이에요.${done}`;
+    return `여우 세상의 하늘은 인천의 진짜 하늘이에요. 해가 지면 밤이 되고, 달은 실제 모양 그대로 실제 시각에 떠요. 보름달 뜨는 밤에 여우 세상에 들어가면 ${her} 불러서 여우들이 달에게 노래하고, 같이 소원을 빌어요 — 끝나면 코인 ${MOON.coins}개. 다음 보름달은 ${when}이에요.${done}`;
   },
 
   /*

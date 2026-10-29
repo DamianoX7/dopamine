@@ -21,6 +21,9 @@ const CAFE_NAME = '카페 몽글';
 const KARAOKE_NAME = '반짝 코인노래방';
 const PARK_NAME = '말랑 공원';
 const SONG_PRICE = 5;
+// the village bus to the foxes (js/bus.js): the stop on the street, and where it goes
+const BUS_STOP_NAME = '말랑공원 앞';
+const FOX_VILLAGE = '여우 마을';
 
 /* The store's shelves: what goes home to cook with (kind 'ing'), and what she eats as it is (kind 'snack' — at the
    window, or at home, out of the fridge). `n`: how many she gets for the price. `months`: only in those months. */
@@ -151,6 +154,12 @@ const TOWN_LINES = {
   scooter: ['배달 오토바이다! 🛵', '오늘도 배달 수고하세요~'],
   big_tree: ['우리 동네 큰 나무 🌳', '여기 그늘 좋다'],
   cafe_sign: ['오늘의 추천은 딸기 라떼래 🍓'],
+  // the bus to the foxes' village
+  bus_board: ['506번… 여우 마을 가는 버스다! 🦊', '여우 마을까지 몇 정거장이지?'],
+  bus_wait: ['버스 언제 오지~ 🚌', '506번 기다리는 중!', '여우들 보러 가야지 🦊'],
+  bus_shut: ['여우 마을 버스는 {opens}부터 다닌대!', '{opens}에 첫차래… 🚌 기다려야지'],
+  bus_card: ['삑! 🚌', '안녕하세요~', '여우 마을 가요!'],
+  bus_home: ['동네 도착! 🏘️', '역시 우리 동네~', '여우들이랑 잘 놀았다 🦊'],
   // eating
   eat_samgak: ['냠! 참치마요 최고 🍙', '역시 삼각김밥!'],
   eat_cupramen: ['후루룩~ 🍜', '편의점 컵라면이 제일 맛있어'],
@@ -260,14 +269,16 @@ const TownLife = {
     Sfx.play('pop');
   },
 
-  /** The 3D side: she is out ('out'), has come somewhere ('arrive'), has paid ('paid'), sings ('singing'), has sung
-   *  ('sung'), is home ('home'). */
+  /** The 3D side: she is out ('out' — off the bus: o = 'bus'), has come somewhere ('arrive'), has paid ('paid'), sings
+   *  ('singing'), has sung ('sung'), has gone off on the bus to the foxes ('bus'), is home ('home'). */
   said(what, o) {
-    if (what === 'out') return this.wentOut();
+    if (what === 'out') return this.wentOut(o);
+    if (what === 'bus') return BusRide.go('fox');
     if (what === 'home') return this.cameHome();
     if (what === 'arrive') return this.arrived(o);
     if (what === 'paid') return this.paid();
     if (what === 'singing') return this.singing(o);
+    if (what === 'catNear' || what === 'catFed' || what === 'catPetted') return CatLife.said(what);
     if (what === 'sung') return this.sung(o);
     if (what === 'wander') {
       this.place = 'street';
@@ -276,7 +287,7 @@ const TownLife = {
     }
   },
 
-  wentOut() {
+  wentOut(by) {
     const t = this.state().town;
     t.outs = (t.outs || 0) + 1;
     t.news = true;
@@ -287,6 +298,8 @@ const TownLife = {
     Store.save();
     this.hud();
     Game.checkAchievements();
+    CatLife.outing(); // (뭉치: is it out there this time? js/cat.js)
+    if (by === 'bus') return; // (home on the bus from the foxes' village: she says so as she gets off)
     // (what she says out of the door: the weather, the hour)
     const w = House.weather();
     setTimeout(() => {
@@ -303,6 +316,7 @@ const TownLife = {
   cameHome() {
     this.out = false;
     this.place = 'street';
+    CatLife.left();
     // (what she bought to eat at home and has not eaten: into the fridge)
     this.keepBag();
     this.basket = {};
@@ -327,12 +341,13 @@ const TownLife = {
   busyText() {
     const api = HouseHost.api;
     const b = api && api.townBusy();
-    return b === 'till' ? '계산하는 중이에요 🧾' : b === 'eat' ? '먹는 중이에요 😋' : b === 'cafe' ? '음료 기다리는 중이에요 ☕' : b === 'sing' ? '노래하는 중이에요 🎤' : b === 'home' ? '집에 들어가는 중이에요 🏠' : '잠깐만요!';
+    return b === 'till' ? '계산하는 중이에요 🧾' : b === 'eat' ? '먹는 중이에요 😋' : b === 'cafe' ? '음료 기다리는 중이에요 ☕' : b === 'sing' ? '노래하는 중이에요 🎤' : b === 'home' ? '집에 들어가는 중이에요 🏠' : b === 'bus' ? '버스 타는 중이에요 🚌' : b === 'cat' ? `${CAT_NAME}랑 있는 중이에요 🐈` : '잠깐만요!';
   },
 
-  /** A tap on the street: a shop, her house, the swings, the scooter, a pigeon. */
+  /** A tap on the street: a shop, her house, the bus stop, the swings, the scooter, a pigeon. */
   tapped(kind) {
-    if (kind === 'store' || kind === 'cafe' || kind === 'karaoke' || kind === 'park' || kind === 'home') return this.go(kind);
+    if (kind === 'store' || kind === 'cafe' || kind === 'karaoke' || kind === 'park' || kind === 'home' || kind === 'bus') return this.go(kind);
+    if (kind === 'cat') return CatLife.tapped();
     if (kind === 'swing') {
       if (this.place !== 'park') return this.go('park');
       return HouseHost.api && HouseHost.api.townSwing();
@@ -352,6 +367,54 @@ const TownLife = {
       Store.save();
       return UI.toast(`${PARK_NAME}에 왔어요 🌳 그네를 누르면 그네를 타요`, { icon: '🌳' });
     }
+    if (place === 'bus') {
+      if (Opening.shut() && HouseHost.api) HouseHost.api.townSay('bus_shut');
+      return this.busSheet();
+    }
+  },
+
+  /* ----- 🚏 the bus stop: the 506 to the foxes' village ----- */
+
+  busSheet() {
+    if (!this.out || this.place !== 'bus') return;
+    Sfx.play('pop');
+    this.closeSheets();
+    const shut = Opening.shut();
+    const ov = this.sheet(
+      `<div class="house-sheet town-sheet bus-sheet">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <h2>🚏 ${esc(BUS_STOP_NAME)} 정류장</h2>
+        <div class="bus-route">
+          <span class="br-no">${BUS_ROUTE}</span>
+          <span class="br-to"><b>🦊 ${esc(FOX_VILLAGE)}</b><small>${shut ? `${esc(BusRide.firstBus())} 첫차` : '곧 도착 · 요금 무료'}</small></span>
+        </div>
+        <ol class="bus-stops" aria-label="정류장">${BusRide.stops('fox').map((s, i) => `<li class="${i === 0 ? 'here' : ''}">${esc(s)}</li>`).join('')}</ol>
+        <p class="hint">${shut ? `${esc(FOX_VILLAGE)}은 ${esc(Opening.whenText())}에 열려요. 그때부터 버스가 다녀요.` : `버스를 타면 여우들과 ${esc(josa(OWNER_NAME, '이/가'))} 사는 ${esc(FOX_VILLAGE)}에 ${esc(josa(Avatar.name(), '이/가'))} 놀러 가요.`}</p>
+        <div class="dialog-actions one"><button class="btn primary" data-bus-go ${shut ? 'disabled' : ''}>${shut ? '🔒 아직 안 다녀요' : '🚌 버스 타기'}</button></div>
+        <button class="link-btn store-leave" data-bus-leave>🚶‍♀️ 정류장에서 나가기</button>
+      </div>`,
+      `${BUS_STOP_NAME} 정류장`
+    );
+    ov.panel.addEventListener('click', (e) => {
+      if (e.target.closest('[data-bus-go]')) return this.takeBus();
+      if (e.target.closest('[data-bus-leave]')) {
+        UI.close(ov);
+        this.go('street');
+      }
+    });
+  },
+
+  /** 🚌 버스 타기: the bus comes along, she gets on — and once it has gone a way, the ride (js/bus.js) takes her to the foxes. */
+  takeBus() {
+    const api = HouseHost.api;
+    if (!api || !this.out) return;
+    if (Opening.shut()) return Opening.tell();
+    if (api.townBusy()) return UI.toast(this.busyText(), { icon: '⏳' });
+    this.closeSheets();
+    if (!api.townBus()) return UI.toast('지금은 버스를 탈 수 없어요. 잠깐 뒤에 다시 해 보세요', { icon: '🚌' });
+    Sfx.play('tap');
+    this.place = 'bus';
+    this.hud();
   },
 
   closeSheets() {
@@ -418,7 +481,9 @@ const TownLife = {
     if (!ov || ov.closed) return;
     const root = $('[data-store-sheet]', ov.panel);
     const y = $('.store-grid', root) ? $('.store-grid', root).scrollTop : 0;
-    const list = STORE_ITEMS.filter((it) => it.kind === (this.storeTab === 'ing' ? 'ing' : 'snack') && this.inSeason(it));
+    if (this.storeTab === 'cat' && !CatLife.known()) this.storeTab = 'snack';
+    const kind = this.storeTab === 'ing' ? 'ing' : this.storeTab === 'cat' ? 'cat' : 'snack';
+    const list = STORE_ITEMS.filter((it) => it.kind === kind && this.inSeason(it));
     const n = Object.values(this.basket).reduce((s, x) => s + x, 0);
     const total = this.basketTotal();
     root.innerHTML = `<div class="sheet-handle" aria-hidden="true"></div>
@@ -426,14 +491,15 @@ const TownLife = {
       <div class="seg store-tabs" role="tablist">
         <button class="seg-btn ${this.storeTab !== 'ing' ? 'on' : ''}" role="tab" data-store-tab="snack">🍙 바로 먹을 것</button>
         <button class="seg-btn ${this.storeTab === 'ing' ? 'on' : ''}" role="tab" data-store-tab="ing">🥚 요리 재료</button>
+        ${CatLife.known() ? `<button class="seg-btn ${this.storeTab === 'cat' ? 'on' : ''}" role="tab" data-store-tab="cat">🐾 고양이</button>` : ''}
       </div>
-      <p class="hint">${this.storeTab === 'ing' ? '재료는 집 냉장고에 들어가요. 🍳 부엌에서 요리할 수 있어요.' : '창가 자리에서 먹고 가거나, 집에 가져갈 수 있어요.'}</p>
+      <p class="hint">${this.storeTab === 'ing' ? '재료는 집 냉장고에 들어가요. 🍳 부엌에서 요리할 수 있어요.' : this.storeTab === 'cat' ? `길고양이 ${CAT_NAME}가 좋아하는 간식이에요. 집에 챙겨 둘게요.` : '창가 자리에서 먹고 가거나, 집에 가져갈 수 있어요.'}</p>
       <div class="store-grid">${list
         .map((it) => {
           const k = this.basket[it.id] || 0;
           const have = this.have(it.id);
           return `<div class="store-item ${k ? 'on' : ''}">
-            <button class="si-pic" data-store-add="${it.id}" aria-label="${esc(it.name)} 담기"><span data-town-thumb="${it.kind}:${it.id}">${it.emoji}</span>${k ? `<i class="si-n">${k}</i>` : ''}</button>
+            <button class="si-pic" data-store-add="${it.id}" aria-label="${esc(it.name)} 담기"><span ${it.kind === 'cat' ? '' : `data-town-thumb="${it.kind}:${it.id}"`}>${it.emoji}</span>${k ? `<i class="si-n">${k}</i>` : ''}</button>
             <b>${esc(it.name)}</b>
             ${it.desc ? `<span class="si-desc">${esc(it.desc)}</span>` : ''}
             <small>${it.price} 🪙${have ? ` · 냉장고 ${have}` : ''}</small>
@@ -480,7 +546,7 @@ const TownLife = {
     for (const [id, k] of entries) {
       const it = this.storeItem(id);
       names.push(it.name);
-      if (it.kind === 'ing') h.pantry[id] = (h.pantry[id] || 0) + k * (it.n || 1);
+      if (it.kind === 'ing' || it.kind === 'cat') h.pantry[id] = (h.pantry[id] || 0) + k * (it.n || 1);
       else for (let i = 0; i < k; i++) snacks.push(id);
     }
     h.town.shops = (h.town.shops || 0) + 1;
@@ -1031,6 +1097,7 @@ const TownLife = {
         <button class="fh-act" data-action="town-go" data-town-act="cafe"><span aria-hidden="true">☕</span><b>카페</b></button>
         <button class="fh-act" data-action="town-go" data-town-act="karaoke"><span aria-hidden="true">🎤</span><b>노래방</b></button>
         <button class="fh-act" data-action="town-go" data-town-act="park"><span aria-hidden="true">🌳</span><b>공원</b></button>
+        <button class="fh-act is-bus" data-action="town-go" data-town-act="bus"><span aria-hidden="true">🚌</span><b>버스</b></button>
       </div>
       <div class="cook-panel" data-house-cook hidden></div>`;
   },
@@ -1046,6 +1113,7 @@ const TownLife = {
       Store.save();
     }
     if (this.song) CoverHost.stopAll();
+    CatLife.left();
     this.out = false;
     this.place = 'street';
     this.basket = {};

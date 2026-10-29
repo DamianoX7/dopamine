@@ -79,6 +79,23 @@ host.register({
   townSingEnd: () => world && world.town && world.town.singEnd(),
   townSwing: () => !!(world && world.where === 'town' && world.town.swingNow()),
   townSay: (line) => world && world.where === 'town' && world.town.me && world.town.me.say(line),
+  /** The village bus (js/bus.js): she takes it to the foxes' village (→ false if she cannot now); the bus she has come
+   *  home on comes along (once the ride's screen has gone); off it again at the kerb (the ride could not be). And straight
+   *  out onto the street, on that bus: the house was opened by the ride. */
+  townBus: () => !!(world && world.where === 'town' && world.town.busOut()),
+  townBusIn: () => !!(world && world.where === 'town' && world.town.busIn()),
+  townBusBack: () => world && world.where === 'town' && world.town.busBack(),
+  arriveByBus: () => !!(world && world.stage && world.arriveByBus()),
+  /** 뭉치, the white cat (js/cat.js): out on the street this time, at spot `i`, trusting her this much; a meow to be found by;
+   *  how far it trusts her now; she goes to it, feeds it a churu, strokes it, takes it home — and, at home, strokes it. */
+  townCat: (i, trust) => !!(world && world.where === 'town' && world.town.catAppear(i, trust)),
+  townCatCall: () => world && world.where === 'town' && world.town.catCall(),
+  townCatTrust: (n) => world && world.town && world.town.catTrustIs(n),
+  townCatGo: () => !!(world && world.where === 'town' && world.town.catGo()),
+  townCatFeed: () => !!(world && world.where === 'town' && world.town.catFeed()),
+  townCatPet: () => !!(world && world.where === 'town' && world.town.catPet()),
+  townCatAdopt: () => !!(world && world.where === 'town' && world.town.catAdopt()),
+  catPet: () => !!(world && world.stage && world.where !== 'town' && world.catPet()),
   /** The kitchen: she cooks `recipe` (→ false: no kitchen), does a step's act, how hot and how done it is, the end of it;
    *  something out of the fridge to eat. */
   cookStart: (r) => !!(world && world.stage && world.me.cook(r)),
