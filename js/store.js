@@ -129,7 +129,12 @@ function defaultState() {
     // her), how she looks and what she wears (ids, as AVATAR_DEFAULT), the clothes she has bought ('slot:id'); what she
     // has ordered to eat and is waiting for ({ id, at, eta }: js/delivery.js), how many times she has had each dish; what is
     // in her fridge (id → how many: js/town.js), what she has cooked (recipe → times, best stars; how often burnt; the
-    // kitchen she was given to start with), and her outings (how often out, at the till, at the café, at the karaoke…)
+    // kitchen she was given to start with), and her outings (how often out, at the till, at the café, at the karaoke…) — and
+    // the veranda (js/veranda.js): when she first stepped out on it, how many planter boxes stand on it (two, up to four),
+    // what is in each ({ crop, grown: ms it has grown, picks: times picked, wet: till when its soil is damp, last: when its
+    // growing was last counted, at: when it was sown } or null), how much of each she has picked and sown, how often she
+    // has watered, whether her first packet of seeds (the present) has been sown, when the rain last watered it, whether
+    // she has been told of it
     house: {
       made: 0,
       size: 0,
@@ -152,6 +157,7 @@ function defaultState() {
       pantry: {},
       cook: { made: {}, best: {}, burnt: 0, kitchen: false },
       town: { outs: 0, shops: 0, spent: 0, cafe: {}, ate: {}, sung: 0, best: 0, parks: 0, taught: false, news: false },
+      veranda: { made: 0, boxes: 2, plots: [null, null, null, null], picked: {}, sown: {}, watered: 0, gift: false, rainAt: 0, news: false },
     },
     opening: { seen: false, greeted: false }, //           the rooms that open on a day of their own (js/opening.js): has she stood before them shut — and been told that they opened?
     // season: 'auto' = the foxes' world follows the calendar; or 'spring', 'summer', 'autumn', 'winter' (js/weather.js)

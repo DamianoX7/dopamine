@@ -103,6 +103,17 @@ host.register({
   cookLevel: (heat, done) => world && world.me.cooking && world.me.cooking.level(heat, done),
   cookEnd: (r) => world && world.me.cooking && world.me.cooking.end(r),
   eatSnack: (id) => world && world.stage && world.me.eatSnack(id),
+  /** The veranda (js/veranda.js): out onto it through the window (→ false if she cannot now), and back in; is she out
+   *  there, and what is she in the middle of ('water', 'sow', 'pick', 'in' — or null); she waters the boxes `ids`, sows
+   *  `crop` ({ id, emoji, short, packet }) in box `i`, picks what is ripe ([{ i, id, n }]); a word from her. */
+  verandaGo: () => !!(world && world.goVeranda()),
+  verandaIn: () => !!(world && world.where === 'veranda' && world.veranda.goIn()),
+  verandaHere: () => !!(world && world.where === 'veranda'),
+  verandaBusy: () => (world && world.where === 'veranda' ? world.veranda.busy : null),
+  verandaWater: (ids) => !!(world && world.where === 'veranda' && world.veranda.water(ids)),
+  verandaSow: (i, crop) => !!(world && world.where === 'veranda' && world.veranda.sow(i, crop)),
+  verandaPick: (list) => !!(world && world.where === 'veranda' && world.veranda.harvest(list)),
+  verandaSay: (line) => world && world.where === 'veranda' && world.veranda.me && world.veranda.me.say(line),
   /** Pictures for the shop: a thing on its own; a wallpaper's or a floor's swatch. */
   thumb: (id) => (ensure() ? world.thumb(id) : ''),
   swatch: (kind, id) => (ensure() ? world.swatch(kind, id) : ''),

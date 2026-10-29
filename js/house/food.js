@@ -397,6 +397,10 @@ export function makeUtensil(kind, morsel) {
   else if (morsel === 'pudding') bite.add(piece(new THREE.SphereGeometry(0.0072, 10, 6), '#f6cf6a', { at: [0, -0.004, 0.003], scale: [1, 0.6, 1.2], mat: 'gloss' }));
   else if (morsel === 'pancake') bite.add(piece(new THREE.CylinderGeometry(0.009, 0.009, 0.007, 3), (q, n) => (Math.abs(n.y) > 0.5 ? C('#c97a2c') : C('#f2c27a')), { at: [0, 0.006, 0], rot: [Math.PI / 2, 0, 0] }));
   else if (morsel === 'roll') bite.add(piece(new THREE.CylinderGeometry(0.0095, 0.0095, 0.011, 14), '#ffcf4a', { rot: [0, 0, Math.PI / 2] }));
+  else if (morsel === 'tomatoegg') {
+    bite.add(piece(new THREE.SphereGeometry(0.0072, 10, 6), '#ffd04a', { at: [0, -0.004, 0.003], scale: [1.1, 0.6, 1.1] }));
+    bite.add(piece(new THREE.SphereGeometry(0.0045, 8, 6), '#e8402f', { at: [0.003, -0.0015, 0.004], mat: 'gloss' }));
+  } else if (morsel === 'ssam') bite.add(piece(new THREE.SphereGeometry(0.0095, 10, 8), (q) => (q.y > 0.004 ? C('#a3365c') : C('#7fc456')), { at: [0, -0.002, 0.003], scale: [1.15, 0.85, 1], mat: 'leaf' })); // (a parcel of lettuce)
   else bite.add(piece(new THREE.CapsuleGeometry(0.0062, 0.02, 3, 8), ['#f06a46', '#f7a283'], { rot: [0, 0, Math.PI / 2], mat: 'gloss' }));
   bite.visible = false;
   holder.add(bite);

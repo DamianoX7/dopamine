@@ -235,6 +235,23 @@ export class Resident extends Person {
     this.task = null;
   }
 
+  /** Whatever she is doing she leaves, to do `tasks` (out of bed first, up from her seat first): out onto the veranda. */
+  redo(tasks) {
+    this.endPhone();
+    this.tasks = tasks;
+    const t = this.task;
+    if (this.abed && t && t.do === 'lie') t.wake = true;
+    else if (this.seat && t && t.do === 'sit') t.t = 0;
+    else {
+      this.task = null;
+      const a = this.anim;
+      a.look = null;
+      a.lookW = 0;
+      a.still();
+      a.setPose('stand', 6);
+    }
+  }
+
   /** Lorelei is in — past the door, and has said hello to whoever is looking on — and the girl has not been to say hello to her yet. */
   guestToMeet() {
     const g = this.world.guest;

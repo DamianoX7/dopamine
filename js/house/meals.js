@@ -12,6 +12,7 @@ import * as THREE from '../vendor/three.module.min.js';
 import { V, TAU, rng, paintTexture } from './shapes.js';
 import { softDotTexture } from '../fox/kit.js';
 import { piece, mark, bowlGeometry, eatAway } from './dishkit.js';
+import { makeProduce } from './crops.js';
 
 const C = (hex) => new THREE.Color(hex);
 const CHAR = C('#2a1a12');
@@ -262,8 +263,9 @@ function eggroll({ burnt = false } = {}) {
   };
 }
 
-/** 🥞 Pancakes: a stack of three, butter melting on top and syrup running down. */
-function pancake({ burnt = false } = {}) {
+/** 🥞 Pancakes: a stack of three, butter melting on top and syrup running down — (🍓 or strawberries from the veranda on
+    top, halved, and a dollop of cream). */
+function pancake({ burnt = false, berries = false } = {}) {
   const object = new THREE.Group();
   const plate = new THREE.Group();
   plate.position.set(0, 0.008, 0.026);
@@ -277,10 +279,19 @@ function pancake({ burnt = false } = {}) {
     plate.add(m);
     stack.push(m);
   }
-  const butter = piece(new THREE.BoxGeometry(0.013, 0.006, 0.013), '#ffe9a0', { at: [0, 0.047, 0], rot: [0, 0.4, 0], mat: 'gloss' });
+  const butter = berries
+    ? piece(new THREE.SphereGeometry(0.012, 12, 8), '#fffaf2', { at: [0, 0.048, 0], scale: [1, 0.75, 1], mat: 'gloss' })
+    : piece(new THREE.BoxGeometry(0.013, 0.006, 0.013), '#ffe9a0', { at: [0, 0.047, 0], rot: [0, 0.4, 0], mat: 'gloss' });
   plate.add(butter);
-  const syrup = piece(new THREE.CylinderGeometry(0.03, 0.03, 0.0015, 22), '#b5651d', { at: [0, 0.0442, 0], mat: 'gloss' });
+  const syrup = berries ? new THREE.Group() : piece(new THREE.CylinderGeometry(0.03, 0.03, 0.0015, 22), '#b5651d', { at: [0, 0.0442, 0], mat: 'gloss' });
   plate.add(syrup);
+  if (berries)
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * TAU + 0.2;
+      // (a strawberry lying on its side, its point out, its green top in)
+      const g = new THREE.ConeGeometry(0.0085, 0.019, 10);
+      syrup.add(piece(g, (q) => (q.y < -0.006 ? C('#5f9a3f') : C(burn('#e3263f', burnt, 0.4))), { at: [Math.cos(a) * 0.022, 0.05, Math.sin(a) * 0.022], rot: [0, -a, -Math.PI / 2 - 0.25], mat: 'gloss' }));
+    }
   const top = mark(0.008, 0.046, 0.008);
   plate.add(top);
   return {
@@ -356,7 +367,92 @@ function budae({ burnt = false } = {}) {
   };
 }
 
-export const MEALS = { ramen, friedrice, toast, eggroll, pancake, budae };
+/** 🍅 Tomato and egg, stir-fried (with tomatoes from the veranda): soft yellow curds, the tomatoes gone soft and red through
+    them, spring onion on top, in a shallow dish — with a spoon. */
+function tomatoegg({ burnt = false } = {}) {
+  const object = new THREE.Group();
+  const dish = new THREE.Group();
+  dish.position.set(0, 0.008, 0.026);
+  object.add(dish);
+  dish.add(crockery('dish', '#ff9f8a').group);
+  const items = [];
+  const rnd = rng(97);
+  for (let i = 0; i < 12; i++) {
+    const a = rnd() * TAU;
+    const r = rnd.range(0, 0.034);
+    const g = new THREE.SphereGeometry(rnd.range(0.008, 0.012), 8, 6);
+    g.scale(1.3, 0.55, 1);
+    items.push(piece(g, burn('#ffd04a', burnt, 0.5), { at: [Math.cos(a) * r, 0.012 + rnd() * 0.006, Math.sin(a) * r], rot: [0, rnd() * TAU, 0] }));
+  }
+  for (let i = 0; i < 7; i++) {
+    const a = rnd() * TAU;
+    const r = rnd.range(0.005, 0.032);
+    items.push(piece(new THREE.SphereGeometry(0.0085, 10, 6, 0, TAU, 0, Math.PI / 2), burn('#e8402f', burnt, 0.45), { at: [Math.cos(a) * r, 0.014, Math.sin(a) * r], rot: [rnd.range(-0.5, 0.5), 0, rnd.range(-0.5, 0.5)], mat: 'gloss' }));
+  }
+  for (let i = 0; i < 6; i++) items.push(piece(new THREE.CylinderGeometry(0.0022, 0.0022, 0.0016, 8), '#4fae4a', { at: [rnd.range(-0.025, 0.025), 0.022, rnd.range(-0.025, 0.025)] }));
+  // (a little red juice in the dish)
+  dish.add(piece(new THREE.CircleGeometry(0.036, 20), '#f0715a', { at: [0, 0.008, 0], rot: [-Math.PI / 2, 0, 0], mat: 'gloss' }));
+  items.forEach((m) => dish.add(m));
+  const top = mark(0, 0.02, 0);
+  dish.add(top);
+  return {
+    object,
+    style: 'bowl',
+    utensil: 'spoon',
+    morsel: 'tomatoegg',
+    bites: 6,
+    top,
+    left(k) {
+      eatAway(items, k);
+    },
+  };
+}
+
+/** 🥬 Pork belly and lettuce (from the veranda): the grilled pork, cut, on a plate by the leaves, a dab of ssamjang, slices
+    of garlic — wrapped one at a time, a lettuce parcel on the chopsticks. */
+function ssam({ burnt = false } = {}) {
+  const object = new THREE.Group();
+  const plate = new THREE.Group();
+  plate.position.set(0, 0.008, 0.026);
+  object.add(plate);
+  plate.add(crockery('plate', '#9fd9a6').group);
+  const leaves = [];
+  for (let i = 0; i < 3; i++) {
+    const g = new THREE.CircleGeometry(0.026, 14);
+    const p = g.attributes.position;
+    for (let j = 0; j < p.count; j++) p.setZ(j, Math.sin(p.getX(j) * 160) * 0.002 + (p.getX(j) ** 2 + p.getY(j) ** 2) * 2.2);
+    g.computeVertexNormals();
+    leaves.push(piece(g, (q) => C('#e6f4c2').lerp(C('#7fc456'), Math.min(1, Math.hypot(q.x, q.y) * 30)).lerp(C('#a3365c'), Math.max(0, Math.hypot(q.x, q.y) * 30 - 0.75)), { at: [-0.028 + i * 0.004, 0.008 + i * 0.002, -0.012 + i * 0.012], rot: [-Math.PI / 2 + 0.15, 0, 0.3 * i], mat: 'leaf' }));
+  }
+  const pork = [];
+  const rnd = rng(101);
+  for (let i = 0; i < 6; i++) {
+    const g = new THREE.BoxGeometry(0.022, 0.008, 0.011);
+    pork.push(piece(g, (q) => (Math.abs(q.y) < 0.0012 ? C('#fbe3cf') : C(burn('#c98a52', burnt, 0.65))), { at: [0.016 + (i % 2) * 0.016, 0.012 + Math.floor(i / 2) * 0.004, -0.02 + Math.floor(i / 2) * 0.016], rot: [0, rnd.range(-0.4, 0.4), 0] }));
+  }
+  const sauce = piece(new THREE.SphereGeometry(0.008, 10, 6, 0, TAU, 0, Math.PI / 2), '#a8452a', { at: [-0.012, 0.009, 0.03], scale: [1, 0.5, 1] });
+  const garlic = [0, 1].map((i) => piece(new THREE.CylinderGeometry(0.0045, 0.0045, 0.0015, 10), '#fff6dc', { at: [0.002 + i * 0.008, 0.01, 0.034] }));
+  [...leaves, ...pork, sauce, ...garlic].forEach((m) => plate.add(m));
+  const top = mark(0.024, 0.016, -0.004);
+  plate.add(top);
+  return {
+    object,
+    style: 'bowl',
+    utensil: 'chopsticks',
+    morsel: 'ssam',
+    bites: 6,
+    top,
+    left(k) {
+      eatAway(pork, k);
+      eatAway(leaves, Math.min(1, k * 1.2));
+      garlic.forEach((m) => (m.visible = k > 0.3));
+    },
+  };
+}
+
+const berrycake = (opts = {}) => pancake({ ...opts, berries: true });
+
+export const MEALS = { ramen, friedrice, toast, eggroll, pancake, budae, tomatoegg, ssam, berrycake };
 
 // ------------------------------------------------------------------ on the hob
 
@@ -544,14 +640,39 @@ function makePan(recipe) {
     const log = tinted('roll', new THREE.CylinderGeometry(0.018, 0.018, 0.11, 18), '#fff3a0', '#ffcf4a', [-0.03, 0.018, 0], [Math.PI / 2, 0, 0]);
     log.userData.grow = true;
     for (let i = 0; i < 8; i++) tinted('sheet', new THREE.BoxGeometry(0.006, 0.003, 0.006), i % 2 ? '#4fae4a' : '#ff8a3a', i % 2 ? '#4fae4a' : '#ff8a3a', [rnd.range(-0.05, 0.05), 0.005, rnd.range(-0.05, 0.05)]);
+  } else if (recipe === 'tomatoegg') {
+    // the eggs go in and set in soft curds as they are stirred; then the tomatoes, halved
+    for (let i = 0; i < 9; i++) {
+      const a = rnd() * TAU;
+      const r = rnd.range(0, 0.05);
+      const g = new THREE.SphereGeometry(rnd.range(0.012, 0.018), 8, 6);
+      g.scale(1.3, 0.45, 1);
+      tinted('egg', g, '#fff3a0', '#ffd04a', [Math.cos(a) * r, 0.006, Math.sin(a) * r], [0, rnd() * TAU, 0]);
+    }
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * TAU + 0.3;
+      const g = new THREE.SphereGeometry(0.013, 10, 6, 0, TAU, 0, Math.PI / 2);
+      tinted('tomato', g, '#ff5a4a', '#e8402f', [Math.cos(a) * 0.036, 0.009, Math.sin(a) * 0.036], [rnd.range(-0.4, 0.4), 0, rnd.range(-0.4, 0.4)]);
+    }
+  } else if (recipe === 'ssam') {
+    // strips of pork belly: pink and white, browning
+    for (let i = 0; i < 3; i++) tinted('pork', new THREE.BoxGeometry(0.11, 0.007, 0.026), '#f4b8b0', '#c98a52', [0, 0.004, -0.033 + i * 0.033], [0, 0.15 * (i - 1), 0]);
   } else {
-    // pancake: a round of batter; bubbles come up through it; flipped, it is golden
+    // pancake: a round of batter; bubbles come up through it; flipped, it is golden — (strawberries on it, at the end)
     const g = new THREE.CylinderGeometry(0.058, 0.06, 0.011, 28);
-    const cake = tinted('batter', g, '#fbeec8', '#d98a3a', [0, 0.006, 0]);
-    cake.userData.flipColor = true;
+    const round = tinted('batter', g, '#fbeec8', '#d98a3a', [0, 0.006, 0]);
+    round.userData.flipColor = true;
+    if (recipe === 'berrycake')
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * TAU + 0.4;
+        const berry = new THREE.ConeGeometry(0.011, 0.02, 10);
+        berry.rotateX(Math.PI / 2);
+        tinted('berry', berry, '#e3263f', '#d81f3a', [Math.cos(a) * 0.028, 0.018, Math.sin(a) * 0.028], [0, -a, 0]);
+      }
   }
-  const bub = bubbles(recipe === 'pancake' ? 14 : 8, R - 0.03, 0.02, recipe === 'pancake' ? '#f6e2b0' : '#fff7e0');
-  bub.group.visible = recipe === 'pancake';
+  const cake = recipe === 'pancake' || recipe === 'berrycake';
+  const bub = bubbles(cake ? 14 : 8, R - 0.03, 0.02, cake ? '#f6e2b0' : '#fff7e0');
+  bub.group.visible = cake;
   object.add(bub.group);
   // smoke, when it burns
   const smoke = [];
@@ -567,6 +688,9 @@ function makePan(recipe) {
     toast: [['egg'], ['bread'], [], ['top']],
     eggroll: [[], ['sheet'], ['roll'], []],
     pancake: [[], ['batter'], [], []],
+    tomatoegg: [[], ['egg'], [], ['tomato'], []],
+    ssam: [['pork'], [], [], []],
+    berrycake: [[], ['batter'], [], ['berry']],
   }[recipe];
   let heat = 0;
   let doneK = 0;
@@ -600,7 +724,7 @@ function makePan(recipe) {
       const char = Math.max(0, Math.min(1, (k - 1) * 2));
       for (const [mat, raw, cooked] of tints) mat.color.copy(raw).lerp(cooked, cook).lerp(CHAR, char * 0.8);
       // (a pancake: its underside goes golden first — the top, once it is turned over)
-      if (recipe === 'pancake' && !flipped) parts.batter[0].material.color.copy(C('#fbeec8')).lerp(golden, cook * 0.2);
+      if (cake && !flipped) parts.batter[0].material.color.copy(C('#fbeec8')).lerp(golden, cook * 0.2);
     },
     stir() {
       jostle = 1;
@@ -625,7 +749,7 @@ function makePan(recipe) {
           food.position.y = 0.006;
           flipped = !flipped;
           // (turned over: the golden side up)
-          if (recipe === 'pancake') parts.batter[0].material.color.copy(golden).lerp(CHAR, Math.max(0, Math.min(1, (doneK - 1) * 2)) * 0.8);
+          if (cake) parts.batter[0].material.color.copy(golden).lerp(CHAR, Math.max(0, Math.min(1, (doneK - 1) * 2)) * 0.8);
         }
       }
       if (recipe === 'eggroll' && parts.roll) parts.roll[0].scale.set(0.6 + 0.4 * rolled, 1, 0.6 + 0.4 * rolled);
@@ -633,7 +757,7 @@ function makePan(recipe) {
         const u = (t * m.userData.speed * 0.6 + m.userData.phase) % 1;
         const s = heat > 0.2 && doneK < 0.9 ? 0.003 * Math.sin(u * Math.PI) * heat : 0;
         m.scale.setScalar(Math.max(1e-4, s));
-        m.position.y = recipe === 'pancake' ? 0.0125 : 0.012 + 0.006 * Math.sin(u * Math.PI);
+        m.position.y = cake ? 0.0125 : 0.012 + 0.006 * Math.sin(u * Math.PI);
       });
       // smoke rises once it has gone too far
       const char = Math.max(0, Math.min(1, (doneK - 1.05) * 3));
@@ -699,6 +823,14 @@ export function makeIngredient(id) {
     case 'mix':
       at.add(piece(new THREE.BoxGeometry(0.04, 0.056, 0.016), (q) => (q.y > 0.02 ? C('#ffd23f') : C('#ff9a4a')), { at: [0, 0.02, 0] }));
       break;
+    case 'pork':
+      // a strip of pork belly: pink, and white where the fat is
+      at.add(piece(new THREE.BoxGeometry(0.07, 0.007, 0.024), (q) => (Math.abs(q.z) < 0.003 || q.z > 0.009 ? C('#fbeae4') : C('#f2a5a0')), { rot: [0.4, 0, 0] }));
+      break;
+    case 'tomato':
+    case 'strawberry':
+    case 'lettuce':
+      return makeProduce(id); // (as she picked it: crops.js)
     default:
       at.add(piece(new THREE.SphereGeometry(0.012, 10, 8), '#ffffff'));
   }

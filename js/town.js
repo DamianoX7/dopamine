@@ -38,6 +38,7 @@ const STORE_ITEMS = [
   { id: 'milk', kind: 'ing', emoji: '🥛', name: '우유', price: 4 },
   { id: 'mix', kind: 'ing', emoji: '🥞', name: '핫케이크 가루', price: 7 },
   { id: 'leek', kind: 'ing', emoji: '🌿', name: '대파', price: 3 },
+  { id: 'pork', kind: 'ing', emoji: '🥓', name: '삼겹살', price: 12, desc: '상추쌈 해 먹기 딱!' },
   { id: 'samgak', kind: 'snack', emoji: '🍙', name: '참치마요 삼각김밥', price: 8, desc: '편의점의 기본' },
   { id: 'cupramen', kind: 'snack', emoji: '🍜', name: '컵라면', price: 10, desc: '뜨거운 물 붓고 3분' },
   { id: 'bananamilk', kind: 'snack', emoji: '🍌', name: '바나나 우유', price: 6, desc: '달달한 단지 우유' },
@@ -116,6 +117,35 @@ const RECIPES = [
       { kind: 'time', act: 'done', label: '🔥 불 끄기', hint: '치즈가 녹아내릴 때 불 끄기!', gauge: '졸이기', zone: [0.55, 0.76], speed: 3.4 },
     ],
   },
+  // (and what wants what grows on the veranda: js/veranda.js)
+  {
+    id: 'tomatoegg', emoji: '🍅', name: '토마토 달걀볶음', fail: '탄 토마토 달걀볶음', need: { tomato: 4, egg: 2 }, tool: 'pan',
+    steps: [
+      { kind: 'mash', act: 'beat', item: 'egg', label: '🥢 계란 풀기', hint: '계란 두 알을 톡톡 풀어요!', n: 8, time: 3.2 },
+      { kind: 'time', act: 'pour', item: 'egg', label: '🍳 계란 붓기', hint: '팬이 달궈지면 계란을 부어요', gauge: '팬 온도', zone: [0.58, 0.8], speed: 3.0 },
+      { kind: 'mash', act: 'stir', label: '🥄 몽글몽글 젓기', hint: '반쯤 익을 때까지 휘휘 저어요!', n: 7, time: 3.0 },
+      { kind: 'time', act: 'add', item: 'tomato', label: '🍅 토마토 넣기', hint: '계란이 몽글해지면 방울토마토를!', gauge: '계란 익힘', zone: [0.46, 0.68], speed: 3.0 },
+      { kind: 'time', act: 'done', label: '✨ 완성', hint: '토마토가 말랑해지면 불을 꺼요', gauge: '토마토 익힘', zone: [0.55, 0.76], speed: 3.2 },
+    ],
+  },
+  {
+    id: 'ssam', emoji: '🥬', name: '삼겹살 상추쌈', fail: '탄 삼겹살', need: { pork: 1, lettuce: 3 }, tool: 'pan',
+    steps: [
+      { kind: 'time', act: 'add', item: 'pork', label: '🥓 삼겹살 올리기', hint: '팬이 달궈지면 삼겹살을 올려요', gauge: '팬 온도', zone: [0.6, 0.82], speed: 3.0 },
+      { kind: 'time', act: 'flip', label: '🔄 뒤집기', hint: '아랫면이 노릇할 때 뒤집어요!', gauge: '노릇노릇', zone: [0.55, 0.76], speed: 3.0 },
+      { kind: 'mash', act: 'stir', label: '✂️ 싹둑싹둑 자르기', hint: '가위로 한 입 크기로 잘라요!', n: 6, time: 3.0 },
+      { kind: 'time', act: 'done', label: '🥬 상추에 싸기', hint: '바삭해지면 불 끄고 상추에 싸요!', gauge: '바삭바삭', zone: [0.55, 0.75], speed: 3.2 },
+    ],
+  },
+  {
+    id: 'berrycake', emoji: '🍓', name: '딸기 핫케이크', fail: '탄 딸기 핫케이크', need: { mix: 1, milk: 1, egg: 1, strawberry: 3 }, tool: 'pan',
+    steps: [
+      { kind: 'mash', act: 'beat', item: 'mix', label: '🥣 반죽 섞기', hint: '가루, 우유, 계란을 휘휘 섞어요!', n: 9, time: 3.4 },
+      { kind: 'time', act: 'pour', item: 'mix', label: '🍳 반죽 붓기', hint: '팬이 달궈지면 동그랗게!', gauge: '팬 온도', zone: [0.58, 0.8], speed: 3.0 },
+      { kind: 'time', act: 'flip', label: '🔄 뒤집기', hint: '보글보글 구멍이 생기면 뒤집어요!', gauge: '굽기', zone: [0.56, 0.76], speed: 3.2 },
+      { kind: 'time', act: 'add', item: 'strawberry', label: '🍓 딸기 올리기', hint: '노릇노릇할 때 딸기를 올려 완성!', gauge: '노릇노릇', zone: [0.55, 0.74], speed: 3.0 },
+    ],
+  },
 ];
 RECIPES.forEach((r) => (r.steps[r.steps.length - 1].last = true));
 
@@ -185,6 +215,9 @@ const TOWN_LINES = {
   eat_eggroll: ['부드럽다~ 🥚', '계란말이 성공!'],
   eat_pancake: ['폭신폭신 🥞', '시럽 듬뿍~'],
   eat_budae: ['얼큰하다 🍲', '햄이 쫄깃해!'],
+  eat_tomatoegg: ['새콤달콤 부드러워 🍅', '내가 키운 토마토라 더 맛있어!'],
+  eat_ssam: ['쌈 싸 먹으니까 최고 🥬', '상추가 아삭아삭!'],
+  eat_berrycake: ['딸기 듬뿍 🍓', '폭신폭신 달콤해~'],
   fridge: ['냉장고에서 하나 꺼내 먹어야지 🧊', '{item} 먹을까?'],
 };
 /* …and the people on the street: the girl at the store's till, the woman at the café ('{item}', '{n}', '{price}'). */
@@ -223,7 +256,7 @@ const TownLife = {
     if (!h.town || typeof h.town !== 'object') h.town = { outs: 0, shops: 0, cafe: {}, sung: 0, swings: 0 };
     return h;
   },
-  storeItem: (id) => STORE_ITEMS.find((x) => x.id === id) || null,
+  storeItem: (id) => STORE_ITEMS.find((x) => x.id === id) || VERANDA_GROWN.find((x) => x.id === id) || null, // (…or grown on the veranda: js/veranda.js)
   cafeItem: (id) => CAFE_MENU.find((x) => x.id === id) || null,
   recipe: (id) => RECIPES.find((x) => x.id === id) || null,
   /** On the shelves this month? */
@@ -774,6 +807,7 @@ const TownLife = {
     const api = HouseHost.api;
     if (!api || !HouseRoom.ov) return '…';
     if (this.out) return '밖에 나가 있어요. 집에 돌아와서 해요 🏠';
+    if (VerandaLife.out) return '베란다에 나가 있어요. 방에 들어가서 해요 🌱';
     if (this.cooking) return '요리하는 중이에요 🍳';
     if (this.eating || Delivery.busy() || api.eating()) return `${josa(Avatar.name(), '이/가')} 먹는 중이에요 😋`;
     if (api.doorBusy()) return '현관에 누가 와 있어요. 잠깐만요!';
@@ -840,6 +874,9 @@ const TownLife = {
           const can = this.canCook(r);
           const best = h.cook.best[r.id] || 0;
           const made = h.cook.made[r.id] || 0;
+          // (what grows on the veranda is not sold at the store: it is grown — js/veranda.js)
+          const grown = Object.keys(r.need).some((id) => this.storeItem(id).grown);
+          const toGrow = Object.entries(r.need).some(([id, n]) => this.have(id) < n && this.storeItem(id).grown);
           return `<button class="recipe ${can ? 'can' : ''}" data-cook="${r.id}" ${can ? '' : 'disabled'}>
             <span class="rc-pic" data-town-thumb="snack:${r.id}" aria-hidden="true">${r.emoji}</span>
             <span class="rc-text"><b>${esc(r.name)}</b>
@@ -848,8 +885,8 @@ const TownLife = {
                 const ok = this.have(id) >= n;
                 return `<span class="rc-ing ${ok ? 'ok' : ''}">${it.emoji}${n > 1 ? `×${n}` : ''}</span>`;
               }).join('')}</span>
-              <small>${made ? `${'⭐'.repeat(best)}${'☆'.repeat(3 - best)} · ${made}번 만들었어요` : '아직 안 만들어 봤어요'}</small></span>
-            <span class="rc-go">${can ? '만들기' : '재료 부족'}</span>
+              <small>${made ? `${'⭐'.repeat(best)}${'☆'.repeat(3 - best)} · ${made}번 만들었어요` : grown ? '🌱 베란다 텃밭에서 키운 걸로 만들어요' : '아직 안 만들어 봤어요'}</small></span>
+            <span class="rc-go">${can ? '만들기' : toGrow ? '🌱 텃밭' : '재료 부족'}</span>
           </button>`;
         }).join('')}</div>
         <div class="dialog-actions one"><button class="btn soft" data-kitchen-shop>🏪 편의점에 장 보러 가기</button></div>`;
@@ -865,7 +902,11 @@ const TownLife = {
     if (!r || !api) return;
     const why = this.whyNotCook();
     if (why) return UI.toast(why, { icon: '🍳' });
-    if (!this.canCook(r)) return UI.toast('재료가 부족해요. 🏪 편의점에서 사 올 수 있어요', { icon: '🥚' });
+    if (!this.canCook(r)) {
+      const grown = Object.entries(r.need).filter(([id, n]) => this.have(id) < n && this.storeItem(id).grown).map(([id]) => this.storeItem(id).name);
+      if (grown.length) return UI.toast(`${josa(grown.join(', '), '은/는')} 베란다 텃밭에서 키워요`, { icon: '🌱' });
+      return UI.toast('재료가 부족해요. 🏪 편의점에서 사 올 수 있어요', { icon: '🥚' });
+    }
     if (!(await this.kitchenReady())) return;
     if (this.whyNotCook()) return;
     // the ingredients come out of the fridge

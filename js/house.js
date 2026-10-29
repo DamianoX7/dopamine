@@ -133,6 +133,8 @@ const HOUSE_TIPS = [
   '🏘️ 동네 버튼을 누르면 편의점, 카페, 코인노래방, 공원에 갈 수 있어요',
   '편의점에서 재료를 사 오면 🍳 부엌에서 요리할 수 있어요. 타이밍 맞추기!',
   '코인노래방에서는 내 커버를 직접 불러요 🎤 마지막엔 점수도 나와요',
+  '🌱 버튼을 누르면 창밖 베란다 텃밭에 나가요. 상추, 대파, 방울토마토, 딸기를 키워요',
+  '베란다 텃밭은 흙이 촉촉한 동안 자라요. 비가 오면 저절로 물이 돼요 ☔',
 ];
 
 /* What Lorelei says when she comes round — and about what she sees. ('{name}' = her nickname) */
@@ -291,6 +293,7 @@ const HouseHost = {
   onCat: (what) => CatLife.said(what), //               뭉치: 'home' (in at the door with her, just taken home)
   onTownTap: (kind) => TownLife.tapped(kind), //         …a tap on the street: a shop, her house, the swings…
   onCook: (what) => TownLife.cookSaid(what), //          the kitchen: 'ready' (she is at the hob)
+  onVeranda: (what, o) => VerandaLife.said(what, o), //  the veranda: 'out', 'in', 'sown', 'watered', 'pickedAll', 'tap' (js/veranda.js)
   sound: (name) => Sfx.play(name),
   clock: () => CoverHost.clock(), //                   (where the song is, and its beat: she dances to it)
   beats: (id) => CoverHost.beats(id),
@@ -370,6 +373,7 @@ const House = {
       weather: this.weather(),
       season: Weather.calendar(), // (Incheon's: the calendar's)
       reduce: reducedMotion(),
+      veranda: VerandaLife.look(), // (the planter boxes out on the veranda, and what grows in them)
     };
   },
 
@@ -812,7 +816,11 @@ const House = {
     let text;
     if (s.dark) text = `${now} ${Moon.describe()}`;
     else text = `${now}${sun.set ? ` 오늘 해는 ${Moon.clock(sun.set)}에 져요.` : ''}${s.gold > 0.3 ? ' 노을이 지고 있어요 🌇' : ''}`;
-    UI.alert({ icon: s.dark ? Moon.emoji() : city ? city.emoji : sky.emoji, title: s.dark ? '창밖은 인천의 밤하늘' : '창밖은 지금 인천 하늘', text });
+    const icon = s.dark ? Moon.emoji() : city ? city.emoji : sky.emoji;
+    const title = s.dark ? '창밖은 인천의 밤하늘' : '창밖은 지금 인천 하늘';
+    // (out there is the veranda: she can step out onto it — js/veranda.js)
+    if (!VerandaLife.out && !VerandaLife.whyNot()) return UI.confirm({ icon, title, text, ok: '🌱 베란다로', cancel: '닫기' }).then((go) => go && VerandaLife.go());
+    UI.alert({ icon, title, text });
   },
 
   /* ----- arranging ----- */
@@ -1168,21 +1176,27 @@ const House = {
     const gift = this.giftWaiting();
     const mail = Post.waiting().length;
     const fresh = h.made && !((h.town && h.town.outs) || (h.cook && Object.keys(h.cook.made || {}).length));
+    const sprout = h.made && !fresh && !(h.veranda && h.veranda.made); // (the veranda: there, and she has not been out on it yet)
+    const garden = h.made && VerandaLife.note(); //                       (…or something on it is ripe, or dry)
     const note = !h.made
       ? '새로 생겼어요! 우리 집에 들어가 볼까요?'
       : fresh
         ? '🏘️ 동네와 🍳 부엌이 새로 생겼어요!'
+        : sprout
+        ? '🌱 창밖 베란다에 텃밭이 새로 생겼어요!'
         : gift
         ? `${gift.event.emoji} 문 앞에 ${gift.event.name} 선물이 와 있어요`
+        : garden
+        ? garden
         : mail
           ? '💌 우편함에 편지가 와 있어요'
           : Moon.dark()
             ? `${Moon.emoji()} 창밖에 인천의 밤하늘이 보여요`
             : '오늘도 집에 들러 볼까요?';
-    return `<button class="card house-card ${!h.made || gift || fresh ? 'is-new' : ''}" data-action="house-open" aria-label="${esc(HOUSE_NAME)}에 들어가기">
+    return `<button class="card house-card ${!h.made || gift || fresh || sprout ? 'is-new' : ''}" data-action="house-open" aria-label="${esc(HOUSE_NAME)}에 들어가기">
       <span class="house-ico" aria-hidden="true">🏠</span>
       <span class="house-text"><b>${esc(HOUSE_NAME)}</b><small>${esc(note)}</small></span>
-      ${!h.made || fresh ? '<span class="chip chip-hot">NEW</span>' : ''}
+      ${!h.made || fresh || sprout ? '<span class="chip chip-hot">NEW</span>' : ''}
       <span class="chev" aria-hidden="true">›</span>
     </button>`;
   },
@@ -1233,6 +1247,7 @@ const HouseRoom = {
           <button class="fox-mail" data-action="house-mail" data-house-mail hidden><span aria-hidden="true">💌</span> <b>편지가 왔어요</b><small>우편함을 눌러 보세요</small></button>
           <button class="fox-mail is-present" data-action="house-gift" data-house-gift hidden></button>
           <button class="fox-mail is-food" data-action="house-food" data-house-food hidden></button>
+          <button class="fox-mail is-garden" data-action="house-veranda" data-house-garden hidden></button>
           ${State.house.taught ? '' : '<p class="fox-tip" data-house-tip>👆 물건을 눌러 보세요 · 손가락으로 밀면 집이 돌아가요</p>'}
         </div>
         <button class="fox-cam" data-action="house-snap" aria-label="방 사진 찍기"><span aria-hidden="true">📷</span></button>
@@ -1240,6 +1255,7 @@ const HouseRoom = {
         <button class="fox-cam is-home" data-action="house-home" aria-label="처음 보던 곳으로 돌아가기"><span aria-hidden="true">🔄</span></button>
         <button class="fox-cam is-food" data-action="house-food" aria-label="배달 시키기"><span aria-hidden="true">🛵</span></button>
         <button class="fox-cam is-cook" data-action="house-kitchen" aria-label="부엌"><span aria-hidden="true">🍳</span></button>
+        <button class="fox-cam is-veranda" data-action="house-veranda" data-house-veranda aria-label="베란다 텃밭"><span aria-hidden="true">🌱</span></button>
         <div class="fh-actions">
           <button class="fh-act" data-action="house-lp"><span aria-hidden="true">💿</span><b>LP 듣기</b></button>
           <button class="fh-act" data-action="house-diary"><span aria-hidden="true">📔</span><b>일기장</b></button>
@@ -1249,6 +1265,7 @@ const HouseRoom = {
           <button class="fh-act is-shop" data-action="house-edit"><span aria-hidden="true">🛋️</span><b>꾸미기</b></button>
         </div>
         ${TownLife.hudHtml()}
+        ${VerandaLife.hudHtml()}
       </div>
       <div class="fox-drawer house-drawer" data-house-drawer hidden>
         <div class="fd-head">
@@ -1376,6 +1393,12 @@ const HouseRoom = {
       await sleep(900);
       if (this.ov !== ov) return;
       UI.toast('새로 생겼어요! 🏘️ 동네에 나가 편의점·카페·노래방·공원에 가고, 🍳 부엌에서 요리도 해요', { icon: '🏘️', kind: 'gold', ms: 6000 });
+    } else if (!VerandaLife.state().news) {
+      VerandaLife.state().news = true;
+      Store.save();
+      await sleep(900);
+      if (this.ov !== ov) return;
+      UI.toast('새로 생겼어요! 🌱 창밖 베란다에 텃밭이 있어요. 🌱 버튼이나 창문을 눌러 나가 봐요', { icon: '🌱', kind: 'gold', ms: 6000 });
     }
     if (House.guestDue()) House.guestTimer = setTimeout(() => House.knock(), (first ? 9000 : 6000) + Math.random() * 9000);
   },
@@ -1394,6 +1417,7 @@ const HouseRoom = {
     clearInterval(this.skyTimer);
     Delivery.closed();
     TownLife.closed();
+    VerandaLife.closed();
     clearTimeout(House.guestTimer);
     House.guestTimer = 0;
     if (this.loop) this.loop();
@@ -1445,6 +1469,7 @@ const HouseRoom = {
     if (bubble) bubble.dataset.who = Avatar.name();
     this.tuneChip();
     Delivery.chip();
+    VerandaLife.chip();
   },
 
   /* The song on the turntable (or anywhere): what it is, pause, stop. */
@@ -1515,7 +1540,7 @@ const HouseRoom = {
     const sr = stage.getBoundingClientRect();
     const bar = $('.house-hud .fh-top', panel);
     const cook = $('[data-house-cook]', panel);
-    const acts = cook && !cook.hidden ? cook : $(TownLife.out ? '.house-hud .town-acts' : '.house-hud .fh-actions', panel);
+    const acts = cook && !cook.hidden ? cook : $(TownLife.out ? '.house-hud .town-acts' : VerandaLife.out ? '.house-hud .veranda-acts' : '.house-hud .fh-actions', panel);
     const top = bar ? bar.getBoundingClientRect().bottom - sr.top + 6 : 0;
     const low = acts && acts.offsetHeight ? sr.bottom - acts.getBoundingClientRect().top + 6 : 0;
     if (!this.editOn && !this.meOn) return HouseHost.api.inset({ top, low });

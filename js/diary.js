@@ -162,6 +162,12 @@ const Diary = {
     if (food.length) add('🛵', `${food.length > 1 ? `‘${food[0]}’ 외 ${food.length - 1}개를` : quoted(food[0], '을/를')} 배달시켜 먹었어요`);
     const cooked = d.cook || [];
     if (cooked.length) add('🍳', `${cooked.length > 1 ? `‘${cooked[0]}’ 외 ${cooked.length - 1}가지를` : quoted(cooked[0], '을/를')} 만들어 먹었어요`);
+    const picked = d.harvest || [];
+    const sown = d.sow || [];
+    if (picked.length) add('🧺', `베란다 텃밭에서 ${picked.length > 1 ? `‘${picked[0]}’ 외 ${picked.length - 1}가지를` : quoted(picked[0], '을/를')} 수확했어요`);
+    if (sown.length) add('🌱', `베란다 텃밭에 ‘${sown[0]}’${sown.length > 1 ? ` 외 ${sown.length - 1}가지` : ''} 씨앗을 심었어요`);
+    else if (d.water && !picked.length) add('💧', '베란다 텃밭에 물을 줬어요');
+    else if (d.veranda && !picked.length) add('🌱', '베란다에 나가 텃밭을 구경했어요');
     const shop = d.shop || [];
     if (shop.length) add('🏪', `편의점에서 ${shop.length > 1 ? `‘${shop[0]}’ 외 ${shop.length - 1}개를` : quoted(shop[0], '을/를')} 샀어요`);
     const cafe = d.cafe || [];

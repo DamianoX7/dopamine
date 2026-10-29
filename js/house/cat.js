@@ -191,6 +191,13 @@ export class Cat {
     face.pupil(this.pupil);
   }
 
+  /** Is she (still) at `what` with it — doing it, or on her way to? Called away (to the door, out onto the veranda), she
+   *  is not, and then it is not either: no hand to lean into, or to lick a treat from. */
+  withHer(what) {
+    const me = this.world.me;
+    return !!me && ((me.task && me.task.do === what) || me.tasks.some((x) => x.do === what));
+  }
+
   /** Turn towards `yaw`; true once it faces it. */
   turnTo(yaw, dt) {
     const a = this.anim;
@@ -490,7 +497,7 @@ export class Cat {
           this.say('eat');
         }
         if (Math.random() < dt * 1.2) this.fx(Math.random() < 0.5 ? '💗' : '✨');
-        if (t.age > t.t) {
+        if (t.age > t.t || !this.withHer('feedCat')) {
           a.mood.chew = 0;
           a.mood.eyes = 'open';
           a.setPose('sit', 5);
@@ -509,7 +516,7 @@ export class Cat {
           if (w.host.sound) w.host.sound('purr');
         }
         if (Math.random() < dt * 1.6) this.fx('💗');
-        if (t.age > t.t) {
+        if (t.age > t.t || !this.withHer('petCat')) {
           a.mood.eyes = 'open';
           a.setPose(this.perch > 0.05 ? 'lie' : 'sit', 4);
           return true;
