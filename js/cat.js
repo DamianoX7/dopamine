@@ -1,6 +1,6 @@
 'use strict';
 /* ==================================================================
-   🐈 뭉치 — the white stray of 우리 동네, made after her own cat.
+   🐈 뭉치 — the white stray of 우리 동네.
 
    Now and then (not often) it is out on the street when she goes out:
    on a bench, by the store's door, under the big tree, by her gate. A

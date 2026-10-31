@@ -331,7 +331,9 @@ export class Cat {
           a.look = null;
           a.lookW = 0;
           t.z = 3;
+          t.yaw = Math.atan2(w.camera.position.x - a.pos.x, w.camera.position.z - a.pos.z) + rand(-0.35, 0.35); // (settling down, it turns round once more: its sleeping face to us)
         }
+        if (t.age < 1.2) this.turnTo(t.yaw, dt * 0.5);
         if (t.age > t.z) {
           t.z = t.age + rand(3.5, 5.5);
           this.fx('💤');
