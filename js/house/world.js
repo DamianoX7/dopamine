@@ -29,6 +29,7 @@ import { makeIngredient } from './meals.js';
 import { Fx } from './fx.js';
 import { Town } from './town.js';
 import { Cat } from './cat.js';
+import { CatPlay } from './catplay.js';
 
 const FOV = 32;
 const YAW = -0.62; //            where the camera stands at first: in front, a little to the left…
@@ -116,6 +117,9 @@ export class HouseWorld {
     this.courier = new Courier(this); // …and at the door, now and then, the courier
     this.cat = new Cat(this); //        …and 뭉치, the white cat: a stray on the street, then (taken home) hers (cat.js)
     this.catHome = false; //            (whether it lives here: the app's — look.cat)
+    this.play = null; //                 the game she is playing with it (catplay.js)
+    this.catAte = -999; //               when it last went to its bowls, and last asked for its dinner
+    this.catAsked = -999;
     this.food = null; //                 what she has ordered and is waiting for (the app's: { order })
     this.fx = new Fx(scene);
     this.bubbles = { guest: { el: null, until: 0 }, me: { el: null, until: 0 }, rider: { el: null, until: 0 }, clerk: { el: null, until: 0 }, barista: { el: null, until: 0 }, cat: { el: null, until: 0 } }; // what each of them says, over their head
@@ -227,6 +231,7 @@ export class HouseWorld {
   }
 
   unmount() {
+    if (this.play) this.play.end(true);
     if (!this.stage) return;
     this.ro.disconnect();
     this.io.disconnect();
@@ -350,6 +355,7 @@ export class HouseWorld {
     this.items.forEach((e) => e.id === 'radio' && e.it.set('on', this.radioOn));
     this.setGift(!!look.gift);
     this.food = look.food || null;
+    this.items.forEach((e) => e.id === 'cat-bowl' && e.it.set('bowl', look.cat));
     this.grid = null;
     // the girl who lives here: dressed as the app has her (built again when anything changed — then she gives a twirl)
     if (look.me && look.me.look) {
@@ -617,6 +623,7 @@ export class HouseWorld {
       who.light(_c, sun);
       who.update(dt);
     }
+    if (this.play) this.play.update(dt);
     if (this.cat.on && this.cat.world === this) this.cat.update(dt);
     // (she is done with 뭉치: the camera goes back — frameCat)
     if (this.catFramed && !(this.me.task && (this.me.task.do === 'petCat' || this.me.task.do === 'feedCat'))) {
@@ -870,6 +877,7 @@ export class HouseWorld {
     this.canvas.setPointerCapture(e.pointerId);
     if (this.where === 'town') return this.town.onDown(e);
     if (this.where === 'veranda') return this.veranda.onDown(e);
+    if (this.play) return this.play.onDown(e);
     this.fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (this.fingers.size === 2) {
       // two fingers: closer and further, and sliding the view
@@ -891,6 +899,7 @@ export class HouseWorld {
   onMove(e) {
     if (this.where === 'town') return this.town.onMove(e);
     if (this.where === 'veranda') return this.veranda.onMove(e);
+    if (this.play) return this.play.onMove(e);
     const f = this.fingers.get(e.pointerId);
     if (f) {
       f.x = e.clientX;
@@ -931,6 +940,7 @@ export class HouseWorld {
   onUp(e, cancelled = false) {
     if (this.where === 'town') return this.town.onUp(e, cancelled);
     if (this.where === 'veranda') return this.veranda.onUp(e, cancelled);
+    if (this.play) return this.play.onUp(e);
     this.fingers.delete(e.pointerId);
     if (this.fingers.size < 2) this.pinch = null;
     const p = this.pointer;
@@ -1716,6 +1726,27 @@ export class HouseWorld {
       return;
     }
     const r = Math.random();
+    // its bowls, every so often — or, empty, it goes and sits by them and says so
+    const bowl = this.catBowls();
+    const full = (this.look && this.look.cat) || {};
+    if (bowl && this.time - this.catAte > 110 && Math.random() < 0.5 && (full.food > 0.03 || full.water > 0.03)) {
+      this.catAte = this.time;
+      const dish = full.food > 0.03 && (full.water <= 0.03 || Math.random() < 0.65) ? 'food' : 'water';
+      return void T.push(...this.toBowl(bowl[dish]), { do: 'bowl', what: dish, t: 5 + Math.random() * 4 });
+    }
+    if (bowl && full.food <= 0.03 && this.time - this.catAsked > 70) {
+      this.catAsked = this.time;
+      return void T.push(...this.toBowl(bowl.food), { do: 'meow', line: 'hungry' }, { do: 'sit', t: 4 });
+    }
+    // its tower: up it, a floor at a time, to the top; a while up there; and down — or a good scratch at the post
+    const tower = this.catTower();
+    if (tower && Math.random() < 0.4) {
+      if (Math.random() < 0.3) return void T.push({ do: 'walk', to: tower.post.at }, { do: 'walk', to: tower.post.close, direct: true, stop: 0.02 }, { do: 'face', at: tower.post.face }, { do: 'scratch', t: 3 + Math.random() * 2 });
+      T.push({ do: 'walk', to: tower.below });
+      for (const p of tower.perches) T.push({ do: 'hop', to: p.at, h: p.h, of: tower.uid });
+      T.push(Math.random() < 0.5 ? { do: 'sleep', t: 16 + Math.random() * 18 } : { do: 'loaf', t: 10 + Math.random() * 12 }, { do: 'hop', to: tower.below, h: 0 });
+      return;
+    }
     const spots = this.spots();
     const win = spots.find((s) => s.kind === 'window');
     const walking = me.on && me.task && me.task.do === 'walk';
@@ -1742,12 +1773,127 @@ export class HouseWorld {
   catPet() {
     const cat = this.cat;
     const me = this.me;
-    if (!cat.on || cat.world !== this || !me.on || me.abed || me.seat || me.cooking || me.busyEating()) return false;
+    if (!this.catFree()) return false;
     const toHer = Math.atan2(me.pos.x - cat.pos.x, me.pos.z - cat.pos.z);
     const kneel = this.freeNear(cat.pos.clone().add(V(Math.sin(toHer) * 0.42, 0, Math.cos(toHer) * 0.42)));
-    me.tasks = [{ do: 'walk', to: kneel }, { do: 'face', at: cat.pos.clone() }, { do: 'petCat', cat, t: 3.6 }];
-    me.task = null;
+    me.redo([{ do: 'walk', to: kneel }, { do: 'face', at: cat.pos.clone() }, { do: 'petCat', cat, t: 3.6 }]); // (up from where she sits, first)
     cat.do([{ do: 'wait', t: 0.2 }, { do: 'face', at: kneel }, { do: 'petted', t: 99 }]);
+    return true;
+  }
+
+  /** Can she see to it now — is it here, and she up (or only sitting), with nothing on her hands? */
+  catFree() {
+    const cat = this.cat;
+    const me = this.me;
+    return !(!cat.on || cat.world !== this || !me.on || me.abed || me.cooking || me.busyEating() || this.play || this.doorBusy());
+  }
+
+  /** A churu at home: she holds it out, as on the street (out of the fridge: js/cat.js). */
+  catFeed() {
+    const cat = this.cat;
+    const me = this.me;
+    if (!this.catFree()) return false;
+    const toHer = Math.atan2(me.pos.x - cat.pos.x, me.pos.z - cat.pos.z);
+    const kneel = this.freeNear(cat.pos.clone().add(V(Math.sin(toHer) * 0.46, 0, Math.cos(toHer) * 0.46)));
+    me.redo([{ do: 'walk', to: kneel }, { do: 'face', at: cat.pos.clone() }, { do: 'feedCat', cat, t: 4.6, done: () => this.host.onCat('churu') }]);
+    return true;
+  }
+
+  /** The hunting game (catplay.js). → false if she cannot now. */
+  catPlay() {
+    if (!this.catFree()) return false;
+    const play = new CatPlay(this);
+    if (!play.begin()) return false;
+    this.play = play;
+    return true;
+  }
+
+  catPlayStop() {
+    if (this.play) this.play.end();
+  }
+
+  /** (it is over: the finger is the room's again) */
+  playEnded(play) {
+    if (this.play === play) this.play = null;
+    this.pointer.down = false;
+    this.fingers.clear();
+  }
+
+  /** Where its two bowls are: where to stand at each, and what to look at — or null if they are not out. */
+  catBowls() {
+    for (const e of this.items.values()) {
+      if (e.id !== 'cat-bowl' || !e.place) continue;
+      const o = e.it.object;
+      o.updateMatrixWorld(true);
+      const flat = (x, z) => {
+        const p = V(x, 0, z).applyMatrix4(o.matrixWorld);
+        p.y = 0;
+        return p;
+      };
+      const side = this.openAt(flat(0, 0.62)) ? 1 : -1; // (from its front — or from behind, if it stands with its front to a wall)
+      const dish = (s) => ({ at: this.freeNear(flat(s.x, 0.62 * side)), close: flat(s.x, 0.31 * side), face: flat(s.x, 0).setY(0.05) });
+      return { food: dish(e.it.spot), water: dish(e.it.drink), her: this.freeNear(flat(0, 0.62 * side)) };
+    }
+    return null;
+  }
+
+  /** Is `p` open floor? */
+  openAt(p) {
+    const g = this.grid || this.makeGrid();
+    const [i, j] = this.cellOf(p);
+    return i >= 0 && j >= 0 && i < g.nx && j < g.nz && !!g.open[i + j * g.nx];
+  }
+
+  /** Its way to one of its bowls: up to it, its nose over it. */
+  toBowl(dish) {
+    return [{ do: 'walk', to: dish.at }, { do: 'walk', to: dish.close, direct: true, stop: 0.02 }, { do: 'face', at: dish.face }];
+  }
+
+  /** Its tower: where to jump up from, its three floors from the bottom up, its scratching post — or null. */
+  catTower() {
+    for (const e of this.items.values()) {
+      if (e.id !== 'cat-tower' || !e.place) continue;
+      const o = e.it.object;
+      o.updateMatrixWorld(true);
+      const flat = (x, z) => {
+        const p = V(x, 0, z).applyMatrix4(o.matrixWorld);
+        p.y = 0;
+        return p;
+      };
+      const side = this.openAt(flat(0, 0.62)) ? 1 : -1;
+      const below = this.freeNear(flat(e.it.spot.x, e.it.spot.z * side));
+      if (!this.reachable(below)) return null;
+      return {
+        uid: e.uid,
+        below,
+        perches: e.it.perches.map((p) => ({ at: flat(p.x, p.z), h: p.h })),
+        post: { at: this.freeNear(flat(e.it.post.x, 0.62 * side)), close: flat(e.it.post.x, 0.46 * side), face: flat(e.it.post.x, e.it.post.z * side).setY(0.3) },
+      };
+    }
+    return null;
+  }
+
+  /** She sees to its bowls (`what`: 'food', 'water'): over to them, down on her knees, a pour — and it comes running. → false if she cannot now. */
+  catFill(what) {
+    const bowl = this.catBowls();
+    if (!bowl || !this.catFree()) return false;
+    const me = this.me;
+    me.redo([
+      { do: 'walk', to: bowl.her },
+      { do: 'face', at: bowl[what].face },
+      {
+        do: 'pour',
+        what,
+        t: 2,
+        done: () => {
+          this.host.onCat('filled', what);
+          const b = this.catBowls();
+          if (!b || !this.cat.on || this.cat.world !== this) return;
+          this.catAte = this.time;
+          this.cat.do([{ do: 'walk', to: b[what].at, fast: true }, ...this.toBowl(b[what]).slice(1), { do: 'bowl', what, t: 6 }]);
+        },
+      },
+    ]);
     return true;
   }
 

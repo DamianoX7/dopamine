@@ -42,6 +42,28 @@ export function makeChuru() {
   return g;
 }
 
+/** A bag of dry cat food, its top rolled. (In the frame of her hand.) */
+export function makeFoodBag() {
+  const g = new THREE.Group();
+  const bag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.05), new THREE.MeshStandardMaterial({ color: '#ffb36b', roughness: 0.6 }));
+  bag.position.y = -0.08;
+  const band = new THREE.Mesh(new THREE.BoxGeometry(0.102, 0.05, 0.052), new THREE.MeshStandardMaterial({ color: '#fff4e4', roughness: 0.6 }));
+  band.position.y = -0.09;
+  g.add(bag, band);
+  g.traverse((o) => o.isMesh && (o.castShadow = true));
+  return g;
+}
+
+/** A little jug of water. */
+export function makeJug() {
+  const g = new THREE.Group();
+  const jug = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.1, 18), new THREE.MeshStandardMaterial({ color: '#c2ecf6', roughness: 0.2 }));
+  jug.position.y = -0.06;
+  g.add(jug);
+  g.traverse((o) => o.isMesh && (o.castShadow = true));
+  return g;
+}
+
 export class Cat {
   constructor(world) {
     this.world = world;
@@ -54,6 +76,7 @@ export class Cat {
     this.abed = null; // (for the bubble: not lying in a bed as she does)
     this.perch = 0; //  how high it is standing or lying (on a bench, on the bed)
     this.lastSay = -99;
+    this.perchOf = null; // (up on its tower: which)
   }
 
   /** Its body (built the first time it is wanted). */
@@ -173,6 +196,14 @@ export class Cat {
       if (t.end) t.end();
       this.task = null;
     }
+    // (up on the tower, and the tower was moved or put away: down it comes)
+    if (this.perchOf && this.perch > 0.05 && t.do !== 'hop') {
+      const e = this.world.items.get(this.perchOf);
+      if (!e || !e.place || e.place.x !== this.perchAt.x || e.place.z !== this.perchAt.z || (e.place.r || 0) !== this.perchAt.r) {
+        this.perchOf = null;
+        this.do([{ do: 'hop', to: this.world.freeNear(a.pos.clone()), h: 0 }]);
+      }
+    }
     a.update(dt);
     this.lookOfFace(t, dt);
   }
@@ -186,7 +217,13 @@ export class Cat {
     const px = innerHeight / (2 * Math.tan((cam.fov * Math.PI) / 360) * cam.position.distanceTo(this.headPoint(_v)));
     face.near(px * this.rig.scale);
     const lit = this.world.lit || { dark: 0 };
-    const want = clamp(0.22 + 0.7 * lit.dark * (lit.light === false ? 1 : 0.6) + (t.do === 'eat' ? 0.3 : 0), 0, 1);
+    // (white in the shade: a little light of its own, or it goes grey the moment it steps out of the sun)
+    const glow = 0.12 * (1 - 0.8 * lit.dark * (lit.light === false ? 1 : 0.5));
+    if (Math.abs(glow - (this.glow || 0)) > 0.004) {
+      this.glow = glow;
+      this.rig.shells.forEach((m) => m.material.emissive.setScalar(glow));
+    }
+    const want = clamp(0.22 + 0.7 * lit.dark * (lit.light === false ? 1 : 0.6) + (t.do === 'eat' || t.do === 'bowl' ? 0.3 : t.do === 'hunt' ? 0.6 : 0), 0, 1);
     this.pupil = damp(this.pupil == null ? want : this.pupil, want, 2, dt);
     face.pupil(this.pupil);
   }
@@ -410,7 +447,53 @@ export class Cat {
         a.setPose(k < 0.5 ? 'leap' : 'perch', 12);
         if (k >= 1) {
           a.air = this.perch = t.h;
+          const up = t.of && this.world.items ? this.world.items.get(t.of) : null;
+          this.perchOf = up && up.place ? t.of : null;
+          this.perchAt = up && up.place ? { x: up.place.x, z: up.place.z, r: up.place.r || 0 } : null;
           a.setPose(t.h > 0.05 ? 'perch' : 'stand', 8);
+          return true;
+        }
+        return false;
+      }
+
+      case 'hunt':
+        return t.play.catFrame(t, dt);
+
+      case 'bowl': {
+        // its nose down in it: crunching, or lapping
+        if (!t.posed) {
+          t.posed = true;
+          a.setPose('eat', 6);
+          a.noseY = 0.14;
+          a.mood.chew = t.what === 'food' ? 1 : 0.5;
+          a.look = null;
+          a.lookW = 0;
+          this.say(t.what === 'food' ? 'kibble' : 'water');
+        }
+        if (t.age > t.t) {
+          a.noseY = null;
+          a.mood.chew = 0;
+          a.setPose('sit', 5);
+          return true;
+        }
+        return false;
+      }
+
+      case 'scratch': {
+        // up on its hind legs against the post, a paw and a paw
+        if (!t.posed) {
+          t.posed = true;
+          a.setPose('scratch', 6);
+          a.mood.eyes = 'happy';
+          this.say('scratch');
+        }
+        const k = Math.min(1, t.age * 3) * clamp((t.t - t.age) * 3, 0, 1);
+        a.lift[0] = (0.2 + Math.max(0, Math.sin(t.age * 11)) * 0.07) * k;
+        a.lift[2] = (0.2 + Math.max(0, Math.sin(t.age * 11 + Math.PI)) * 0.07) * k;
+        if (t.age > t.t) {
+          a.still();
+          a.mood.eyes = 'open';
+          a.setPose('stand', 5);
           return true;
         }
         return false;

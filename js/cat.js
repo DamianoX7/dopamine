@@ -10,6 +10,13 @@
    it knows her — and when it trusts her enough she can take it home:
    it follows her to her door and in, and from then on it lives in 둘의
    집 with her (js/house/cat.js: what it does there).
+
+   At home, a tap on it opens its sheet: she can stroke it, give it a
+   churu, fill its bowls (the dry food comes from the store, 🐾 고양이;
+   the first bowls and bag are a present), and play with it — 사냥 놀이,
+   a feather on a wand (js/house/catplay.js). Its bowls go down slowly
+   with the hours, whether she is there or not; empty, it sits by them
+   and says so. Nothing worse comes of it. Its tower is in the shop.
    ================================================================== */
 
 const CAT_NAME = '뭉치';
@@ -27,6 +34,14 @@ const CAT_LINES = {
   yes: ['냐옹!', '(꼬리를 세우고 따라와요)'],
   new_home: ['냐아… (새 집이다!)', '(두리번두리번)'],
   welcome: ['냐앙~ (어서 와!)', '냥냥!'],
+  stalk: ['(살금살금…)', '(엉덩이를 씰룩씰룩)', '…!'],
+  caught: ['냥!! 잡았다!', '(앙! 물었어요)', '냐앙!'],
+  miss: ['냥?!', '(어디 갔지?)', '…냥!'],
+  played: ['냐아~ (재밌었다!)', '냥냥~', '(꼬리를 바짝 세웠어요)'],
+  hungry: ['냐아앙… (밥 줘!)', '(빈 밥그릇을 쳐다봐요)', '냥…?'],
+  kibble: ['오독오독…', '(맛있게 먹어요)', '냠냠 🥣'],
+  water: ['할짝할짝…', '(물을 마셔요)'],
+  scratch: ['(벅벅벅벅)', '(발톱을 갈아요)'],
 };
 /* …and what she says to it (the town's lines: js/town.js meLine). */
 Object.assign(TOWN_LINES, {
@@ -36,10 +51,15 @@ Object.assign(TOWN_LINES, {
   cat_feed: ['츄르 먹을래? 🐟', '자, 맛있는 거야~'],
   cat_pet: ['보들보들해… 💗', '착하다 뭉치~', '골골송 들린다 😊'],
   cat_adopt: ['뭉치야, 우리 집에 가자! 🏠', '이제 우리 같이 살자 💗'],
+  cat_play: ['뭉치야, 놀자! 🪶', '이거 잡아 봐~', '자, 간다~'],
+  cat_played: ['잘했어 뭉치야! 💗', '사냥꾼 다 됐네~', '재밌었지? 😊'],
+  cat_fill: ['뭉치야, 밥 먹자~ 🥣', '맛있게 먹어~'],
+  cat_water: ['시원한 물 줄게 💧', '물도 마셔야지~'],
 });
 CLERK_LINES.tap.push('요즘 하얀 길고양이가 동네에 가끔 보여요 🐈');
 /* (on the store's shelves: what it likes best) */
 STORE_ITEMS.push({ id: 'churu', kind: 'cat', emoji: '🐟', name: '고양이 츄르', price: 6, desc: '길고양이도 좋아하는 간식' });
+STORE_ITEMS.push({ id: 'kibble', kind: 'cat', emoji: '🥣', name: '고양이 사료', price: 8, n: 3, desc: '밥그릇을 세 번 채워요' });
 
 const CatLife = {
   here: false, //    it is out on the street this time
@@ -50,7 +70,11 @@ const CatLife = {
   state() {
     const h = State.house;
     if (!h.cat || typeof h.cat !== 'object') h.cat = { trust: 0, meets: 0, adopted: false, at: null, miss: 0, fed: 0, pets: 0 };
-    return h.cat;
+    const c = h.cat;
+    // (at home: how full its bowls are and when that was last counted; the present of its first bowls; when she last played
+    // with it, how often, how many catches; how often she has filled its bowls; the days of the day's first reward)
+    if (!c.bowl) Object.assign(c, { bowl: { food: 0, water: 0 }, tickAt: 0, gift: false, playAt: 0, plays: 0, catches: 0, fills: 0, playDay: '', fillDay: '' });
+    return c;
   },
   adopted() {
     return !!this.state().adopted;
@@ -104,10 +128,7 @@ const CatLife = {
   tapped() {
     const api = HouseHost.api;
     if (!api) return;
-    if (this.adopted() && !TownLife.out) {
-      if (!api.catPet()) UI.toast(`${josa(Avatar.name(), '이/가')} 지금은 바빠요. 조금 있다가 쓰다듬어요 🐈`, { icon: '🐈' });
-      return;
-    }
+    if (this.adopted() && !TownLife.out) return this.homeSheet();
     if (!this.here || !TownLife.out) return;
     if (api.townBusy()) return UI.toast(TownLife.busyText(), { icon: '⏳' });
     TownLife.closeSheets();
@@ -118,11 +139,16 @@ const CatLife = {
 
   /** What the 3D side says: she is down by it ('catNear'), it has eaten the churu ('catFed'), been stroked ('catPetted'),
    *  come in at her door with her ('home'). */
-  said(what) {
+  said(what, o) {
     if (what === 'catNear') return this.near();
     if (what === 'catFed') return this.fed();
     if (what === 'catPetted') return this.petted();
     if (what === 'home') return this.home();
+    if (what === 'filled') return this.filled(o);
+    if (what === 'churu') return this.churuEaten();
+    if (what === 'playOn') return this.panel(true);
+    if (what === 'playTick') return this.gauge(o);
+    if (what === 'played') return this.played(o);
   },
 
   near() {
@@ -275,9 +301,217 @@ const CatLife = {
     Diary.note('catHome');
     Sfx.play('reward');
     UI.confetti({ count: 70 });
-    UI.toast(`${CAT_NAME}가 둘의 집 가족이 됐어요! 🐈 눌러서 쓰다듬어 줄 수 있어요`, { icon: '🏠', kind: 'gold', ms: 5200 });
+    UI.toast(`${CAT_NAME}가 둘의 집 가족이 됐어요! 🐈 눌러서 돌봐 주고 놀아 줄 수 있어요`, { icon: '🏠', kind: 'gold', ms: 5200 });
     HouseHost.sync();
     Game.checkAchievements();
+  },
+
+  /* ----- at home: its sheet, its bowls, its game ----- */
+
+  /** Its bowls go down with the hours: a full one lasts a day and a half, the water two. */
+  tick() {
+    const c = this.state();
+    const now = Date.now();
+    if (!c.tickAt) c.tickAt = now;
+    const h = (now - c.tickAt) / 3600000;
+    if (h < 0.05) return c;
+    c.tickAt = now;
+    c.bowl.food = Math.max(0, c.bowl.food - h / 36);
+    c.bowl.water = Math.max(0, c.bowl.water - h / 48);
+    return c;
+  },
+
+  /** What the 3D side should know. */
+  look() {
+    const c = this.tick();
+    return { adopted: !!c.adopted, food: c.bowl.food, water: c.bowl.water };
+  },
+
+  kibble() {
+    return TownLife.have('kibble');
+  },
+
+  /** How glad it is: the longer since she played with it, the less. */
+  mood() {
+    const c = this.state();
+    return c.playAt ? Math.max(0.08, 1 - (Date.now() - c.playAt) / (36 * 3600000)) : 0.3;
+  },
+
+  /** The bowls are put out the first time she sees to it — a present, and a bag of food to go with them. */
+  bowlsOut() {
+    const c = this.state();
+    if (House.placedCount('cat-bowl')) return true;
+    const spot = HouseHost.api && HouseHost.api.findSpot('cat-bowl');
+    if (!spot) return false;
+    const i = State.house.stored.indexOf('cat-bowl');
+    if (i >= 0) State.house.stored.splice(i, 1);
+    State.house.items.push({ uid: House.newUid(), id: 'cat-bowl', ...spot });
+    if (!c.gift) {
+      c.gift = true;
+      const h = TownLife.state();
+      h.pantry.kibble = (h.pantry.kibble || 0) + 3;
+      UI.toast(`${CAT_NAME} 밥그릇과 사료를 선물로 놓아 뒀어요 🥣`, { icon: '🎁', ms: 4200 });
+    }
+    Store.save();
+    HouseHost.sync();
+    return true;
+  },
+
+  homeSheet() {
+    if (this.homeOv && !this.homeOv.closed) return this.renderHome();
+    Sfx.play('pop');
+    TownLife.closeSheets();
+    this.bowlsOut();
+    const ov = (this.homeOv = TownLife.sheet(`<div class="house-sheet town-sheet cat-sheet" data-cat-home-sheet></div>`, CAT_NAME));
+    const after = ov.opts.onClose;
+    ov.opts.onClose = () => {
+      this.homeOv = null;
+      if (after) after();
+    };
+    ov.panel.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-cat-do]');
+      if (b) return this.homeAct(b.dataset.catDo);
+      if (e.target.closest('[data-cat-leave]')) UI.close(ov);
+    });
+    this.renderHome();
+  },
+
+  renderHome() {
+    const ov = this.homeOv;
+    if (!ov || ov.closed) return;
+    const c = this.tick();
+    const food = c.bowl.food;
+    const water = c.bowl.water;
+    const mood = this.mood();
+    const n = this.kibble();
+    const churu = this.churu();
+    const out = House.placedCount('cat-bowl') > 0;
+    const bar = (icon, label, k) => `<div class="cat-meter"><span>${icon} ${label}</span><i><b style="width:${Math.round(k * 100)}%"></b></i></div>`;
+    const hint = !out
+      ? '밥그릇을 놓을 자리가 없어요. 🛋️ 꾸미기에서 물건을 조금 옮겨 주세요'
+      : food < 0.12
+        ? '밥그릇이 거의 비었어요. 사료를 채워 주세요 🥣'
+        : water < 0.12
+          ? '물그릇이 거의 비었어요 💧'
+          : mood < 0.4
+            ? `${CAT_NAME}가 놀아 달라는 눈치예요 🪶`
+            : `${CAT_NAME}는 지금 기분이 좋아요 💗`;
+    const fresh = c.playDay !== dateKey();
+    $('[data-cat-home-sheet]', ov.panel).innerHTML = `<div class="sheet-handle" aria-hidden="true"></div>
+      <h2>🐈 ${CAT_NAME}</h2>
+      <div class="cat-meters">${bar('🥣', '밥', food)}${bar('💧', '물', water)}${bar('💗', '기분', mood)}</div>
+      <p class="hint">${esc(hint)}</p>
+      <div class="cat-acts">
+        <button class="btn primary" data-cat-do="play">🪶 사냥 놀이${fresh ? ' <small>오늘 첫 놀이는 보상이 있어요</small>' : ''}</button>
+        <button class="btn soft" data-cat-do="pet">✋ 쓰다듬기</button>
+        <button class="btn soft" data-cat-do="food" ${n && out ? '' : 'disabled'}>🥣 사료 주기 <small>${n ? `${n}번 남았어요` : '편의점에서 살 수 있어요'}</small></button>
+        <button class="btn soft" data-cat-do="water" ${out ? '' : 'disabled'}>💧 물 갈아 주기</button>
+        ${churu ? `<button class="btn soft" data-cat-do="churu">🐟 츄르 주기 <small>${churu}개</small></button>` : ''}
+      </div>
+      <button class="link-btn store-leave" data-cat-leave>닫기</button>`;
+  },
+
+  /** She sees to it. (The sheet goes, so that it can be seen.) */
+  homeAct(what) {
+    const api = HouseHost.api;
+    if (!api) return;
+    const go = {
+      pet: () => api.catPet(),
+      play: () => api.catPlay(),
+      food: () => this.kibble() > 0 && api.catFill('food'),
+      water: () => api.catFill('water'),
+      churu: () => this.churu() > 0 && api.catFeed(),
+    }[what];
+    if (!go()) return UI.toast(`${josa(Avatar.name(), '이/가')} 지금은 바빠요. 조금 있다가 해 주세요 🐈`, { icon: '🐈' });
+    Sfx.play('tap');
+    if (this.homeOv) UI.close(this.homeOv);
+  },
+
+  filled(what) {
+    const c = this.state();
+    if (what === 'food') {
+      const h = TownLife.state();
+      h.pantry.kibble = Math.max(0, (h.pantry.kibble || 0) - 1);
+      if (!h.pantry.kibble) delete h.pantry.kibble;
+    }
+    this.tick();
+    c.bowl[what] = 1;
+    c.fills = (c.fills || 0) + 1;
+    Diary.note('catFill');
+    if (c.fillDay !== dateKey()) {
+      c.fillDay = dateKey();
+      Game.reward({ dopamine: 5, coins: 5 });
+    }
+    Sfx.play('pop');
+    Store.save();
+    HouseHost.sync();
+    Game.checkAchievements();
+  },
+
+  churuEaten() {
+    const h = TownLife.state();
+    h.pantry.churu = Math.max(0, (h.pantry.churu || 0) - 1);
+    if (!h.pantry.churu) delete h.pantry.churu;
+    const c = this.state();
+    c.fed = (c.fed || 0) + 1;
+    c.playAt = Math.max(c.playAt || 0, Date.now() - 12 * 3600000);
+    Store.save();
+    UI.toast(`${CAT_NAME}가 츄르를 다 먹었어요 💗`, { icon: '🐟' });
+  },
+
+  /* The bar along the bottom while they play. */
+  hudHtml() {
+    return `<div class="cat-play" data-cat-play hidden>
+      <div class="cat-play-head"><b>🪶 사냥 놀이</b><span data-cat-play-n></span></div>
+      <div class="cat-play-bar"><i data-cat-play-joy></i></div>
+      <p class="cat-play-hint" data-cat-play-hint>손가락으로 깃털을 끌어서 움직여 보세요</p>
+      <button class="link-btn" data-cat-play-stop>그만하기</button>
+    </div>`;
+  },
+
+  panel(on) {
+    const room = HouseRoom.ov && $('[data-house-room]', HouseRoom.ov.panel);
+    const el = HouseRoom.ov && $('[data-cat-play]', HouseRoom.ov.panel);
+    if (!room || !el) return;
+    room.classList.toggle('cat-play-on', on);
+    el.hidden = !on;
+    if (on) {
+      $('[data-cat-play-stop]', el).onclick = () => HouseHost.api && HouseHost.api.catPlayStop();
+      $('[data-cat-play-hint]', el).textContent = '손가락으로 깃털을 끌어서 움직여 보세요';
+    }
+  },
+
+  gauge(o) {
+    const el = HouseRoom.ov && $('[data-cat-play]', HouseRoom.ov.panel);
+    if (!el) return;
+    $('[data-cat-play-joy]', el).style.width = `${Math.round(o.joy)}%`;
+    $('[data-cat-play-n]', el).textContent = `${'🪶'.repeat(Math.min(5, o.catches))} ${Math.ceil(o.left)}초`;
+    const says = { ready: '엉덩이를 씰룩씰룩! 곧 덮칠 거예요', caught: '잡았다! 💗', miss: '아깝다! 더 약이 올랐어요' };
+    if (o.hint) $('[data-cat-play-hint]', el).textContent = says[o.hint];
+  },
+
+  /** The game is over: how it went (and the day's first game pays). */
+  played(o) {
+    this.panel(false);
+    if (!o.played) return;
+    const c = this.state();
+    c.plays = (c.plays || 0) + 1;
+    c.catches = (c.catches || 0) + o.catches;
+    c.playAt = Date.now();
+    Diary.note('catPlay');
+    const first = c.playDay !== dateKey();
+    c.playDay = dateKey();
+    Store.save();
+    if (o.broken) return Game.checkAchievements();
+    const coins = [0, 10, 20, 30][o.stars];
+    if (first) {
+      Game.reward({ dopamine: 10, xp: 5, coins });
+      Sfx.play('reward');
+    }
+    const text = o.stars === 3 ? `${CAT_NAME}가 정말 신났어요!` : o.catches ? `${CAT_NAME}가 ${o.catches}번 잡았어요!` : `${CAT_NAME}가 아직 놀고 싶어 해요`;
+    UI.toast(`${text}${first ? ` 🪙 +${coins}` : ''}`, { icon: '⭐'.repeat(o.stars), kind: o.stars === 3 ? 'gold' : undefined, ms: 3800 });
+    Game.checkAchievements();
+    if (HouseRoom.ov) HouseHost.sync();
   },
 
   /* ----- what is said ----- */

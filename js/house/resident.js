@@ -18,7 +18,7 @@ import { makeFood, makeUtensil, makePhone } from './food.js';
 import { Cooking } from './kitchen.js';
 import { disposeTree } from '../fox/kit.js';
 import { V } from './shapes.js';
-import { makeChuru } from './cat.js';
+import { makeChuru, makeFoodBag, makeJug } from './cat.js';
 
 const SLEEP_FROM = 23.5; // she goes to bed at half past eleven…
 const WAKE_AT = 7; //       …and is up at seven
@@ -240,6 +240,12 @@ export class Resident extends Person {
     this.endPhone();
     this.tasks = tasks;
     const t = this.task;
+    if (t && t.do === 'pour') {
+      // (called away with the bag in her hand: it goes back where it came from)
+      this.anim.reach = null;
+      const held = this.drop('R');
+      if (held) disposeTree(held.object);
+    }
     if (this.abed && t && t.do === 'lie') t.wake = true;
     else if (this.seat && t && t.do === 'sit') t.t = 0;
     else {
@@ -319,6 +325,53 @@ export class Resident extends Person {
     }
     a.reach = { side: 'R', point: _q.copy(t.hand).add(_r.set(0, Math.sin(t.age * 3) * 0.006, 0)) };
     a.mood.smile = 1;
+    if (t.age < t.t) return false;
+    a.reach = null;
+    const held = this.drop('R');
+    if (held) disposeTree(held.object);
+    a.setPose('stand', 5);
+    if (t.done) t.done();
+    return true;
+  }
+
+  /** The hunting game (catplay.js): on her knees, the wand in her right hand, her eyes on the feather. */
+  wand(t, dt) {
+    const a = this.anim;
+    const p = t.play;
+    if (!t.posed) {
+      t.posed = true;
+      a.setPose('pet', 5);
+      this.say('cat_play');
+      p.start();
+    }
+    if (p.phase === 'over') {
+      a.reach = null;
+      a.look = null;
+      a.lookW = 0;
+      a.setPose('stand', 5);
+      if (p.catches) this.say('cat_played');
+      return true;
+    }
+    const to = Math.atan2(p.pos.x - a.pos.x, p.pos.z - a.pos.z);
+    this.turnTo(to, dt);
+    a.reach = { side: 'R', point: _q.set(a.pos.x + Math.sin(a.yaw) * 0.32, 0.42, a.pos.z + Math.cos(a.yaw) * 0.32) };
+    t.at = (t.at || V()).set(p.pos.x, 0.05, p.pos.z);
+    a.look = t.at;
+    a.lookW = 0.8;
+    a.mood.smile = 1;
+    return false;
+  }
+
+  /** Down by its bowls: a bag of dry food, or a jug of water, tipped over the bowl. */
+  pour(t, dt) {
+    const a = this.anim;
+    if (!t.posed) {
+      t.posed = true;
+      a.setPose('pet', 5);
+      this.hold('R', t.what === 'food' ? makeFoodBag() : makeJug());
+      this.say(t.what === 'food' ? 'cat_fill' : 'cat_water');
+    }
+    a.reach = { side: 'R', point: _q.set(a.pos.x + Math.sin(a.yaw) * 0.34, 0.3 + Math.sin(t.age * 8) * 0.012, a.pos.z + Math.cos(a.yaw) * 0.34) };
     if (t.age < t.t) return false;
     a.reach = null;
     const held = this.drop('R');
@@ -648,6 +701,8 @@ export class Resident extends Person {
     }
     if (t.do === 'petCat') return this.petCat(t, dt);
     if (t.do === 'feedCat') return this.feedCat(t, dt);
+    if (t.do === 'wand') return this.wand(t, dt);
+    if (t.do === 'pour') return this.pour(t, dt);
     if (t.do === 'eat') return !t.meal; // (eating standing up: see update)
     if (t.do === 'out') {
       this.world.enterTown();

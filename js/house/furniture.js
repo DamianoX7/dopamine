@@ -1365,6 +1365,93 @@ function pumpkin() {
   };
 }
 
+// ------------------------------------------------------------------ 뭉치's own things
+
+/** Its two bowls on a mat: dry food and water. set('bowl', { food, water }): how full they are (0 … 1). */
+function catBowl() {
+  const P = new Parts();
+  P.get('paint').add(roundBox(0.68, 0.016, 0.34, 0.008), { at: [0, 0.008, 0], color: ['#f7c9d6', '#ffe0e8'] });
+  const g = P.get('gloss');
+  for (const [x, color] of [
+    [-0.165, ['#ff9cbc', '#ffc4d6']],
+    [0.165, ['#8fd3e8', '#c2ecf6']],
+  ]) {
+    g.add(new THREE.CylinderGeometry(0.115, 0.135, 0.075, 30, 1, true), { at: [x, 0.054, 0], color });
+    g.add(new THREE.TorusGeometry(0.11, 0.009, 8, 30), { at: [x, 0.092, 0], rot: [Math.PI / 2, 0, 0], color: '#fff6f2' });
+    g.add(new THREE.CylinderGeometry(0.1, 0.1, 0.004, 26), { at: [x, 0.03, 0], color: '#fff6f2' });
+  }
+  const group = P.bake(new THREE.Group());
+  // the food: little brown stars of it, in a heap
+  const K = new Parts();
+  const rnd = rng(7);
+  for (let i = 0; i < 90; i++) {
+    const a = rnd() * TAU;
+    const r = Math.sqrt(rnd()) * 0.092;
+    K.get('paint').add(new THREE.IcosahedronGeometry(0.0115, 0), { at: [Math.cos(a) * r, 0.012 + (1 - r / 0.1) * 0.03 + rnd() * 0.012, Math.sin(a) * r], rot: [rnd() * 3, rnd() * 3, 0], color: rnd() < 0.5 ? '#a9703f' : '#c98f58', flat: true });
+  }
+  const heap = K.bake(new THREE.Group());
+  heap.position.set(-0.165, 0.028, 0);
+  group.add(heap);
+  const water = new THREE.Mesh(new THREE.CircleGeometry(0.1, 28), new THREE.MeshStandardMaterial({ color: '#a6e2f5', roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.85 }));
+  water.rotation.x = -Math.PI / 2;
+  water.position.set(0.165, 0.08, 0);
+  group.add(water);
+  const fill = (o) => {
+    const f = o || { food: 0, water: 0 };
+    heap.visible = f.food > 0.02;
+    heap.scale.set(0.8 + 0.2 * f.food, 0.25 + 0.9 * f.food, 0.8 + 0.2 * f.food);
+    water.visible = f.water > 0.02;
+    water.position.y = 0.04 + 0.042 * f.water;
+  };
+  fill(null);
+  return {
+    object: group,
+    spot: { x: -0.165, z: 0.42, yaw: Math.PI },
+    drink: { x: 0.165, z: 0.42 },
+    set(what, v) {
+      if (what === 'bowl') fill(v);
+    },
+  };
+}
+
+/** A cat tower: three round cushions, one over the other, on rope-wound posts; a ball on a string to bat at. */
+function catTower() {
+  const P = new Parts();
+  P.get('wood').add(roundBox(0.72, 0.04, 0.72, 0.02), { at: [0, 0.02, 0], color: CREAM });
+  const SISAL = ['#c9a878', '#e3c79c'];
+  const rope = (x, z, y0, y1) => {
+    const w = P.get('paint');
+    const n = Math.round((y1 - y0) / 0.018);
+    for (let i = 0; i < n; i++) w.add(new THREE.TorusGeometry(0.052, 0.0095, 6, 18), { at: [x, y0 + (i + 0.5) * 0.018, z], rot: [Math.PI / 2, 0, 0], color: i % 2 ? SISAL : ['#bd9a6a', '#d6b98d'] });
+    w.add(new THREE.CylinderGeometry(0.05, 0.05, y1 - y0, 14), { at: [x, (y0 + y1) / 2, z], color: '#b89567' });
+  };
+  rope(-0.17, -0.17, 0.04, 0.4);
+  rope(0.17, 0.12, 0.04, 0.74);
+  rope(-0.14, -0.1, 0.4, 1.06);
+  const cushion = (x, z, y, r, color) => {
+    P.get('wood').add(new THREE.CylinderGeometry(r, r, 0.03, 32), { at: [x, y - 0.03, z], color: CREAM });
+    P.get('paint').add(new THREE.CylinderGeometry(r - 0.012, r - 0.002, 0.042, 32), { at: [x, y, z], color });
+    P.get('paint').add(new THREE.TorusGeometry(r - 0.012, 0.022, 10, 36), { at: [x, y + 0.022, z], rot: [Math.PI / 2, 0, 0], color });
+  };
+  const PINK = ['#f59bbb', '#ffc4d6'];
+  const MINT = ['#9fd9c6', '#c9efe2'];
+  cushion(-0.1, 0.12, 0.42, 0.25, PINK);
+  cushion(0.13, -0.08, 0.76, 0.24, MINT);
+  cushion(-0.08, 0.02, 1.08, 0.27, PINK);
+  pole(P.get('metal'), [0.13, 0.72, 0.15], [0.17, 0.5, 0.18], 0.004, '#fff6ea');
+  P.get('paint').add(new THREE.SphereGeometry(0.035, 14, 10), { at: [0.175, 0.47, 0.185], color: ['#ffd27a', '#ffe6ad'] });
+  return {
+    object: P.bake(new THREE.Group()),
+    spot: { x: 0, z: 0.6, yaw: Math.PI },
+    perches: [
+      { x: -0.1, z: 0.12, h: 0.46 },
+      { x: 0.13, z: -0.08, h: 0.8 },
+      { x: -0.08, z: 0.02, h: 1.12 },
+    ],
+    post: { x: 0.17, z: 0.2 },
+  };
+}
+
 // ------------------------------------------------------------------ the list
 
 const SOFA = { pink: ['#f59bbb', '#ffc4d6'], cream: ['#e6d5c1', '#f8efe3'], sage: ['#9cc29c', '#c7e2c2'] };
@@ -1409,6 +1496,8 @@ export const FURNITURE = {
   choco: { w: 0.5, d: 0.5, h: 0.5, kind: 'floor', build: choco },
   'xmas-tree': { w: 0.75, d: 0.75, h: 1.4, kind: 'floor', build: xmasTree },
   pumpkin: { w: 0.5, d: 0.5, h: 0.35, kind: 'floor', build: pumpkin },
+  'cat-bowl': { w: 0.75, d: 0.5, h: 0.1, kind: 'floor', build: catBowl },
+  'cat-tower': { w: 0.75, d: 0.75, h: 1.2, kind: 'floor', build: catTower },
 };
 
 /** Build one: its object (marked with what it is, for taps), and the rest of what it can do. */

@@ -62,6 +62,8 @@ const HOUSE_ITEMS = [
   { id: 'calendar', emoji: '📅', name: '우리 달력', cat: 'wall', price: 50, desc: '만난 지 며칠째인지 알려 줘요' },
   { id: 'garland', emoji: '✨', name: '가랜드 전구', cat: 'wall', price: 70, desc: '밤이면 반짝여요' },
   { id: 'shelf', emoji: '🕯️', name: '벽 선반', cat: 'wall', price: 60 },
+  { id: 'cat-tower', emoji: '🐈', name: '캣타워', cat: 'floor', price: 280, unique: true, forCat: true, desc: '뭉치가 올라가 쉬고 기둥을 긁어요' },
+  { id: 'cat-bowl', emoji: '🥣', name: '뭉치 밥그릇', cat: 'floor', price: 40, unique: true, forCat: true, desc: '사료와 물을 담아 줘요' },
   { id: 'mailbox', emoji: '📮', name: '우편함', cat: 'wall', fixed: true, gift: true },
   // what the days worth remembering bring
   { id: 'cake', emoji: '🎂', name: '기념일 케이크', cat: 'floor', gift: true },
@@ -135,6 +137,7 @@ const HOUSE_TIPS = [
   '코인노래방에서는 내 커버를 직접 불러요 🎤 마지막엔 점수도 나와요',
   '🌱 버튼을 누르면 창밖 베란다 텃밭에 나가요. 상추, 대파, 방울토마토, 딸기를 키워요',
   '베란다 텃밭은 흙이 촉촉한 동안 자라요. 비가 오면 저절로 물이 돼요 ☔',
+  '뭉치를 누르면 밥을 주고 사냥 놀이를 할 수 있어요 🪶 깃털을 살짝 피해 주다가 잡게 해 주면 제일 좋아해요',
 ];
 
 /* What Lorelei says when she comes round — and about what she sees. ('{name}' = her nickname) */
@@ -290,7 +293,7 @@ const HouseHost = {
   onDelivery: (what, o) => Delivery.said(what, o), //  the courier: 'knock', 'handed', 'gone'
   onMeal: (source, id) => (source === 'delivery' ? Delivery.said('done', { id }) : TownLife.ate(source, id)), // she has eaten it all: what the courier brought, what she bought, what she cooked
   onTown: (what, o) => TownLife.said(what, o), //       out of the door: 'out', 'arrive', 'paid', 'singing', 'sung', 'home'
-  onCat: (what) => CatLife.said(what), //               뭉치: 'home' (in at the door with her, just taken home)
+  onCat: (what, o) => CatLife.said(what, o), //         뭉치: 'home' (in at the door with her, just taken home), 'filled', 'churu', 'playOn', 'playTick', 'played'
   onTownTap: (kind) => TownLife.tapped(kind), //         …a tap on the street: a shop, her house, the swings…
   onCook: (what) => TownLife.cookSaid(what), //          the kitchen: 'ready' (she is at the hob)
   onVeranda: (what, o) => VerandaLife.said(what, o), //  the veranda: 'out', 'in', 'sown', 'watered', 'pickedAll', 'tap' (js/veranda.js)
@@ -364,7 +367,7 @@ const House = {
       food: { order: (Delivery.pending() || {}).id || null },
       shut: Opening.shut(), // (the coin karaoke on the street opens with the studio — and the bus to the foxes runs from then)
       opens: Opening.shut() ? BusRide.firstBus() : '',
-      cat: { adopted: CatLife.adopted() }, // (뭉치 lives here: js/cat.js)
+      cat: CatLife.look(), // (뭉치 lives here, and how full its bowls are: js/cat.js)
       calendar: this.calendar(today),
       magnets: Object.keys(State.achievements).length,
       tune: CoverHost.tune(),
@@ -448,6 +451,9 @@ const House = {
         if (Radio.on) Radio.stop();
         else Radio.start({ screen: false });
         return setTimeout(() => HouseHost.sync(), 300);
+      case 'cat-bowl':
+      case 'cat-tower':
+        return CatLife.adopted() ? CatLife.homeSheet() : Sfx.play('pop');
       case 'fridge':
         return TownLife.kitchenSheet('fridge');
       case 'kitchen':
@@ -1266,6 +1272,7 @@ const HouseRoom = {
         </div>
         ${TownLife.hudHtml()}
         ${VerandaLife.hudHtml()}
+        ${CatLife.hudHtml()}
       </div>
       <div class="fox-drawer house-drawer" data-house-drawer hidden>
         <div class="fd-head">
@@ -1582,7 +1589,7 @@ const HouseRoom = {
         <small>${state}</small></button>`;
     };
     if (tab === 'floor' || tab === 'wall') {
-      const list = HOUSE_ITEMS.filter((it) => it.cat === tab && !it.gift);
+      const list = HOUSE_ITEMS.filter((it) => it.cat === tab && !it.gift && (!it.forCat || CatLife.adopted()));
       return `<p class="hint">${tab === 'floor' ? '누르면 집에 들어와요. 놓인 물건을 누르면 끌어서 옮기고, ↻로 돌리고, 📦로 넣어 둘 수 있어요.' : '벽에 거는 것들이에요. 놓인 걸 누르고 끌면 벽을 따라 옮겨져요.'}</p>${grid(list.map(card).join(''))}`;
     }
     if (tab === 'box') {

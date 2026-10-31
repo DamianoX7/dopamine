@@ -618,3 +618,93 @@ body.reduce-motion .cook-verdict.show {
 .cat-acts .btn.primary {
   grid-column: 1 / -1;
 }
+
+/* ---------- 뭉치 at home: its sheet, and the bar along the bottom of the hunting game ---------- */
+.cat-meters {
+  display: grid;
+  gap: 7px;
+  margin: 2px 0 8px;
+}
+.cat-meter {
+  display: grid;
+  grid-template-columns: 62px 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.cat-meter i {
+  display: block;
+  height: 10px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: rgba(120, 80, 110, 0.14);
+}
+.cat-meter b {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #ffb3c9, #ff7fa8);
+  transition: width 0.3s ease;
+}
+.house-room.cat-play-on .house-hud .fh-actions,
+.house-room.cat-play-on .fox-cam,
+.house-room.cat-play-on .fh-mid {
+  display: none;
+}
+.cat-play {
+  pointer-events: auto;
+  position: absolute;
+  left: max(12px, env(safe-area-inset-left, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+  bottom: calc(var(--safe-b) + 14px);
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 460px;
+  margin: 0 auto;
+  padding: 10px 14px 8px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #3a1f43;
+  box-shadow: 0 14px 30px -14px rgba(40, 10, 50, 0.8);
+  animation: cookIn 0.25s ease;
+}
+.cat-play[hidden] {
+  display: none;
+}
+.cat-play-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+.cat-play-head span {
+  font-size: 12px;
+  font-weight: 700;
+}
+.cat-play-bar {
+  height: 12px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: rgba(120, 80, 110, 0.14);
+}
+.cat-play-bar i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #ffd27a, #ff7fa8);
+  transition: width 0.25s ease;
+}
+.cat-play-hint {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+.cat-play .link-btn {
+  align-self: center;
+  font-size: 12px;
+}

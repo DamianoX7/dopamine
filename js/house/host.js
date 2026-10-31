@@ -95,7 +95,13 @@ host.register({
   townCatFeed: () => !!(world && world.where === 'town' && world.town.catFeed()),
   townCatPet: () => !!(world && world.where === 'town' && world.town.catPet()),
   townCatAdopt: () => !!(world && world.where === 'town' && world.town.catAdopt()),
-  catPet: () => !!(world && world.stage && world.where !== 'town' && world.catPet()),
+  catPet: () => !!(world && world.stage && world.where === 'home' && world.catPet()),
+  /** …at home: a churu; the hunting game (and an end to it); its bowls filled (what: 'food', 'water'); is she free for it? */
+  catFeed: () => !!(world && world.stage && world.where === 'home' && world.catFeed()),
+  catPlay: () => !!(world && world.stage && world.where === 'home' && world.catPlay()),
+  catPlayStop: () => world && world.catPlayStop(),
+  catFill: (what) => !!(world && world.stage && world.where === 'home' && world.catFill(what)),
+  catFree: () => !!(world && world.stage && world.where === 'home' && world.catFree()),
   /** The kitchen: she cooks `recipe` (→ false: no kitchen), does a step's act, how hot and how done it is, the end of it;
    *  something out of the fridge to eat. */
   cookStart: (r) => !!(world && world.stage && world.me.cook(r)),

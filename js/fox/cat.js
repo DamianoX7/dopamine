@@ -394,6 +394,8 @@ export const MUNGCHI = {
     // (a loaf, its chin down on its paws and its head a little on one side, its tail round it)
     sleep: { hy: -0.168, hrx: -0.02, sry: 0.12, cry: 0.14, crx: 0.08, nrx: 1, nry: 0.05, hdx: -1.3, hdy: 0.05, hdz: 0.24, tl: 0.3, tc: 0, ts: 0.74, earB: 0.1, earD: 0.08, ffx: 0.05, ffz: 0.1, hfx: 0.095, hfz: 0.1 },
     eat: { hy: -0.02, hrx: 0.16, nrx: 0.36, hdx: 0.1, tl: 0.5, tc: 0.1, earB: 0.1 },
+    // (reaching up a post, its front paws on it, its hind legs under it)
+    scratch: { hy: -0.05, hz: -0.02, hrx: -0.72, srx: 0.06, crx: 0.06, nrx: 0.3, hdx: 0.18, tl: 0.5, tc: 0.08, locF: 1, ffx: 0.05, ffz: 0.12 },
   },
 
   own: {
