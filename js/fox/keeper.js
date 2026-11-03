@@ -239,7 +239,7 @@ export class Keeper extends Brain {
     // (to its left or its right, whichever she comes from)
     const left = Math.sin(fox.anim.yaw - Math.atan2(a.pos.x - fox.anim.pos.x, a.pos.z - fox.anim.pos.z)) < 0 ? 1 : -1;
     yield* this.goTo(0, 0, { speed: this.distTo(fox) > 1.4 ? 'trot' : 'walk', stop: 0.1, timeout: 8, skip: fox, moving: () => this.kneelBy(fox, left) });
-    if (!w.foxes.includes(fox) || this.distTo(fox) > 0.5 + 0.3 * this.tall || fox.brain.doing !== 'strokedBy') return; // it was called away
+    if (!w.inYard(fox) || this.distTo(fox) > 0.5 + 0.3 * this.tall || fox.brain.doing !== 'strokedBy') return; // it was called away
     this.skip = fox;
     yield* this.turnTo(this.angleTo(fox), 6);
     a.setPose('pet', 5);
@@ -249,7 +249,7 @@ export class Keeper extends Brain {
     const sec = rand(3.5, 6);
     let heart = 0.3;
     this.stroking = true;
-    for (let t = 0; t < sec && w.foxes.includes(fox) && fox.brain.doing === 'strokedBy'; ) {
+    for (let t = 0; t < sec && w.inYard(fox) && fox.brain.doing === 'strokedBy'; ) {
       t += yield;
       // from between its ears back over its neck
       fox.anim.headPoint(head);
@@ -268,6 +268,20 @@ export class Keeper extends Brain {
     this.skip = null;
     yield* this.wait(0.5);
     a.setPose('stand', 4);
+    yield* this.wait(0.8);
+  }
+
+  /** A fox and the white cat are being brought together (world.catMeet): she comes to stand a little behind where they
+   *  meet, out of the way of them, and looks on, smiling. */
+  *seeMeet(s) {
+    const a = this.a;
+    const at = this.clampPoint(s.spot.x - s.spot.dir * 0.62, s.spot.z - 0.7, 0.98);
+    a.mood.smile = 1;
+    yield* this.goTo(at.x, at.z, { speed: 'trot', stop: 0.12, timeout: 4 });
+    yield* this.turnTo(Math.atan2(s.spot.x - a.pos.x, s.spot.z - a.pos.z), 5);
+    this.lookAt(s.cat, 0.8);
+    a.mood.smile = 1;
+    while (s.on && !s.over) yield;
     yield* this.wait(0.8);
   }
 

@@ -286,8 +286,8 @@ export class Town {
   // ---------------------------------------------------------------- shown, or not
 
   /** The town is shown (`me`: the girl, out of her door — or, `by` 'bus', on the bus from the foxes' village): the
-   *  street's people at their posts, the camera on her. */
-  show(me, by = 'door') {
+   *  street's people at their posts, the camera on her. (`then` 'bus': out of her door she goes straight to the stop.) */
+  show(me, by = 'door', then = null) {
     this.me = me;
     me.world = this;
     this.scene.add(me.rig.group);
@@ -327,6 +327,11 @@ export class Town {
       a.pos.copy(H.inside);
       a.yaw = 0; // (out of her door, towards the street)
       me.tasks = [{ do: 'town', step: 'homeDoor', open: true }, { do: 'walk', to: H.outside.clone(), direct: true }, { do: 'town', step: 'homeDoor', open: false }, { do: 'walk', to: H.gate.clone() }, { do: 'say', line: 'out' }];
+      if (then === 'bus') {
+        this.place = 'bus';
+        me.tasks.pop();
+        me.tasks.push({ do: 'walk', to: B.wait.clone() }, { do: 'face', at: B.look.clone() }, { do: 'town', step: 'arrive', place: 'bus' });
+      }
     }
     a.snap();
     // the camera: by her door (or the stop), as it swings in
@@ -519,8 +524,8 @@ export class Town {
 
   /** She takes the bus to the foxes' village: it is on its way at once; she waits for it at the kerb, gets on when its
    *  door opens (her card to the reader: beep) — and off it goes, with her. The app is told once it has gone a way
-   *  (host.onTown('bus')): the ride itself is its. → false if she cannot now. */
-  busOut() {
+   *  (host.onTown('bus')): the ride itself is its. `cat`: 뭉치 comes along. → false if she cannot now. */
+  busOut(cat = false) {
     const me = this.me;
     if (!me || this.busy) return false;
     const B = this.places.bus;
@@ -530,8 +535,53 @@ export class Town {
     this.coach = { phase: 'come', x: this.busFrom(), v: BUS_TOP, door: 0, t: 0, to: 'fox' };
     this.bus.setSign('여우마을');
     this.world.sound('busCome');
+    if (cat) this.catToBus();
     this.send(me, [{ do: 'walk', to: B.wait.clone() }, { do: 'face', at: B.look.clone() }, { do: 'town', step: 'busWait' }, { do: 'walk', to: B.kerb.clone(), direct: true }, { do: 'town', step: 'board' }]);
     return true;
+  }
+
+  /** 뭉치 comes along: down the pavement after her at a trot, up to the kerb by her — and when the door is open, on ahead
+   *  of her. (She waits for it: busTask, 'board'.) */
+  catToBus() {
+    const cat = this.world.cat;
+    const B = this.places.bus;
+    const c = this.coach;
+    c.cat = true;
+    cat.setWorld(this);
+    cat.following = false;
+    cat.show(this.freeNear(V(-5.4, 0, 1.85)), Math.PI / 2, 0, [
+      { do: 'meow' },
+      { do: 'walk', to: B.kerb.clone().add(V(-0.38, 0, 0.06)), fast: true, max: 12 },
+      { do: 'stay', at: B.step, until: () => c.phase === 'stop' && c.door > 0.85, t: 20 },
+      { do: 'hop', to: B.step.clone(), h: 0.05 },
+      { do: 'walk', to: B.inside.clone(), direct: true, max: 2 },
+      { do: 'call', fn: () => this.catOnBus(c) },
+    ]);
+  }
+
+  /** (It is on: out of sight, it goes where the bus goes.) */
+  catOnBus(c) {
+    this.world.cat.hide();
+    c.catOn = true;
+  }
+
+  /** Home on the bus with her: down off its step after her — and when the bus has gone, along the pavement and in at the
+   *  gate ahead of her. (world.js backHome: it meets her at the door, as it always does.) */
+  catGetsOff() {
+    const cat = this.world.cat;
+    const B = this.places.bus;
+    const H = this.places.home;
+    this.catAlong = false;
+    cat.setWorld(this);
+    cat.following = false;
+    cat.show(B.step.clone(), 0, 0.05, [
+      { do: 'hop', to: B.kerb.clone().add(V(0.36, 0, 0.12)), h: 0 },
+      { do: 'meow', line: 'bus_off' },
+      { do: 'stay', until: () => !this.busy, t: 14 },
+      { do: 'meow', line: 'home_run' },
+      { do: 'walk', to: H.gate.clone(), fast: true, max: 16 },
+      { do: 'call', fn: () => cat.hide() },
+    ]);
   }
 
   /** The bus she is on (show: 'bus') comes along now (the app: the ride's screen has gone). */
@@ -550,6 +600,7 @@ export class Town {
     this.coach = null;
     this.bus.group.visible = false;
     this.busy = null;
+    if (this.world.cat.world === this) this.world.cat.hide();
     if (!me) return;
     const B = this.places.bus;
     me.rig.group.visible = true;
@@ -1115,6 +1166,16 @@ export class Town {
         t.from = a.pos.clone();
       }
       p.turnTo(Math.PI, dt);
+      if (c && c.cat && !c.catOn) {
+        // (뭉치 first: she holds on until it is up — and not for ever)
+        if (!t.waited) {
+          t.waited = true;
+          p.say('bus_cat');
+        }
+        t.k = 0;
+        if (t.age > 14) this.catOnBus(c);
+        return false;
+      }
       if (t.k < 0.55) {
         // up onto its step
         const k = ease(t.k / 0.55);
@@ -1167,6 +1228,12 @@ export class Town {
     a.speed = 0.45;
     if (k < 1) return false;
     a.air = 0;
+    a.speed = 0;
+    if (this.catAlong) {
+      t.cat = t.k;
+      this.catGetsOff();
+    }
+    if (t.cat && t.k - t.cat < 1.1) return false; // (…and it after her, before the door shuts)
     if (c) c.off = true; // (its door shuts, and off it goes: she sees it off — busy until it has gone)
     return true;
   }

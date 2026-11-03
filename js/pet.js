@@ -419,6 +419,12 @@ const FoxHost = {
   visitLine: (kind, id) => BusRide.line(kind, id), // what she says ('arrive', 'pet', 'bye'…; `id`: the fox it is about)
   visitOwnerLine: (kind) => BusRide.ownerLine(kind), // …and what Lorelei says to her ('hello', 'bye')
   visitName: () => Avatar.name(),
+  onCatTap: () => CatTrip.sheet(), //               her cat, come along with her: tapped
+  onCatMet: (id, level, ok) => CatTrip.met(id, level, ok), // …it and a fox she brought to it: how that went
+  catFriend: (id) => CatTrip.level(id), //          …how far it has got with fox `id`
+  catLine: (kind) => CatLife.line(kind), //         …what it, or a fox to it, says
+  catName: () => CAT_NAME,
+  sound: (name) => Sfx.play(name),
   onPresent: (what) => OwnerSays.heard(what), // Lorelei has come forward with what she has to say (js/present.js)
   onHail: (what) => Chat.heard(what), //         …or calls to be heard, and has waited in vain (js/chat.js)
   moodLine: () => Pet.moodLine(),
@@ -679,6 +685,7 @@ const Pet = {
     p.out = swap(p.out);
     p.names[to] = name;
     p.outfits[to] = this.outfit(id);
+    CatTrip.renamed(id, to);
     ['names', 'outfits', 'growth', 'stay'].forEach((key) => delete p[key][id]);
     delete (State.daily.kitCare || {})[id];
     if (p.trip && p.trip.fox === id) p.trip.fox = to;
@@ -1706,6 +1713,7 @@ const FoxRoom = {
         <button class="fox-cam is-trip" data-action="fox-trip" data-fox-trip-btn aria-label="탐험 보내기"><span aria-hidden="true">🧭</span></button>
         <button class="fox-cam is-moon" data-action="fox-moon" data-fox-moon aria-label="밤하늘 보기" hidden><span aria-hidden="true">🌙</span></button>
         <button class="fox-cam is-bus" data-action="fox-bus" data-fox-bus aria-label="버스 타고 동네로"><span aria-hidden="true">🚌</span></button>
+        <button class="fox-cam is-cat" data-action="fox-cat" data-fox-cat aria-label="${CAT_NAME}와 여우들" hidden><span aria-hidden="true">🐈</span></button>
         <button class="fox-sky" data-action="fox-sky" data-fox-sky aria-label="여우 세상의 계절과 날씨"></button>
         <div class="fh-actions">
           <button class="fh-act" data-action="pet-pet" data-sfx="none"><span aria-hidden="true">💗</span><b>쓰다듬기</b></button>
@@ -1801,6 +1809,7 @@ const FoxRoom = {
       FoxHost.stage = stage;
       stage.classList.add('is-flat');
     }
+    if (ok && bus && BusRide.catAlong && FoxHost.api) FoxHost.api.catBuild(); // (her cat, ready to get off with her)
     this.mailButton();
     this.tripChip();
     this.tripWatch();
@@ -1893,6 +1902,7 @@ const FoxRoom = {
     Halloween.left();
     Christmas.left();
     Moon.left();
+    CatTrip.left();
     BusRide.left('fox');
     FoxHost.unmount();
     if (!BusRide.switching) this.leaveFullscreen(); // (on the bus to the town: it is full screen there too)

@@ -12,16 +12,18 @@
 // doings of her own): they wait for her hand when she comes to stroke them, for the food she
 // brings, for the ball she throws; they trot after her, go up for a sniff, lie down against her.
 //
-// Four kinds of behaviour live in files of their own and are mixed in at the bottom: what a
+// Five kinds of behaviour live in files of their own and are mixed in at the bottom: what a
 // fox does with the things in the yard (yardlife.js), how it dances to her covers (dance.js),
-// how it goes off exploring and comes home with a gift (trips.js), and what it does about the
-// weather — taking cover from the rain, playing in the puddles and in the snow (weatherlife.js).
+// how it goes off exploring and comes home with a gift (trips.js), what it does about the
+// weather — taking cover from the rain, playing in the puddles and in the snow (weatherlife.js) —
+// and how it gets on with the white cat she brings on the bus (catlife.js).
 import { V, clamp, TAU } from './kit.js';
 import { wrapAngle } from './animator.js';
 import { YARDLIFE } from './yardlife.js';
 import { DANCING } from './dance.js';
 import { TRIPS } from './trips.js';
 import { WEATHERLIFE } from './weatherlife.js';
+import { CATLIFE } from './catlife.js';
 
 const damp = (cur, target, rate, dt) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
 const rand = (lo, hi) => lo + Math.random() * (hi - lo);
@@ -193,6 +195,7 @@ export class Brain {
       if (!sky.raining) return ['takeCover'];
       return [this.last !== 'rainRomp' && Math.random() < (kid ? 0.3 : 0.12) ? (this.last = 'rainRomp') : (this.last = 'takeCover')];
     }
+    if (w.meeting && !w.meeting.quiet && w.meeting.fox !== this.fox) return ['watchCat', [w.meeting, this.place()]]; // she is introducing another fox to her cat: everybody watches
     const table = [];
     const add = (name, weight, ...args) => weight > 0 && table.push([name, weight, args]);
     const lively = (st.mood === 'happy' ? 1 : st.mood === 'hungry' ? 0.3 : 0.6) * (1 + 0.5 * kid);
@@ -232,6 +235,8 @@ export class Brain {
       if (her.brain.doing === 'sitAwhile') add('snuggle', 1.4 * this.room(her), her);
       add('nuzzle', (her === w.visitor ? 0.45 : 0.3) * this.room(her), her);
     }
+    // the white cat she has brought along (mungchi.js)
+    if (w.mungchi && w.mungchi.brain.came && !w.meeting) add('catCurious', 0.55 * this.room(w.mungchi), w.mungchi);
     // the things she has put in the yard, as long as no other fox has them
     for (const it of w.decor) {
       const use = !it.trial && it.users.length < (it.def.share || 1) && it.def.use;
@@ -291,7 +296,7 @@ export class Brain {
   crowded(p, but = null) {
     const mine = 0.26 * this.S;
     const c = [];
-    for (const her of [this.w.owner, this.w.visitor]) if (her && her !== this.fox && her !== but && Math.hypot(p.x - her.anim.pos.x, p.z - her.anim.pos.z) < 0.16 + mine) return true; // (…or on top of Lorelei, or the girl from the house)
+    for (const her of [this.w.owner, this.w.visitor, this.w.mungchi]) if (her && her !== this.fox && her !== but && Math.hypot(p.x - her.anim.pos.x, p.z - her.anim.pos.z) < 0.16 + mine) return true; // (…or on top of Lorelei, or the girl from the house, or her cat)
     return this.w.foxes.some((f) => {
       if (f === this.fox || f === but) return false;
       this.w.shape(f, c);
@@ -754,8 +759,8 @@ export class Brain {
         mind(f.anim.pos.x - fs * 0.2, f.anim.pos.z - fc * 0.2, 0.13 * f.rig.scale, near);
         mind(f.anim.pos.x + fs * 0.3, f.anim.pos.z + fc * 0.3, 0.13 * f.rig.scale, near);
       }
-      // …and Lorelei (and the girl from the house)
-      for (const her of [w.owner, w.visitor]) if (her && her !== this.fox && her !== skip && her.anim.air < 0.02) mind(her.anim.pos.x, her.anim.pos.z, 0.16, near);
+      // …and Lorelei (and the girl from the house, and her cat)
+      for (const her of [w.owner, w.visitor, w.mungchi]) if (her && her !== this.fox && her !== skip && her.anim.air < 0.02) mind(her.anim.pos.x, her.anim.pos.z, 0.16, near);
       want += clamp(lean, -1.35, 1.35);
       const d = wrapAngle(want - a.yaw);
       const step = clamp(d, -turnRate * dt, turnRate * dt);
@@ -2131,4 +2136,4 @@ export class Brain {
   }
 }
 
-Object.assign(Brain.prototype, YARDLIFE, DANCING, TRIPS, WEATHERLIFE);
+Object.assign(Brain.prototype, YARDLIFE, DANCING, TRIPS, WEATHERLIFE, CATLIFE);

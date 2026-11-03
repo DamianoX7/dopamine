@@ -64,6 +64,25 @@ export function makeJug() {
   return g;
 }
 
+/** What of its face shows, at the size it is seen and in the light it is in: its whiskers fade out with the distance
+ *  (they are a pixel wide however far it is), its pupils open in the dark (and by `open`, at something it wants).
+ *  `memo` keeps how far they have got: `glow`, `pupil`. (`lit`: { dark, light }, the world's. Also in the foxes' world.) */
+export function faceInLight(rig, memo, head, cam, lit, open, dt) {
+  const face = rig.face;
+  if (!face.near || !cam) return;
+  const px = innerHeight / (2 * Math.tan((cam.fov * Math.PI) / 360) * cam.position.distanceTo(head));
+  face.near(px * rig.scale);
+  // (white in the shade: a little light of its own, or it goes grey the moment it steps out of the sun)
+  const glow = 0.12 * (1 - 0.8 * lit.dark * (lit.light === false ? 1 : 0.5));
+  if (Math.abs(glow - (memo.glow || 0)) > 0.004) {
+    memo.glow = glow;
+    rig.shells.forEach((m) => m.material.emissive.setScalar(glow));
+  }
+  const want = clamp(0.22 + 0.7 * lit.dark * (lit.light === false ? 1 : 0.6) + open, 0, 1);
+  memo.pupil = damp(memo.pupil == null ? want : memo.pupil, want, 2, dt);
+  face.pupil(memo.pupil);
+}
+
 export class Cat {
   constructor(world) {
     this.world = world;
@@ -208,24 +227,9 @@ export class Cat {
     this.lookOfFace(t, dt);
   }
 
-  /** What of its face shows, at the size it is seen and in the light it is in: its whiskers fade out with the distance
-   *  (they are a pixel wide however far it is), its pupils open in the dark — and at something to eat. */
+  /** Its face, for how it is seen now (and at something to eat, its pupils open). */
   lookOfFace(t, dt) {
-    const face = this.rig.face;
-    const cam = this.world.camera;
-    if (!face.near || !cam) return;
-    const px = innerHeight / (2 * Math.tan((cam.fov * Math.PI) / 360) * cam.position.distanceTo(this.headPoint(_v)));
-    face.near(px * this.rig.scale);
-    const lit = this.world.lit || { dark: 0 };
-    // (white in the shade: a little light of its own, or it goes grey the moment it steps out of the sun)
-    const glow = 0.12 * (1 - 0.8 * lit.dark * (lit.light === false ? 1 : 0.5));
-    if (Math.abs(glow - (this.glow || 0)) > 0.004) {
-      this.glow = glow;
-      this.rig.shells.forEach((m) => m.material.emissive.setScalar(glow));
-    }
-    const want = clamp(0.22 + 0.7 * lit.dark * (lit.light === false ? 1 : 0.6) + (t.do === 'eat' || t.do === 'bowl' ? 0.3 : t.do === 'hunt' ? 0.6 : 0), 0, 1);
-    this.pupil = damp(this.pupil == null ? want : this.pupil, want, 2, dt);
-    face.pupil(this.pupil);
+    faceInLight(this.rig, this, this.headPoint(_v), this.world.camera, this.world.lit || { dark: 0 }, t.do === 'eat' || t.do === 'bowl' ? 0.3 : t.do === 'hunt' ? 0.6 : 0, dt);
   }
 
   /** Is she (still) at `what` with it — doing it, or on her way to? Called away (to the door, out onto the veranda), she
@@ -339,6 +343,15 @@ export class Cat {
         }
         return false;
       }
+
+      case 'stay':
+        // sitting where it is until it is time (at the kerb: until the bus's door is open)
+        if (!t.posed) {
+          t.posed = true;
+          a.setPose('sit', 5);
+        }
+        if (t.at) this.turnTo(Math.atan2(t.at.x - a.pos.x, t.at.z - a.pos.z), dt);
+        return t.until() || t.age > (t.t || 30);
 
       case 'look': {
         // sitting, looking at something (out of the window): its tail twitching now and then

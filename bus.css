@@ -490,9 +490,80 @@ body.reduce-motion .ride-sky .ride-layer span {
 .fox-cam.is-moon[hidden] ~ .fox-cam.is-bus {
   top: calc(var(--safe-t) + 172px);
 }
-.fox-room.talk-on[data-point='camera'] .fox-cam.is-bus {
+.fox-room.talk-on[data-point='camera'] .fox-cam.is-bus,
+.fox-room.talk-on[data-point='camera'] .fox-cam.is-cat {
   visibility: hidden;
   animation: none;
+}
+/* 뭉치, along for the trip (js/cattrip.js) */
+.fox-cam.is-cat {
+  top: calc(var(--safe-t) + 280px);
+  background: linear-gradient(135deg, #fff5f7, #fdeee2);
+}
+.fox-cam.is-cat[hidden] {
+  display: none;
+}
+.fox-cam.is-moon[hidden] ~ .fox-cam.is-cat {
+  top: calc(var(--safe-t) + 226px);
+}
+.bus-with-cat {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 8px;
+}
+.cat-friends {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 46dvh;
+  margin: 8px 0 10px;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+@media (max-height: 560px) {
+  .cat-friends {
+    max-height: none; /* (a phone on its side: the sheet scrolls as a whole) */
+    overflow: visible;
+  }
+}
+.cat-friend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: #fff7f2;
+}
+.cf-who {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+.cf-who b {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cf-who small {
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.cf-who i {
+  font-size: 11px;
+  font-style: normal;
+  letter-spacing: 1px;
+}
+.cat-friend .btn {
+  flex: none;
+  max-width: 44%;
+  padding: 8px 10px;
+  font-size: 13px;
+  white-space: normal;
 }
 .fox-bubble.is-me[data-who]::before {
   color: #8a63d2;

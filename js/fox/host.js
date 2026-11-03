@@ -48,12 +48,19 @@ host.register({
   hush: () => world && world.hush(),
   /** Lorelei turns to whoever is looking on, waves and says `line`. */
   owner: (line) => world && world.ownerHello(line),
-  /** The girl from the house, come on the bus (js/bus.js): in she comes (`look`: js/avatar.js look3d); goodbye, and out to
+  /** The girl from the house, come on the bus (js/bus.js): in she comes (`look`: js/avatar.js look3d; `cat`: with her cat); goodbye, and out to
    *  the bus (→ false if she is not here); tapped: a wave and `line`; is she here? */
-  visit: (look) => !!(world && world.stage && world.visit(look)),
+  visit: (look, cat) => !!(world && world.stage && world.visit(look, cat)),
   visitLeave: () => !!(world && world.visitLeave()),
   visitHello: (line) => world && world.visitorHello(line),
   visiting: () => !!(world && world.visitor),
+  /** Her cat (js/cattrip.js): its body made ready, under the ride's screen; is it here; the foxes in the yard and whether each
+   *  can come to it now; a fox brought to it (→ false if it cannot be now); she strokes it (→ false if she cannot now). */
+  catBuild: () => world && world.catBuild(),
+  catHere: () => !!(world && world.mungchi),
+  catFoxes: () => (world ? world.catFoxes() : []),
+  catMeet: (id, level) => !!(world && world.catMeet(id, level)),
+  catPet: () => !!(world && world.catPet()),
   /** Lorelei would like a word: she comes forward, calls `line` and waits to be tapped (`bye`: what she says if she is not; `now`: whatever she is doing). → false if she cannot just now. */
   hail: (line, bye, now) => !!(world && world.hail(line, bye, now)),
   unhail: () => world && world.unhail(),

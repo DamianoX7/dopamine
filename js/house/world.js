@@ -1624,10 +1624,12 @@ export class HouseWorld {
 
   /* ----- out of the door: the street (town.js) ----- */
 
-  /** She goes out: to the door, and out of it — then the street is shown, with her on it. → false if she cannot now. */
-  goOut() {
+  /** She goes out: to the door, and out of it — then the street is shown, with her on it (`then` 'bus': on her way to
+   *  the stop). → false if she cannot now. */
+  goOut(then) {
     if (!this.stage || this.where !== 'home' || this.going || this.courier.on || this.guest.on) return false;
     this.going = true;
+    this.goingTo = then;
     this.me.leaveHouse();
     return true;
   }
@@ -1646,7 +1648,8 @@ export class HouseWorld {
       this.going = false;
       this.room.openDoor(false); // (the door shut behind her)
       this.hush('me');
-      this.town.show(this.me);
+      this.town.show(this.me, 'door', this.goingTo);
+      this.goingTo = null;
       this.grace(2500);
       this.host.onTown('out');
     });
@@ -1898,8 +1901,8 @@ export class HouseWorld {
   }
 
   /** She has come home on the bus (js/bus.js): the street at once — no door, no fade, the ride's screen is over it all —
-   *  with her on the bus, which comes along when the app says (town.busIn). */
-  arriveByBus() {
+   *  with her on the bus (and her cat, if `cat`), which comes along when the app says (town.busIn). */
+  arriveByBus(cat = false) {
     if (!this.stage || this.where === 'town') return false;
     if (!this.town) {
       this.town = new Town(this);
@@ -1911,6 +1914,7 @@ export class HouseWorld {
     this.going = false;
     this.hush('me');
     this.town.show(this.me, 'bus');
+    this.town.catAlong = cat;
     this.grace(2500);
     this.host.onTown('out', 'bus');
     return true;

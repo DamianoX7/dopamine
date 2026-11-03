@@ -179,6 +179,9 @@ const Diary = {
     else if (d.catMeet) add('🐈', '동네에서 하얀 길고양이 뭉치를 만났어요');
     if (d.catPlay) add('🪶', d.catPlay > 1 ? `뭉치랑 사냥 놀이를 ${d.catPlay}번 했어요` : '뭉치랑 사냥 놀이를 했어요');
     else if (d.catFill) add('🥣', '뭉치 밥을 챙겨 줬어요');
+    if (d.catBest) add('💤', '뭉치가 여우 단짝과 나란히 낮잠을 잤어요');
+    else if (d.catFox) add('🐾', '뭉치가 여우 친구와 한 걸음 더 가까워졌어요');
+    else if (d.catTrip) add('🚌', '뭉치랑 버스 타고 여우 마을에 갔어요');
     if (d.busRide) add('🚌', d.busRide > 1 ? `506번 버스를 타고 여우 마을에 ${d.busRide}번 놀러 갔어요` : '506번 버스를 타고 여우 마을에 놀러 갔어요');
     if (d.dream) add('💭', `${d.dream}의 꿈 이야기를 들었어요`);
     if (d.moon) add('🌕', '보름달에 소원을 빌었어요');

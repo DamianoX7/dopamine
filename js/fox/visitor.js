@@ -76,6 +76,7 @@ export class Visitor extends Keeper {
     add('sitAwhile', wet ? 0 : 1.2);
     const one = wet ? null : this.foxToPet();
     if (one) add('petOne', 1.6, one);
+    if (!wet && w.mungchi && w.mungchi.brain.free) add('petOne', 0.9, w.mungchi); // (her cat: now and then a word, and a stroke)
     table.forEach((row) => row[0] === this.last && (row[1] *= 0.3));
     let pick = Math.random() * table.reduce((s, row) => s + row[1], 0);
     const row = table.find((x) => (pick -= x[1]) < 0) || table[0];
@@ -85,8 +86,28 @@ export class Visitor extends Keeper {
 
   /** …and as she kneels down by one, now and then a word for it. */
   *petOne(fox = this.foxToPet()) {
-    if (fox && Math.random() < 0.5) this.say(this.w.host.visitLine('pet', fox.id), 2400);
+    if (fox && Math.random() < 0.5) this.say(this.w.host.visitLine(fox.isCat ? 'pet_cat' : 'pet', fox.id), 2400);
     yield* super.petOne(fox);
+  }
+
+  /** She has brought a fox and her cat together (world.catMeet): a word to them, a few steps to behind where they meet,
+   *  so as not to stand between them and whoever is looking on — down on her knees, and she looks on. */
+  *seeMeet(s) {
+    const a = this.a;
+    const w = this.w;
+    const at = this.clampPoint(s.spot.x + s.spot.dir * 0.3, s.spot.z - 0.62, 0.98);
+    a.mood.smile = 1;
+    this.lookAt(s.cat, 0.8);
+    this.say(w.host.visitLine(s.level > 1 ? 'meet_nap' : s.level ? 'meet_play' : 'meet_hello', s.fox.id), 2800);
+    yield* this.goTo(at.x, at.z, { speed: 'walk', stop: 0.1, timeout: 5 });
+    yield* this.turnTo(Math.atan2(s.spot.x + s.spot.dir * 0.45 - a.pos.x, s.spot.z - a.pos.z), 5);
+    a.setPose('pet', 4);
+    while (s.on && !s.over) yield;
+    a.mood.eyes = 'happy';
+    yield* this.wait(1.2);
+    a.mood.eyes = 'open';
+    a.setPose('stand', 4);
+    yield* this.wait(0.5);
   }
 
   /**

@@ -17,6 +17,7 @@
    a feather on a wand (js/house/catplay.js). Its bowls go down slowly
    with the hours, whether she is there or not; empty, it sits by them
    and says so. Nothing worse comes of it. Its tower is in the shop.
+   And it can come along on the bus to the foxes: js/cattrip.js.
    ================================================================== */
 
 const CAT_NAME = '뭉치';
@@ -407,6 +408,7 @@ const CatLife = {
         <button class="btn soft" data-cat-do="food" ${n && out ? '' : 'disabled'}>🥣 사료 주기 <small>${n ? `${n}번 남았어요` : '편의점에서 살 수 있어요'}</small></button>
         <button class="btn soft" data-cat-do="water" ${out ? '' : 'disabled'}>💧 물 갈아 주기</button>
         ${churu ? `<button class="btn soft" data-cat-do="churu">🐟 츄르 주기 <small>${churu}개</small></button>` : ''}
+        ${Opening.shut() ? '' : `<button class="btn soft" data-cat-do="trip">🚌 여우 마을 같이 가기 <small>정류장으로 나가요</small></button>`}
       </div>
       <button class="link-btn store-leave" data-cat-leave>닫기</button>`;
   },
@@ -415,6 +417,10 @@ const CatLife = {
   homeAct(what) {
     const api = HouseHost.api;
     if (!api) return;
+    if (what === 'trip') {
+      if (this.homeOv) UI.close(this.homeOv);
+      return TownLife.goOut('bus'); // (out of the door, to the stop: the bus's sheet there has her take it along)
+    }
     const go = {
       pet: () => api.catPet(),
       play: () => api.catPlay(),

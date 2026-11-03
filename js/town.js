@@ -293,12 +293,12 @@ const TownLife = {
   },
 
   /** Out she goes (the 🏘️ button, the door) — asleep, up first (the store is open all night). */
-  goOut() {
+  goOut(then) {
     const why = this.whyNot();
     if (why) return UI.toast(why, { icon: '🏘️' });
     if (HouseRoom.editOn) HouseRoom.setEdit(false);
     if (HouseRoom.meOn) HouseRoom.setMe(false);
-    if (!HouseHost.api.goOut()) return UI.toast('지금은 나갈 수 없어요. 잠깐 뒤에 다시 해 보세요', { icon: '🏘️' });
+    if (!HouseHost.api.goOut(then)) return UI.toast('지금은 나갈 수 없어요. 잠깐 뒤에 다시 해 보세요', { icon: '🏘️' });
     Sfx.play('pop');
   },
 
@@ -413,6 +413,7 @@ const TownLife = {
     Sfx.play('pop');
     this.closeSheets();
     const shut = Opening.shut();
+    const cat = !shut && CatLife.adopted(); // (뭉치 can come along: js/cattrip.js)
     const ov = this.sheet(
       `<div class="house-sheet town-sheet bus-sheet">
         <div class="sheet-handle" aria-hidden="true"></div>
@@ -423,13 +424,18 @@ const TownLife = {
         </div>
         <ol class="bus-stops" aria-label="정류장">${BusRide.stops('fox').map((s, i) => `<li class="${i === 0 ? 'here' : ''}">${esc(s)}</li>`).join('')}</ol>
         <p class="hint">${shut ? `${esc(FOX_VILLAGE)}은 ${esc(Opening.whenText())}에 열려요. 그때부터 버스가 다녀요.` : `버스를 타면 여우들과 ${esc(josa(OWNER_NAME, '이/가'))} 사는 ${esc(FOX_VILLAGE)}에 ${esc(josa(Avatar.name(), '이/가'))} 놀러 가요.`}</p>
-        <div class="dialog-actions one"><button class="btn primary" data-bus-go ${shut ? 'disabled' : ''}>${shut ? '🔒 아직 안 다녀요' : '🚌 버스 타기'}</button></div>
+        ${
+          cat
+            ? `<div class="dialog-actions bus-with-cat"><button class="btn primary" data-bus-go="cat">🐈 ${CAT_NAME}랑 같이 타기</button><button class="btn soft" data-bus-go>🚌 혼자 타기</button></div>`
+            : `<div class="dialog-actions one"><button class="btn primary" data-bus-go ${shut ? 'disabled' : ''}>${shut ? '🔒 아직 안 다녀요' : '🚌 버스 타기'}</button></div>`
+        }
         <button class="link-btn store-leave" data-bus-leave>🚶‍♀️ 정류장에서 나가기</button>
       </div>`,
       `${BUS_STOP_NAME} 정류장`
     );
     ov.panel.addEventListener('click', (e) => {
-      if (e.target.closest('[data-bus-go]')) return this.takeBus();
+      const go = e.target.closest('[data-bus-go]');
+      if (go) return this.takeBus(go.dataset.busGo === 'cat');
       if (e.target.closest('[data-bus-leave]')) {
         UI.close(ov);
         this.go('street');
@@ -437,14 +443,16 @@ const TownLife = {
     });
   },
 
-  /** 🚌 버스 타기: the bus comes along, she gets on — and once it has gone a way, the ride (js/bus.js) takes her to the foxes. */
-  takeBus() {
+  /** 🚌 버스 타기: the bus comes along, she gets on — and once it has gone a way, the ride (js/bus.js) takes her to the foxes.
+   *  (`cat`: with 뭉치, js/cattrip.js.) */
+  takeBus(cat = false) {
     const api = HouseHost.api;
     if (!api || !this.out) return;
     if (Opening.shut()) return Opening.tell();
     if (api.townBusy()) return UI.toast(this.busyText(), { icon: '⏳' });
     this.closeSheets();
-    if (!api.townBus()) return UI.toast('지금은 버스를 탈 수 없어요. 잠깐 뒤에 다시 해 보세요', { icon: '🚌' });
+    if (!api.townBus(cat)) return UI.toast('지금은 버스를 탈 수 없어요. 잠깐 뒤에 다시 해 보세요', { icon: '🚌' });
+    BusRide.catAlong = cat;
     Sfx.play('tap');
     this.place = 'bus';
     this.hud();

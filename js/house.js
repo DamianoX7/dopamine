@@ -1348,7 +1348,7 @@ const HouseRoom = {
     if (this.ov !== ov) return;
     HouseHost.stage = stage;
     HouseHost.api.mount(stage);
-    if (bus) HouseHost.api.arriveByBus();
+    if (bus) HouseHost.api.arriveByBus(BusRide.catAlong);
     this.inset();
     House.sendAll();
     this.refresh();

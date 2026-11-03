@@ -69,7 +69,7 @@ host.register({
   /** Out of the door (js/town.js): she goes out (→ false if she cannot now); where to on the street; is she in the middle
    *  of something there (what: 'till', 'eat', 'cafe', 'sing', 'home' — or null); at the store's till with what she has
    *  paid for, eating at its window, ordering at the café, singing at the karaoke (and its end), on a swing; a word from her. */
-  goOut: () => !!(world && world.stage && world.goOut()),
+  goOut: (then) => !!(world && world.stage && world.goOut(then)),
   townGo: (place) => !!(world && world.where === 'town' && world.town.go(place)),
   townBusy: () => (world && world.where === 'town' ? world.town.busy : null),
   townCheckout: (items) => !!(world && world.where === 'town' && world.town.checkout(items)),
@@ -79,13 +79,13 @@ host.register({
   townSingEnd: () => world && world.town && world.town.singEnd(),
   townSwing: () => !!(world && world.where === 'town' && world.town.swingNow()),
   townSay: (line) => world && world.where === 'town' && world.town.me && world.town.me.say(line),
-  /** The village bus (js/bus.js): she takes it to the foxes' village (→ false if she cannot now); the bus she has come
-   *  home on comes along (once the ride's screen has gone); off it again at the kerb (the ride could not be). And straight
-   *  out onto the street, on that bus: the house was opened by the ride. */
-  townBus: () => !!(world && world.where === 'town' && world.town.busOut()),
+  /** The village bus (js/bus.js): she takes it to the foxes' village, with her cat if `cat` (→ false if she cannot now); the
+   *  bus she has come home on comes along (once the ride's screen has gone); off it again at the kerb (the ride could not
+   *  be). And straight out onto the street, on that bus (with her cat, if `cat`): the house was opened by the ride. */
+  townBus: (cat) => !!(world && world.where === 'town' && world.town.busOut(cat)),
   townBusIn: () => !!(world && world.where === 'town' && world.town.busIn()),
   townBusBack: () => world && world.where === 'town' && world.town.busBack(),
-  arriveByBus: () => !!(world && world.stage && world.arriveByBus()),
+  arriveByBus: (cat) => !!(world && world.stage && world.arriveByBus(cat)),
   /** 뭉치, the white cat (js/cat.js): out on the street this time, at spot `i`, trusting her this much; a meow to be found by;
    *  how far it trusts her now; she goes to it, feeds it a churu, strokes it, takes it home — and, at home, strokes it. */
   townCat: (i, trust) => !!(world && world.where === 'town' && world.town.catAppear(i, trust)),

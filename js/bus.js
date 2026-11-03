@@ -50,6 +50,7 @@ const BusRide = {
   landers: [], //      what waits for the screen to go (landed())
   visiting: false, //  the girl from the house is in the foxes' world
   leaving: false, //   …and on her way out to the bus
+  catAlong: false, //  뭉치 is with her on this trip (js/cattrip.js)
 
   /** '10월 31일': when the first bus runs (the foxes' village opens: js/opening.js). */
   firstBus() {
@@ -179,6 +180,17 @@ const BusRide = {
         <ellipse cx="-5" cy="2.6" rx="1.8" ry="1" fill="#ff8fb2" opacity="0.55"/><ellipse cx="5.2" cy="2.6" rx="1.8" ry="1" fill="#ff8fb2" opacity="0.55"/>
         <path d="M-1.6 3.3 Q0.2 4.8 1.9 3.3" stroke="#a5435f" stroke-width="0.9" fill="none" stroke-linecap="round"/>
       </g>
+      ${
+        this.catAlong
+          ? `<g transform="translate(106 57)">
+        <path d="M-6.4 -2.6 L-6.6 -9.4 L-2 -6 Q0 -6.6 2 -6 L6.6 -9.4 L6.4 -2.6 Q7.6 2.6 0 7.4 Q-7.6 2.6 -6.4 -2.6 Z" fill="#fdfbf8"/>
+        <path d="M-5.6 -7.6 L-5.4 -4.4 L-3.2 -5.8 Z M5.6 -7.6 L5.4 -4.4 L3.2 -5.8 Z" fill="#f4b6c2"/>
+        <circle cx="-2.7" cy="-0.6" r="1.2" fill="#a59a38"/><circle cx="2.7" cy="-0.6" r="1.2" fill="#a59a38"/>
+        <circle cx="-2.7" cy="-0.6" r="0.6" fill="#2c2428"/><circle cx="2.7" cy="-0.6" r="0.6" fill="#2c2428"/>
+        <path d="M-0.8 1.7 H0.8 L0 2.6 Z" fill="#e8909f"/>
+      </g>`
+          : ''
+      }
       <rect x="158" y="38" width="26" height="58" rx="3" fill="#2a9c7c"/>
       <rect x="161" y="41" width="9" height="52" rx="1.5" fill="#2c3c4c" class="rb-glass"/><rect x="172" y="41" width="9" height="52" rx="1.5" fill="#2c3c4c" class="rb-glass"/>
       <path d="M190 38 H214 Q226 38 226 50 V66 H190 Z" fill="#2c3c4c" class="rb-glass"/>
@@ -313,12 +325,13 @@ const BusRide = {
     this.hum(false);
     UI.close(ov);
     this.landers.splice(0).forEach((done) => done());
-    if (lost) return;
+    if (lost) return void (this.catAlong = false);
     // the foxes' world: she gets off, out of sight, and comes in through the gap in the bushes
     if (this.to === 'fox' && FoxRoom.ov && FoxHost.api && !FoxHost.failed) {
-      this.visiting = FoxHost.api.visit(Avatar.look3d());
+      this.visiting = FoxHost.api.visit(Avatar.look3d(), this.catAlong);
       setTimeout(() => FoxRoom.ov && Sfx.play('busGo'), 1600); // (the bus goes on, out of sight)
     }
+    if (this.to === 'town') this.catAlong = false; // (it is off the bus and on its way home: js/house/town.js)
   },
 
   /* ----- in the foxes' world ----- */
@@ -326,6 +339,7 @@ const BusRide = {
   /** The 3D side: she is in, and has been met ('in'); she is out of the yard and away to the bus ('gone'). */
   visitSaid(what) {
     if (what === 'in') {
+      if (this.catAlong) CatTrip.arrived();
       const h = TownLife.state().town;
       if (!h.busTaught) {
         h.busTaught = true;
@@ -355,6 +369,7 @@ const BusRide = {
     Sfx.play('tap');
     if (this.visiting && FoxHost.api && !FoxHost.failed && FoxHost.api.visitLeave()) {
       this.leaving = true;
+      CatTrip.button();
       clearTimeout(this.leaveTimer);
       this.leaveTimer = setTimeout(() => this.visitSaid('gone'), 11000); // (should she never get out of the yard)
       return;
@@ -368,6 +383,7 @@ const BusRide = {
     if (kind !== 'fox') return;
     this.visiting = false;
     this.leaving = false;
+    if (!this.switching) this.catAlong = false; // (not on the bus: it is at home again, with her)
     clearTimeout(this.leaveTimer);
   },
 
@@ -380,7 +396,7 @@ const BusRide = {
     const list = BUS_ME_LINES[k] || BUS_ME_LINES[kind];
     if (!list) return '';
     return pick(list)
-      .replace(/\{fox\}/g, Pet.nameOf(id || State.pet.species))
+      .replace(/\{fox\}/g, id === '~cat' ? CAT_NAME : Pet.nameOf(id || State.pet.species))
       .replace(/\{owner\}/g, OWNER_NAME);
   },
 
