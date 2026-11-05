@@ -10,6 +10,9 @@
 // she goes to the door — out of bed if need be — takes it from him, and sits down to eat it, a
 // mouthful at a time: the straw to her lips, the chopsticks from the bowl to her mouth.
 //
+// And when her boyfriend comes round (him.js) she opens the door to him, says hello, and is with him till he goes: the
+// visit tells her where to be (beside him on the sofa, before a picture, at the window); in between she stays by him.
+//
 // And she goes out (town.js): to the door and out of it, into the street round the corner — where the street tells her
 // what to do (its planFor, its ownTask) — and home again with what she bought, which she puts away in the fridge.
 import { buildMe } from './me.js';
@@ -55,6 +58,7 @@ export class Resident extends Person {
     this.cooking = null; //  …and how it is going (kitchen.js)
     this.baseLook = null;
     this.apronOn = '';
+    this.withHim = null; //  her boyfriend, while he is round (him.js)
   }
 
   /** Dress her as `look` says (she is built again only when it changes — or her apron goes on or off). → true if she was dressed anew. */
@@ -103,6 +107,7 @@ export class Resident extends Person {
     this.phone = null;
     this.door = null;
     this.atDoor = false;
+    this.withHim = null;
     const a = this.anim;
     a.pitch = 0;
     a.air = 0;
@@ -506,6 +511,40 @@ export class Resident extends Person {
     }
   }
 
+  /**
+   * Her boyfriend has knocked (him.js): whatever she is doing — asleep, sitting, dancing — she goes to the door and opens
+   * it, standing aside (on the side away from the open door) for him to come in, and stays turned to him while they say
+   * hello.
+   */
+  welcome(him) {
+    if (!this.on) return;
+    const w = this.world;
+    const door = w.room.doorway();
+    this.endPhone();
+    this.withHim = him;
+    this.atDoor = false;
+    const aside = w.freeNear(door.inside.clone().add(V(0.05, 0, 0.45)));
+    const go = [
+      { do: 'say', line: 'him_door' },
+      { do: 'walk', to: aside },
+      { do: 'face', at: door.inside.clone() },
+      { do: 'door', open: true },
+      { do: 'until', at: him.pos, test: () => !him.on || (him.phase === 'in' && !(him.task && him.task.do === 'hello')), onStart: () => (this.atDoor = true), max: 90 },
+    ];
+    const t = this.task;
+    const a = this.anim;
+    this.tasks = go;
+    if (this.abed && t && t.do === 'lie') t.wake = true; // (out of bed first)
+    else if (this.seat && t && t.do === 'sit') t.t = 0; // (up first)
+    else if (!(t && t.do === 'stand')) {
+      this.task = null;
+      a.look = null;
+      a.lookW = 0;
+      a.still();
+      a.setPose('stand', 6);
+    }
+  }
+
   /** He has gone: she shuts the door, and sits down to eat it where she can be seen eating it. */
   afterDelivery(order) {
     this.atDoor = false;
@@ -745,6 +784,14 @@ export class Resident extends Person {
       this.tasks.push({ do: 'face' }, { do: 'wait', t: 1.5 });
       return;
     }
+    // her boyfriend is round: between the things they do together she stays by him, turned to him (not to bed, either)
+    const him = this.withHim;
+    if (him && him.on) {
+      if (this.pos.distanceTo(him.pos) > 0.95) this.tasks.push({ do: 'walk', to: w.near(him.pos, 0.55) || him.pos.clone() });
+      this.tasks.push({ do: 'look', at: him.headPoint(V()), follow: him, t: 2.5, pose: 'stand' });
+      return;
+    }
+    this.withHim = null;
     // the night: to bed (unless she is waiting for something to eat)
     const food = w.foodWaiting();
     if (this.asleepNow() && !food) {

@@ -409,6 +409,7 @@ const PostDesk = {
         <h2 class="card-title">📮 보낸 편지</h2>
         <div data-post-sent>${this.sentHtml()}</div>
       </div>
+      <a class="btn soft wide" href="#/me/visit">🏠 그녀 집에 놀러 가기</a>
       <a class="btn ghost wide" href="#/me/messages">✏️ 랜덤 메시지 편집으로</a>
     </section>`;
   },

@@ -153,6 +153,7 @@ const Diary = {
     if (d.knit) add('🧶', '그림을 그려서 여우 스웨터를 떴어요');
     (d.gifts || []).slice(0, 2).forEach((g) => add('🧭', `탐험 간 여우가 ${quoted(g, '을/를')} 물어 왔어요`));
     if (d.houseGuest) add('👧', `${josa(OWNER_NAME, '이/가')} 둘의 집에 놀러 왔어요`);
+    if (d.himVisit) add('💙', `${josa(CFG.boyfriendName || '남자친구', '이/가')} 둘의 집에 놀러 왔어요`);
     const fresh = d.houseNew || [];
     if (fresh.length) add('🛋️', `둘의 집에 ${fresh.length > 1 ? `‘${fresh[0]}’ 외 ${fresh.length - 1}개를` : quoted(fresh[0], '을/를')} 들였어요`);
     else if (d.house) add('🏠', '둘의 집에 들렀어요');

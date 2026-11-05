@@ -43,7 +43,7 @@ const Stars = {
     const start = Days.start;
     if (start) {
       for (const d of Days.between(start, today)) {
-        if (d.kind === 'year' || (d.kind === 'ours' && Opening.at && d.key === dateKey(new Date(Opening.at)))) continue;
+        if (d.kind === 'year' || d.kind === 'visit' || d.kind === 'cat' || (d.kind === 'ours' && Opening.at && d.key === dateKey(new Date(Opening.at)))) continue;
         add('us', d.key + d.name, d.key, d.name, d.emoji, d.kind === 'ours' && (d.key === start || /^(\d*00일|\d+주년)$/.test(d.name)));
       }
     }

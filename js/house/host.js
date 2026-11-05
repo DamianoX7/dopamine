@@ -60,6 +60,11 @@ host.register({
   arrive: (stay) => world && world.guest.arrive(stay),
   leave: (now) => world && world.guest.leave(now),
   guestHere: () => !!(world && world.guest.on),
+  /** Her boyfriend (js/him.js): he has come round (`v`: { id, look, name, gift, note } — → false if he cannot come in now);
+   *  time for him to go (`now`: at once, quietly); is he here? */
+  himArrive: (v) => !!(world && world.stage && world.himArrive(v)),
+  himLeave: (now) => world && world.him.leave(now),
+  himHere: () => !!(world && world.him.on),
   /** Something to eat (js/delivery.js): she has ordered it — out comes her phone; it is here — the courier comes to the door (→ false if
    *  he cannot now); is somebody at the door; is she busy with it (the courier at the door, or eating). */
   order: (o) => world && world.order(o),

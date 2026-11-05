@@ -288,6 +288,8 @@ const TownLife = {
     if (Delivery.busy() || api.eating()) return `${josa(Avatar.name(), '이/가')} 먹는 중이에요 😋 다 먹고 나갈 수 있어요`;
     if (this.cooking) return `${josa(Avatar.name(), '이/가')} 요리하는 중이에요 🍳`;
     if (api.guestHere()) return `${josa(OWNER_NAME, '이/가')} 놀러 와 있어요. ${josa(OWNER_NAME, '이랑/랑')} 놀고 나서 나가요 💗`;
+    const him = HisVisit.here(); // (her boyfriend: js/him.js)
+    if (him) return `${josa(him, '이/가')} 놀러 와 있어요. ${josa(him, '이랑/랑')} 놀고 나서 나가요 💙`;
     if (api.doorBusy()) return '현관에 누가 있어요. 잠깐만 기다려 주세요';
     return '';
   },
@@ -818,6 +820,8 @@ const TownLife = {
     if (VerandaLife.out) return '베란다에 나가 있어요. 방에 들어가서 해요 🌱';
     if (this.cooking) return '요리하는 중이에요 🍳';
     if (this.eating || Delivery.busy() || api.eating()) return `${josa(Avatar.name(), '이/가')} 먹는 중이에요 😋`;
+    const him = HisVisit.here(); // (her boyfriend is round: js/him.js)
+    if (him) return `${josa(him, '이/가')} 놀러 와 있어요 💙 ${josa(him, '이/가')} 가면 해요`;
     if (api.doorBusy()) return '현관에 누가 와 있어요. 잠깐만요!';
     if (!snack && api.guestHere()) return `${josa(OWNER_NAME, '이/가')} 놀러 와 있어요 💗 ${josa(OWNER_NAME, '이/가')} 가면 요리해요`;
     return '';

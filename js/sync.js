@@ -194,6 +194,43 @@ const Cloud = {
   },
 };
 
+/* What HisVisit.call() asks (js/him.js) — server.py's api/visits — answered from the table `visits` (columns: id, at,
+   note, gift, look (his look and name, as JSON), surprise, sent_at, seen_at, how). Throws as Cloud.letters does. */
+Cloud.visits = async function (path, o = {}) {
+  const method = o.method || 'GET';
+  const m = /^visits(?:\/([^/]+)(\/seen)?)?$/.exec(path);
+  try {
+    if (!m) throw new Error(`cloud: no ${method} ${path}`);
+    const one = m[1] ? `visits?id=eq.${encodeURIComponent(decodeURIComponent(m[1]))}` : '';
+    if (!m[1] && method === 'GET') {
+      const rows = await (await this.rest('GET', 'visits?select=id,at,note,gift,look,surprise,sent_at,seen_at,how&order=at.asc')).json();
+      return { visits: rows.map((r) => ({ id: r.id, at: +r.at || 0, note: r.note || '', gift: r.gift || '', look: r.look || '{}', surprise: !!r.surprise, sent: +r.sent_at || 0, seen: +r.seen_at || 0, how: r.how || '' })) };
+    }
+    if (!m[1] && method === 'POST') {
+      const v = o.json;
+      // (409: sent again after an answer that got lost — it is there already)
+      await this.rest('POST', 'visits', { id: v.id, at: v.at, note: v.note || '', gift: v.gift || '', look: JSON.stringify({ ...(v.look || {}), name: v.name || '' }), surprise: !!v.surprise, sent_at: v.sent || Date.now() }, { prefer: 'return=minimal' });
+      return { ok: true };
+    }
+    if (m[2] && method === 'POST') {
+      await this.rest('PATCH', `${one}&seen_at=eq.0`, { seen_at: o.json.seen, how: o.json.how === 'met' ? 'met' : 'missed' }, { prefer: 'return=minimal' });
+      return { ok: true };
+    }
+    if (m[1] && !m[2] && method === 'DELETE') {
+      const gone = await (await this.rest('DELETE', `${one}&seen_at=eq.0`, undefined, { prefer: 'return=representation' })).json();
+      if (!gone.length) {
+        const [left] = await (await this.rest('GET', `${one}&select=seen_at`)).json();
+        if (left && +left.seen_at) throw Object.assign(new Error('she has seen him'), { code: 'refused' });
+      }
+      return { ok: true };
+    }
+    throw new Error(`cloud: no ${method} ${path}`);
+  } catch (e) {
+    if (!e.code) e.code = 'offline';
+    throw e;
+  }
+};
+
 const Sync = {
   on: false, //      the server is there
   cloud: false, //   …or, on the published site, Supabase is (see Cloud above)

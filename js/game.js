@@ -78,6 +78,7 @@ const ACHIEVEMENTS = [
   { id: 'house_warm', emoji: '🏠', name: '우리 집', desc: '둘의 집에 처음 들어가요.', test: (s) => !!s.house.made },
   { id: 'house_lp', emoji: '🎶', name: '우리 집 턴테이블', desc: '둘의 집 턴테이블로 LP를 들어요.', test: (s) => (s.statistics.houseLP || 0) >= 1 },
   { id: 'house_guest', emoji: '👧', name: '손님 맞이', desc: '로렐라이가 둘의 집에 놀러 와요.', test: (s) => !!s.house.guest.met },
+  { id: 'house_him', emoji: '💙', name: '그가 놀러 온 날', desc: '남자친구가 둘의 집에 놀러 와요.', test: (s) => ((s.house.him && s.house.him.met) || 0) >= 1 },
   { id: 'house_decor', emoji: '🛋️', name: '인테리어 디자이너', desc: '둘의 집에 물건을 스무 개 놓아요.', test: (s) => s.house.items.length >= 20 },
   { id: 'house_big', emoji: '🏡', name: '넓은 집', desc: '둘의 집을 넓혀요.', test: (s) => s.house.size >= 1 },
   { id: 'house_style', emoji: '👗', name: '오늘의 코디', desc: '둘의 집에 사는 나에게 새 옷을 사 입혀요.', test: (s) => ((s.house.me && s.house.me.owned) || []).length >= 1 },

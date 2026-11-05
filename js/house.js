@@ -289,8 +289,11 @@ const HouseHost = {
   onPlace: (uid, place) => House.placed(uid, place), // …and put it down somewhere else
   onRefuse: () => House.refused(), //                  …where it cannot stand
   onGuest: (what) => House.guestSaid(what), //         Lorelei: 'hello', 'wave', 'bye', 'leaving', 'gone'
-  line: (who, kind) => (who === 'guest' ? House.guestLine(kind) : who === 'rider' ? Delivery.riderLine(kind) : who === 'cat' ? CatLife.line(kind) : who === 'clerk' || who === 'barista' ? TownLife.line(who, kind) : TownLife.meLine(kind)), // what Lorelei ('guest'), the girl ('me'), the courier ('rider') — or the girl at the store's till, the woman at the café — says about `kind`
+  line: (who, kind) => (who === 'guest' ? House.guestLine(kind) : who === 'him' ? HisVisit.line(kind) : who === 'rider' ? Delivery.riderLine(kind) : who === 'cat' ? CatLife.line(kind) : who === 'clerk' || who === 'barista' ? TownLife.line(who, kind) : TownLife.meLine(kind)), // what Lorelei ('guest'), the girl ('me'), the courier ('rider') — or the girl at the store's till, the woman at the café — says about `kind`
   onDelivery: (what, o) => Delivery.said(what, o), //  the courier: 'knock', 'handed', 'gone'
+  onHim: (what, v) => HisVisit.said(what, v), //       her boyfriend (js/him.js): 'knock', 'in', 'photo', 'gift', 'gone' — or 'cut' (the house closed)
+  himChat: (kind, i) => HisVisit.chat(kind, i), //    …a line of his about doing `kind` together, and her answer
+  himHold: () => HisVisit.holding(), //               …is a window of the app over the house (he waits till it has gone)?
   onMeal: (source, id) => (source === 'delivery' ? Delivery.said('done', { id }) : TownLife.ate(source, id)), // she has eaten it all: what the courier brought, what she bought, what she cooked
   onTown: (what, o) => TownLife.said(what, o), //       out of the door: 'out', 'arrive', 'paid', 'singing', 'sung', 'home'
   onCat: (what, o) => CatLife.said(what, o), //         뭉치: 'home' (in at the door with her, just taken home), 'filled', 'churu', 'playOn', 'playTick', 'played'
@@ -363,6 +366,7 @@ const House = {
       diaryReady: Diary.writable() && Diary.isOpen() && !State.diary.pages[Diary.today()],
       gift: !!this.giftWaiting(),
       giftKey: (this.giftWaiting() || {}).key || null,
+      party: this.party(today), // (bunting on the back wall, on a day worth remembering)
       me: { look: Avatar.look3d(), showcase: HouseRoom.meOn },
       food: { order: (Delivery.pending() || {}).id || null },
       shut: Opening.shut(), // (the coin karaoke on the street opens with the studio — and the bus to the foxes runs from then)
@@ -378,6 +382,22 @@ const House = {
       reduce: reducedMotion(),
       veranda: VerandaLife.look(), // (the planter boxes out on the veranda, and what grows in them)
     };
+  },
+
+  /**
+   * What the bunting on the back wall says today, or '': the 100th day (or another of theirs), an anniversary, a birthday,
+   * the day her boyfriend comes round (one she may know of — or that has happened), 뭉치's 100th day or its year.
+   */
+  party(today = dateKey()) {
+    const evs = Days.on(today);
+    const ours = evs.find((e) => e.kind === 'ours' && /^(\d+일|\d+주년)$/.test(e.name));
+    if (ours) return `${ours.name} 축하해`;
+    if (evs.some((e) => e.kind === 'own' && /생일/.test(e.name))) return '생일 축하해';
+    const him = HisVisit.today(today);
+    if (him) return `${him} ${Avatar.name()}`;
+    const cat = evs.find((e) => e.kind === 'cat' && /100일|주년/.test(e.name));
+    if (cat) return cat.name.replace('뭉치 입양 ', '뭉치 ');
+    return '';
   },
 
   /** The weather outside the window: Incheon's, if it could be had — otherwise her world's (the meadow follows the year). */
@@ -414,11 +434,12 @@ const House = {
     if (kind === 'window') return this.windowCard();
     if (kind === 'switch') return this.switchLight();
     if (kind === 'gift') return this.openGift();
-    if (kind === 'guest' || kind === 'me' || kind === 'rider') return; // (they turn and wave: the 3D side has done it)
+    if (kind === 'guest' || kind === 'me' || kind === 'rider' || kind === 'him') return; // (they turn and wave: the 3D side has done it)
     if (kind === 'cat') return CatLife.tapped(); // (뭉치: she goes and strokes it — js/cat.js)
     if (kind === 'door') {
       Sfx.play('tap');
       if (HouseHost.api && HouseHost.api.guestHere()) return UI.toast(`${josa(OWNER_NAME, '이/가')} 놀러 와 있어요 💗`, { icon: '🚪' });
+      if (HouseHost.api && HouseHost.api.himHere() && HisVisit.playing) return UI.toast(`${josa(HisVisit.playing.name, '이/가')} 놀러 와 있어요 💙`, { icon: '🚪' });
       return UI.menu('🚪 현관문', [{ icon: '🏘️', label: '동네로 나가기', onClick: () => TownLife.goOut() }]);
     }
     if (kind === 'fixed') return UI.toast('우편함은 문 옆에 붙어 있어서 옮길 수 없어요', { icon: '📮' });
@@ -774,13 +795,17 @@ const House = {
     Sfx.play('pop');
     if (Post.waiting().length) return void Post.open();
     const kept = Post.kept();
-    if (!kept.length) return UI.toast('우편함이 비어 있어요. 편지가 오면 깃발이 올라가요 💌', { icon: '📮' });
+    const notes = HisVisit.notes(); // (the notes he left when he came round: js/him.js)
+    if (!kept.length && !notes.length) return UI.toast('우편함이 비어 있어요. 편지가 오면 깃발이 올라가요 💌', { icon: '📮' });
     const ov = UI.open(
       `<div class="house-sheet">
         <div class="sheet-handle" aria-hidden="true"></div>
         <h2>📮 우편함</h2>
-        <p class="hint">받은 편지 ${kept.length}통 · 누르면 다시 읽어요</p>
-        <div class="house-letters">${kept
+        <p class="hint">${[kept.length ? `받은 편지 ${kept.length}통` : '', notes.length ? `쪽지 ${notes.length}장` : ''].filter(Boolean).join(' · ')} · 누르면 다시 읽어요</p>
+        <div class="house-letters">${notes
+          .slice(0, 10)
+          .map((v) => `<button class="house-letter is-note" data-house-note="${esc(v.id)}"><span aria-hidden="true">💙</span><b>${esc(v.note.slice(0, 40))}${v.note.length > 40 ? '…' : ''}</b><small>${esc(josa(v.name, '이/가'))} 두고 간 쪽지 · ${esc(fmtDateLong(v.at))}</small></button>`)
+          .join('')}${kept
           .slice(0, 20)
           .map((l) => `<button class="house-letter" data-house-letter="${esc(l.id)}"><span aria-hidden="true">💌</span><b>${esc(l.text.slice(0, 40))}${l.text.length > 40 ? '…' : ''}</b><small>${esc(fmtDateLong(l.at))}</small></button>`)
           .join('')}</div>
@@ -788,6 +813,12 @@ const House = {
       { cls: 'is-house-sheet', label: '우편함' }
     );
     ov.panel.addEventListener('click', (e) => {
+      const n = e.target.closest('[data-house-note]');
+      if (n) {
+        const v = notes.find((x) => x.id === n.dataset.houseNote);
+        UI.close(ov).then(() => v && HisVisit.openNote(v));
+        return;
+      }
       const b = e.target.closest('[data-house-letter]');
       if (!b) return;
       const l = kept.find((x) => x.id === b.dataset.houseLetter);
@@ -1021,6 +1052,8 @@ const House = {
   /** A present waiting by the door — of today, or of yesterday if she was not here then: { key, id, event }. */
   giftWaiting() {
     if (!State.house.made) return null;
+    const his = HisVisit.parcel(); // (what her boyfriend left at the door: js/him.js)
+    if (his) return his;
     const today = dateKey();
     for (const day of [today, addDays(today, -1)]) {
       for (const e of Days.on(day)) {
@@ -1034,6 +1067,7 @@ const House = {
   openGift() {
     const g = this.giftWaiting();
     if (!g) return;
+    if (g.him) return HisVisit.openParcel(g.him);
     State.house.gifts[g.key] = Date.now();
     this.give(g.id, `${g.event.emoji} ${g.event.name} 선물`);
   },
@@ -1078,7 +1112,7 @@ const House = {
   knock(tries = 0) {
     this.guestTimer = 0;
     if (!HouseRoom.ov || !HouseHost.api || !State.pet.introduced || Opening.shut()) return;
-    if (HouseRoom.editOn || HouseRoom.meOn || UI.top() !== HouseRoom.ov || HouseHost.api.doorBusy()) {
+    if (HouseRoom.editOn || HouseRoom.meOn || UI.top() !== HouseRoom.ov || HouseHost.api.doorBusy() || HisVisit.due() || HisVisit.playing) {
       if (tries < 8) this.guestTimer = setTimeout(() => this.knock(tries + 1), 7000);
       return;
     }
@@ -1130,7 +1164,7 @@ const House = {
 
   /* ----- a picture of the room ----- */
 
-  async snap() {
+  async snap(o = {}) {
     if (!HouseHost.api || this.snapping) return;
     this.snapping = true;
     try {
@@ -1149,10 +1183,10 @@ const House = {
       }
       const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9));
       if (!blob) throw new Error('the picture could not be encoded');
-      const rec = { id: `p${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`, blob, thumb: Photos.thumbOf(canvas), w: canvas.width, h: canvas.height, at: Date.now(), kind: 'house', scene: '', names: [] };
+      const rec = { id: `p${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`, blob, thumb: Photos.thumbOf(canvas), w: canvas.width, h: canvas.height, at: Date.now(), kind: 'house', scene: '', names: o.names || [] };
       await DB.put('photos', rec);
       Photos.last = rec;
-      UI.toast('우리 집 사진을 사진첩에 간직했어요 📷 액자에 걸 수도 있어요', { icon: '📷' });
+      UI.toast(o.toast || '우리 집 사진을 사진첩에 간직했어요 📷 액자에 걸 수도 있어요', { icon: '📷', ms: o.toast ? 4200 : undefined });
     } catch (err) {
       console.warn('[House] could not keep the picture', err);
       UI.toast('사진을 간직하지 못했어요. 다시 찍어 볼까요?', { icon: '📷' });
@@ -1184,9 +1218,12 @@ const House = {
     const fresh = h.made && !((h.town && h.town.outs) || (h.cook && Object.keys(h.cook.made || {}).length));
     const sprout = h.made && !fresh && !(h.veranda && h.veranda.made); // (the veranda: there, and she has not been out on it yet)
     const garden = h.made && VerandaLife.note(); //                       (…or something on it is ripe, or dry)
-    const note = !h.made
-      ? '새로 생겼어요! 우리 집에 들어가 볼까요?'
-      : fresh
+    const him = HisVisit.cardNote(); // (her boyfriend: at the door, come and gone, or coming today — js/him.js: first of all)
+    const note = him
+      ? him.text
+      : !h.made
+        ? '새로 생겼어요! 우리 집에 들어가 볼까요?'
+        : fresh
         ? '🏘️ 동네와 🍳 부엌이 새로 생겼어요!'
         : sprout
         ? '🌱 창밖 베란다에 텃밭이 새로 생겼어요!'
@@ -1199,7 +1236,7 @@ const House = {
           : Moon.dark()
             ? `${Moon.emoji()} 창밖에 인천의 밤하늘이 보여요`
             : '오늘도 집에 들러 볼까요?';
-    return `<button class="card house-card ${!h.made || gift || fresh || sprout ? 'is-new' : ''}" data-action="house-open" aria-label="${esc(HOUSE_NAME)}에 들어가기">
+    return `<button class="card house-card ${!h.made || gift || fresh || sprout || (him && him.hot) ? 'is-new' : ''}" data-action="house-open" aria-label="${esc(HOUSE_NAME)}에 들어가기">
       <span class="house-ico" aria-hidden="true">🏠</span>
       <span class="house-text"><b>${esc(HOUSE_NAME)}</b><small>${esc(note)}</small></span>
       ${!h.made || fresh || sprout ? '<span class="chip chip-hot">NEW</span>' : ''}
@@ -1237,6 +1274,7 @@ const HouseRoom = {
         <div class="fox-bubble house-bubble" data-house-bubble="guest" data-who="${esc(OWNER_NAME)}" hidden></div>
         <div class="fox-bubble house-bubble is-me" data-house-bubble="me" data-who="${esc(Avatar.name())}" hidden></div>
         <div class="fox-bubble house-bubble is-rider" data-house-bubble="rider" data-who="🛵 ${RIDER_NAME}" hidden></div>
+        <div class="fox-bubble house-bubble is-him" data-house-bubble="him" data-who="💙 ${esc(HimLook.name())}" hidden></div>
         <div class="fox-bubble house-bubble is-clerk" data-house-bubble="clerk" data-who="🏪 편의점 알바생" hidden></div>
         <div class="fox-bubble house-bubble is-barista" data-house-bubble="barista" data-who="☕ 카페 사장님" hidden></div>
         <div class="fox-bubble house-bubble is-cat" data-house-bubble="cat" data-who="🐈 뭉치" hidden></div>
@@ -1408,13 +1446,23 @@ const HouseRoom = {
       UI.toast('새로 생겼어요! 🌱 창밖 베란다에 텃밭이 있어요. 🌱 버튼이나 창문을 눌러 나가 봐요', { icon: '🌱', kind: 'gold', ms: 6000 });
     }
     if (House.guestDue()) House.guestTimer = setTimeout(() => House.knock(), (first ? 9000 : 6000) + Math.random() * 9000);
+    // (her boyfriend: what he left at the door — and his knock, if his hour has come)
+    HisVisit.entered();
+    setTimeout(() => this.ov === ov && HisVisit.tick(), 2500);
   },
 
   close() {
     if (this.ov) UI.close(this.ov);
   },
 
+  /** (her boyfriend's name over his bubble: as he came) */
+  setHimName(name) {
+    const b = this.ov && $('[data-house-bubble="him"]', this.ov.panel);
+    if (b) b.dataset.who = `💙 ${name}`;
+  },
+
   closed() {
+    HisVisit.closed();
     this.ov = null;
     this.editOn = false;
     this.meOn = false;

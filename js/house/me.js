@@ -37,6 +37,7 @@ export const LOOK = {
   head: { kind: 'none', color: '#ff7fa8' }, //                               kind: none, ribbon, heart, blossom, headband, catears, beret, straw, santa (helmet: the courier's)
   glasses: { kind: 'none', color: '#5c4a58' }, //                            kind: none, round
   scarf: false,
+  boy: false, //                                                             a boy's face and build (the boyfriend who comes round: js/house/him.js)
   apron: null, //                                                            a colour: an apron over it all (cooking; the girl at the till)
 };
 
@@ -124,7 +125,8 @@ function paintFace(look, eyes, mouth, blush) {
     g.fillStyle = shade;
     g.fillRect(0, 0, canvas.width, Y(-0.006));
   }
-  for (const sg of [-1, 1]) soft(sg * 0.058, -0.066, 0.03, 0.016, '255, 150, 150', 0.22 + 0.34 * blush);
+  const boy = !!look.boy; // (a boy's face: light lashes, no flick at their ends, straighter and thicker brows, hardly a flush)
+  for (const sg of [-1, 1]) soft(sg * 0.058, -0.066, 0.03, 0.016, '255, 150, 150', (boy ? 0.05 : 0.22) + (boy ? 0.24 : 0.34) * blush);
   soft(-0.0015, NOSE_Y - 0.005, 0.0075, 0.0042, rgb(deep), 0.45);
   soft(MOUTH.x, MOUTH.y - 0.009, 0.009, 0.0035, rgb(deep), 0.32);
 
@@ -236,9 +238,12 @@ function paintFace(look, eyes, mouth, blush) {
     g.restore();
 
     // the upper lashes: thin at the inner corner, heavy where they come down round the outer one
-    const thick = (i) => (0.002 + 0.0036 * smooth(0, 11, i) + 0.0026 * smooth(18, 32, i)) * (0.55 + 0.45 * open);
+    const thick = boy
+      ? (i) => (0.0017 + 0.0019 * smooth(0, 11, i) + 0.0006 * smooth(18, 32, i)) * (0.55 + 0.45 * open)
+      : (i) => (0.002 + 0.0036 * smooth(0, 11, i) + 0.0026 * smooth(18, 32, i)) * (0.55 + 0.45 * open);
     const band = upper.slice();
-    band.push(lower[3], [w * 1.07, lower[3][1] + 0.002], [w * 1.25, outer[1] + 0.0045 * open]);
+    if (boy) band.push(lower[2], [w * 1.02, outer[1] + 0.0012 * open]);
+    else band.push(lower[3], [w * 1.07, lower[3][1] + 0.002], [w * 1.25, outer[1] + 0.0045 * open]);
     for (let i = upper.length - 1; i >= 0; i--) {
       const lean = smooth(21, 32, i);
       band.push([upper[i][0] + thick(i) * 1.2 * lean, upper[i][1] + thick(i) * (1 - 0.35 * lean)]);
@@ -246,8 +251,10 @@ function paintFace(look, eyes, mouth, blush) {
     g.fillStyle = lash;
     poly(band);
     g.fill();
-    poly([[w * 0.97, lid * 0.72 + 0.003 + outerY * 0.5], [w * 1.2, lid * 0.72 + 0.0105 * open + outerY], [w * 1.1, lid * 0.45 + 0.004 + outerY * 0.5]]);
-    g.fill();
+    if (!boy) {
+      poly([[w * 0.97, lid * 0.72 + 0.003 + outerY * 0.5], [w * 1.2, lid * 0.72 + 0.0105 * open + outerY], [w * 1.1, lid * 0.45 + 0.004 + outerY * 0.5]]);
+      g.fill();
+    }
     g.strokeStyle = 'rgba(150, 110, 104, 0.4)';
     g.lineWidth = 0.0013 * k;
     g.beginPath();
@@ -259,18 +266,19 @@ function paintFace(look, eyes, mouth, blush) {
   // her brows, a shade of her hair, a little lower towards her nose
   const brow = C(look.hair.top).lerp(C('#3a2a2a'), 0.35);
   brow.convertLinearToSRGB();
-  g.fillStyle = `rgba(${rgb(brow)}, 0.88)`;
+  g.fillStyle = `rgba(${rgb(brow)}, ${boy ? 0.94 : 0.88})`;
   const lift = eyes === 'happy' ? 0.003 : 0;
   const browTilt = shape === 'soft' ? -0.0025 : shape === 'cat' ? 0.002 : 0;
   for (const sg of [-1, 1]) {
-    const a = [0.025, 0.0072 + lift - browTilt * 0.5];
-    const b = [0.069, 0.0152 + lift + browTilt];
-    const mid = [0.048, 0.0138 + lift];
+    const a = boy ? [0.022, 0.0098 + lift - browTilt * 0.3] : [0.025, 0.0072 + lift - browTilt * 0.5];
+    const b = boy ? [0.072, 0.0128 + lift + browTilt * 0.6] : [0.069, 0.0152 + lift + browTilt];
+    const mid = boy ? [0.048, 0.0142 + lift] : [0.048, 0.0138 + lift];
+    const th = boy ? 1.75 : 1;
     g.beginPath();
-    g.moveTo(X(sg * a[0]), Y(a[1] + 0.0021));
-    g.quadraticCurveTo(X(sg * mid[0]), Y(mid[1] + 0.0026), X(sg * b[0]), Y(b[1] + 0.0008));
-    g.lineTo(X(sg * b[0]), Y(b[1] - 0.0008));
-    g.quadraticCurveTo(X(sg * mid[0]), Y(mid[1] - 0.0019), X(sg * a[0]), Y(a[1] - 0.0021));
+    g.moveTo(X(sg * a[0]), Y(a[1] + 0.0021 * th));
+    g.quadraticCurveTo(X(sg * mid[0]), Y(mid[1] + 0.0026 * th), X(sg * b[0]), Y(b[1] + 0.0008 * th));
+    g.lineTo(X(sg * b[0]), Y(b[1] - 0.0008 * th));
+    g.quadraticCurveTo(X(sg * mid[0]), Y(mid[1] - 0.0019 * th), X(sg * a[0]), Y(a[1] - 0.0021 * th));
     g.closePath();
     g.fill();
   }
@@ -302,7 +310,7 @@ function paintFace(look, eyes, mouth, blush) {
     g.stroke();
     soft(mx, my - 0.0062, 0.0062, 0.0026, '240, 150, 152', 0.75);
   } else {
-    soft(mx, my - 0.003, 0.0072, 0.004, '240, 156, 156', 0.85);
+    soft(mx, my - 0.003, 0.0072, 0.004, '240, 156, 156', boy ? 0.3 : 0.85);
     g.lineWidth = 0.0014 * k;
     g.beginPath();
     g.moveTo(X(mx - 0.0074), Y(my - 0.0002));
@@ -448,6 +456,27 @@ const BOB = [
   [-0.115, 0.108, 0.036, 0.092, -0.015],
   [-0.13, 0.097, 0.03, 0.082, -0.01],
 ];
+// a boy's short hair (style 'short', and 'perm' — the same, curled): the cap of it over his crown only, down to the
+// tops of his ears ([height, half-width, in front, behind, forward], as CAP) — and the back of his head (SHORT_BACK) close
+// round it from there to his nape, open at the sides: his ears show
+const SHORT_CAP = [
+  [0.136, 0.014, 0.014, 0.014, -0.004],
+  [0.128, 0.056, 0.054, 0.058, -0.004],
+  [0.108, 0.089, 0.086, 0.093, -0.004],
+  [0.076, 0.106, 0.098, 0.109, -0.004],
+  [0.04, 0.111, 0.086, 0.113, -0.006],
+  [0.008, 0.109, 0.05, 0.108, -0.012],
+  [-0.014, 0.104, 0.022, 0.1, -0.018],
+  [-0.024, 0.097, 0.012, 0.092, -0.02],
+];
+const SHORT_BACK = [
+  [0.02, 0.108, 0.11, 0.116, -0.006],
+  [-0.01, 0.105, 0.11, 0.113, -0.005],
+  [-0.04, 0.1, 0.108, 0.102, -0.003],
+  [-0.062, 0.091, 0.104, 0.085, -0.001],
+  [-0.078, 0.08, 0.1, 0.067, 0.001],
+  [-0.088, 0.07, 0.096, 0.056, 0.002],
+];
 const TAIL_K = [1.6, 3.4, 5.0, 6.6, 8.2]; // where along a tail (in rows) its bones are
 const LONG_K = [4.4, 5.6, 6.8, 8.0, 9.2]; // …and down long hair (its rows: below her chin it swings)
 
@@ -570,7 +599,8 @@ export function buildMe(lookIn) {
     [0.445, 0.066, 0.052, 0.054, { hips: 1 }],
     [0.408, 0.058, 0.047, 0.049, { hips: 1 }],
   ];
-  const bulk = { knit: 1.12, hoodie: 1.15, cardigan: 1.0, tee: 1.03, blouse: 1.02, dress: 1.02 }[top] || 1;
+  if (look.boy) BODY.forEach((row) => (row[1] *= row[0] > 0.6 ? 1.07 : row[0] < 0.47 ? 0.95 : 1)); // (a boy: broader shoulders, straighter hips)
+  const bulk = { knit: 1.12, hoodie: 1.15, cardigan: 1.0, tee: 1.03, blouse: 1.02, dress: 1.02, shirt: 1.03 }[top] || 1;
   const long = top === 'knit' || top === 'hoodie'; // (a top that comes down over the waist of her skirt or her trousers: they are hidden under it)
   /** Her body in her top at the height y: [half-width, in front, behind]. */
   const bodyAt = (y) => {
@@ -619,6 +649,21 @@ export function buildMe(lookIn) {
     );
   }
   if (top === 'blouse' || top === 'dress') collar(ink.top2, ink.acc);
+  if (top === 'shirt') {
+    for (const sg of [-1, 1])
+      skin.loft(
+        [V(sg * 0.036, 0.722, -0.014), V(sg * 0.043, 0.716, 0.008), V(sg * 0.036, 0.708, 0.03), V(sg * 0.02, 0.694, 0.045), V(sg * 0.011, 0.684, 0.049)].map((c, k) => ({
+          c,
+          rx: [0.01, 0.0135, 0.014, 0.01, 0.002][k],
+          ry: 0.0026,
+          w: { chest: 0.7, neck: 0.3 },
+          up: V(sg * 0.8, 0.9, k < 2 ? -0.2 : 0.6).normalize(),
+        })),
+        { segs: 10, sub: 3, cap: 0.6, color: (i) => col.copy(ink.top).lerp(ink.topDeep, 0.12 + 0.25 * smooth(0.2, -0.6, i.s)) }
+      );
+    for (const y of [0.665, 0.615, 0.565, 0.515])
+      skin.loft([y + 0.004, y - 0.004].map((yy) => ({ c: V(0, yy, bodyAt(yy)[1] + 0.0015), rx: 0.0042, ry: 0.0016, w: { chest: y > 0.55 ? 1 : 0.5, spine: y > 0.55 ? 0 : 0.5 } })), { segs: 10, sub: 2, cap: 0.9, color: () => col.copy(ink.top2) });
+  }
   if (top === 'hoodie') hood();
   if (top === 'cardigan') cardigan();
   // a hem round her hips (over her skirt or her trousers)
@@ -1355,7 +1400,19 @@ export function buildMe(lookIn) {
   /* Her hair: the cap of it, her fringe, the locks before her ears — and the rest as she has it done. */
   function hair() {
     const headAt = V(0, HEAD_Y, 0);
-    const cap = new Rings(CAP, headAt, CAP_N);
+    const short = style === 'short' || style === 'perm';
+    const curly = style === 'perm';
+    const cap = new Rings(short ? SHORT_CAP : CAP, headAt, CAP_N);
+    // (a perm: in soft curls all over — the more, the further down from his crown)
+    const curls = (from) =>
+      curly
+        ? (P, i) => {
+            const k = (0.05 * Math.sin(i.a * 13 + i.v * 17) + 0.03 * Math.sin(i.a * 7 - i.v * 11)) * smooth(from, from + 0.38, i.v) + 0.03 * smooth(from + 0.08, from + 0.38, i.v);
+            P.x += (P.x - i.ring.c.x) * k;
+            P.y += 0.004 * Math.sin(i.a * 9 + i.v * 13) * smooth(from, from + 0.3, i.v);
+            P.z += (P.z - i.ring.c.z) * k;
+          }
+        : undefined;
     const HM = V(0, HEAD_Y + 0.02, -0.006);
     const outwards = (az, el) => V(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
     const reach = (dir) => Math.max(head.reach(HM, dir), cap.reach(HM, dir));
@@ -1398,6 +1455,7 @@ export function buildMe(lookIn) {
       frame: LEVEL,
       cap: 0.15,
       mode: HAIR,
+      warp: curls(0.12),
       tex: (i, tex) => {
         dirTo.copy(i.P).sub(HM).normalize();
         const ang = Math.atan2(dirTo.dot(tieB), dirTo.dot(tieA));
@@ -1412,6 +1470,29 @@ export function buildMe(lookIn) {
         return col.lerp(ink.hairDeep, clamp(0.55 * smooth(-0.01, -0.09, y) + 0.45 * smooth(-0.3, 0.3, i.s) * smooth(0.03, -0.02, y), 0, 1));
       },
     });
+
+    // (a boy's short hair: the back of his head, from the crown down to his nape, close round it — open at the sides)
+    if (short) {
+      const back = new Rings(SHORT_BACK, headAt, 2.2);
+      const OPEN = 1.95;
+      skin.loft(back.keys({ head: 1 }), {
+        segs: 36,
+        sub: 3,
+        frame: LEVEL,
+        arc: [Math.PI / 2 + OPEN, Math.PI / 2 - OPEN + TAU],
+        n: 2.2,
+        cap: 0.4,
+        mode: HAIR,
+        warp: curls(0),
+        tex: (i, tex) => {
+          const a = i.a + 0.6 * Math.sin(i.v * 2);
+          tex[0] = Math.cos(a * 7) * 0.01;
+          tex[1] = Math.sin(a * 7) * 0.01;
+          tex[2] = 2 + i.v * 3;
+        },
+        color: (i) => col.copy(ink.hair).lerp(ink.hairTip, smooth(0.3, 1, i.v)).lerp(ink.hairDeep, 0.25 + 0.25 * smooth(0.4, 1, i.v)),
+      });
+    }
 
     // her fringe: one sheet of hair over her brow and her temples, from a parting to its edge
     {
@@ -1458,8 +1539,8 @@ export function buildMe(lookIn) {
       });
     }
 
-    // the locks before her ears (not with a bob: it hangs over them)
-    if (style !== 'bob') {
+    // the locks before her ears (not with a bob: it hangs over them — nor with a boy's short hair: his ears show)
+    if (style !== 'bob' && !short) {
       const long = style === 'long';
       const hung = (bone) => (v) => ({ head: 1 - smooth(0.25, 0.75, v), [bone]: smooth(0.25, 0.75, v) });
       for (const sg of [-1, 1]) {

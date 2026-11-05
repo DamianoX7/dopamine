@@ -1,0 +1,152 @@
+/* ==================================================================
+   💙 그가 놀러 오는 날 (js/him.js): his bubble in her house, the note
+   he leaves, and the page where he makes himself and plans a visit.
+   ================================================================== */
+
+/* ---------- in her house ---------- */
+.house-bubble.is-him[data-who]::before {
+  color: #3f7fd6;
+}
+/* (his note in the mailbox, among the letters) */
+.house-letter.is-note {
+  background: #eef5ff;
+}
+.house-letter.is-note small {
+  color: #5a7fb0;
+}
+/* what he wrote, under his present */
+.him-note {
+  margin: 10px 0 4px;
+  padding: 14px 16px 12px;
+  border-radius: 16px;
+  background-color: #f6faff;
+  background-image: repeating-linear-gradient(transparent 0 29px, rgba(110, 150, 210, 0.2) 29px 30px);
+  color: #2f4a72;
+  text-align: left;
+  box-shadow: inset 0 0 0 1px rgba(90, 130, 190, 0.18), 0 8px 18px -14px rgba(40, 70, 120, 0.5);
+}
+.him-note p {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 30px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.him-note small {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+  color: #5a7fb0;
+}
+.letter.him-letter {
+  background-color: #f6faff;
+  background-image: repeating-linear-gradient(transparent 0 31px, rgba(110, 150, 210, 0.2) 31px 32px);
+  color: #2f4a72;
+}
+.letter.him-letter .letter-from,
+.letter.him-letter .letter-date {
+  color: #5a7fb0;
+}
+
+/* ---------- 🏠 놀러 가기: how he looks ---------- */
+.him-card {
+  overflow: hidden;
+}
+.him-stage {
+  position: relative;
+  height: min(46vh, 330px);
+  margin: -4px -4px 12px;
+  border-radius: 18px;
+  background:
+    radial-gradient(120% 70% at 50% 100%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 70%),
+    linear-gradient(180deg, #e7f1ff 0%, #fdeef5 100%);
+  touch-action: pan-y;
+}
+.him-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+.him-canvas:active {
+  cursor: grabbing;
+}
+.him-wait {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 44px;
+  animation: foxBob 2.6s ease-in-out infinite;
+}
+.him-stage.is-ready .him-wait {
+  display: none;
+}
+.him-tabs {
+  margin: 0 0 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.him-tabs::-webkit-scrollbar {
+  display: none;
+}
+.him-tabs .seg-btn {
+  flex: 1 0 auto;
+  padding: 0 8px;
+}
+.him-opts .shop-head:first-child {
+  margin-top: 2px;
+}
+
+/* ---------- …and his visit ---------- */
+.him-plan .set-block + .card-title,
+.him-plan .card-title {
+  display: block;
+  margin-top: 14px;
+}
+.him-plan .card-title small {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+.him-day {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.him-day .ob-input {
+  flex: 1.25;
+  min-width: 0;
+  margin: 0;
+  font-size: 16px !important;
+  padding: 12px 8px !important;
+  border-radius: 14px !important;
+}
+.him-day .ob-input[type='time'] {
+  flex: 1;
+}
+.him-note-input {
+  font-size: 19px;
+}
+.him-gifts {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.him-plan .dialog-actions {
+  margin-top: 12px;
+}
+.him-plan .dialog-actions .btn {
+  padding-left: 12px;
+  padding-right: 12px;
+  white-space: nowrap;
+}
+@media (max-width: 360px) {
+  .him-gifts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

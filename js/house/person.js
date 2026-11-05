@@ -12,7 +12,7 @@ import { V } from './shapes.js';
 
 const WALK = 0.62; //   how fast she walks (world units a second)
 const TURN = 5.5; //    …and turns (radians a second)
-const HIPS = 0.507; //  her hips above her feet, standing
+export const HIPS = 0.507; //  her hips above her feet, standing
 const Y_AXIS = V(0, 1, 0);
 const _q = new THREE.Quaternion();
 const _q2 = new THREE.Quaternion();

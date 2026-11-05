@@ -158,7 +158,12 @@ function defaultState() {
       cook: { made: {}, best: {}, burnt: 0, kitchen: false },
       town: { outs: 0, shops: 0, spent: 0, cafe: {}, ate: {}, sung: 0, best: 0, parks: 0, taught: false, news: false },
       veranda: { made: 0, boxes: 2, plots: [null, null, null, null], picked: {}, sown: {}, watered: 0, gift: false, rainAt: 0, news: false },
+      // her boyfriend's visits (js/him.js): each as he planned it ({ id, at, note, gift, look, name, surprise, sent }) and how
+      // it went here (came: when he knocked; opened: when she saw what he brought; told: the box knows) — and how often he came
+      him: { list: [], met: 0 },
     },
+    // (on his device — the login he writes with: how he looks when he goes round to her house, and his name there)
+    him: { name: '', look: {} },
     opening: { seen: false, greeted: false }, //           the rooms that open on a day of their own (js/opening.js): has she stood before them shut — and been told that they opened?
     // season: 'auto' = the foxes' world follows the calendar; or 'spring', 'summer', 'autumn', 'winter' (js/weather.js)
     settings: { soundEnabled: true, theme: 'pink', lateNight: 'auto', reduceMotion: false, foxFullscreen: true, season: 'auto' },
@@ -307,8 +312,10 @@ const Store = {
     State.pet = Object.assign(d.pet, { name: State.pet.name, named: State.pet.named, names: { red: State.pet.name } });
     // (the girl in the house keeps her name, her face and her hair — the clothes she bought go with the coins)
     const me = State.house.me || d.house.me;
+    const him = State.house.him; // (his visits are his, not her game: they stay, with his notes)
     State.house = d.house;
     Object.assign(State.house.me, { name: me.name, named: me.named, look: me.look });
+    if (him) State.house.him = him;
     State.singing.currentStreak = 0;
     State.singing.longestStreak = 0;
     Store.saveNow();

@@ -6,7 +6,10 @@
 
    Nothing is saved: everything is worked out from `startDate` in
    js/config.js (that day is day 1) and the device's own date. Days of
-   your own (birthdays…) go in `specialDays` there.
+   your own (birthdays…) go in `specialDays` there. And the days that
+   happened here: the days her boyfriend comes round, or came (js/him.js:
+   not a surprise one before it comes), and 뭉치's — the day it came
+   home with her, its 100th day, each year after (js/cat.js).
    ================================================================== */
 
 /* Every year, 'MM-DD'. */
@@ -70,7 +73,17 @@ const Days = {
         add(`${y}-${md}`, `${y - +start.slice(0, 4)}주년`, '💐', 'ours');
       }
     }
-    const rank = { ours: 0, own: 1, year: 2 };
+    // (her boyfriend's visits: js/him.js)
+    if (typeof HisVisit !== 'undefined') for (const e of HisVisit.days(from, to)) add(e.key, e.name, e.emoji, e.kind);
+    // (뭉치: the day it came home with her, its 100th day with her, and each year after)
+    const cat = State.house && State.house.cat;
+    if (cat && cat.adopted && cat.at) {
+      const home = dateKey(new Date(cat.at));
+      add(home, '뭉치가 우리 집에 온 날', '🐈', 'cat');
+      add(addDays(home, 99), '뭉치랑 100일', '🐾', 'cat');
+      for (let y = Math.max(y0, +home.slice(0, 4) + 1); y <= y1; y++) add(`${y}-${home.slice(5) === '02-29' ? '02-28' : home.slice(5)}`, `뭉치 입양 ${y - +home.slice(0, 4)}주년`, '🐈', 'cat');
+    }
+    const rank = { ours: 0, own: 1, visit: 2, cat: 3, year: 4 };
     return out.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : rank[a.kind] - rank[b.kind]));
   },
 

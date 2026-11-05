@@ -39,7 +39,7 @@ const DOOR_TRIES = 5; //         so many wrong ones in a row, and the door wants
 const DOOR_WAIT = 30000; //      half a minute, twice as long after every further five…
 const DOOR_WAIT_MAX = 600000; // …up to ten minutes
 
-const behindDoor = () => /^#\/me\/(write|messages)\b/.test(location.hash);
+const behindDoor = () => /^#\/me\/(write|messages|visit)\b/.test(location.hash);
 
 const Door = {
   isOpen: false,
@@ -146,6 +146,8 @@ const Door = {
     if (!this.isOpen || Cloud.writer) return; // (on his login it stands open: that login has said who he is)
     this.isOpen = false;
     PostDesk.list = null;
+    VisitDesk.list = null;
+    VisitDesk.drop();
     if (!behindDoor()) return; // (he has left: another view is on its way)
     // The page is the door again, and a dialog of those pages — a letter being previewed, "보내기 취소?" — goes:
     // out of sight at once, as closing takes a moment that a page put away may not be given.
@@ -400,7 +402,7 @@ Views.me = {
   tab: 'me',
   render(params) {
     const sub = params[0];
-    if (['stats', 'achievements', 'letters', 'settings', 'messages', 'write'].includes(sub)) return this[sub]();
+    if (['stats', 'achievements', 'letters', 'settings', 'messages', 'write', 'visit'].includes(sub)) return this[sub]();
     return this.main();
   },
 
@@ -409,6 +411,7 @@ Views.me = {
     if (params[0] === 'settings') this.fillStorage();
     Door.mount(root);
     if (params[0] === 'write' && Door.isOpen) PostDesk.load();
+    if (params[0] === 'visit') VisitDesk.mount(root);
     if (params[0] === 'pet') {
       // an old link to the pet's room: it is the fox's world now
       history.replaceState(null, '', '#/me');
@@ -559,6 +562,11 @@ Views.me = {
     return PostDesk.html();
   },
 
+  /* 🏠 …and where he makes himself, and plans when he goes round to her house (js/him.js). */
+  visit() {
+    return VisitDesk.html();
+  },
+
   letters() {
     const got = Messages.collected();
     const total = Messages.all().length;
@@ -629,9 +637,10 @@ Views.me = {
       </div>
       <div class="card">
         <h2 class="card-title">💌 메시지</h2>
-        <p class="hint">남자친구 전용 공간이에요: 편지를 써서 보내고, 랜덤 메시지와 기념 메시지를 쓰고, 고치고, 지울 수 있어요.</p>
+        <p class="hint">남자친구 전용 공간이에요: 편지를 써서 보내고, 그녀의 집에 놀러 가고, 랜덤 메시지와 기념 메시지를 쓰고, 고치고, 지울 수 있어요.</p>
         <div class="chip-row">
           <a class="btn primary" href="#/me/write">✍️ 편지 쓰기</a>
+          <a class="btn primary" href="#/me/visit">🏠 놀러 가기</a>
           <a class="btn soft" href="#/me/messages">✏️ 메시지 편집</a>
         </div>
       </div>

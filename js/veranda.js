@@ -196,6 +196,8 @@ const VerandaLife = {
     if (Delivery.busy() || api.eating()) return `${josa(Avatar.name(), '이/가')} 먹는 중이에요 😋`;
     if (TownLife.cooking) return `${josa(Avatar.name(), '이/가')} 요리하는 중이에요 🍳`;
     if (api.guestHere()) return `${josa(OWNER_NAME, '이/가')} 놀러 와 있어요 💗 ${josa(OWNER_NAME, '이/가')} 가고 나서 나가요`;
+    const him = HisVisit.here(); // (her boyfriend: js/him.js)
+    if (him) return `${josa(him, '이/가')} 놀러 와 있어요 💙 ${josa(him, '이/가')} 가고 나서 나가요`;
     if (api.doorBusy()) return '현관에 누가 와 있어요. 잠깐만요!';
     return '';
   },

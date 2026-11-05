@@ -24,6 +24,8 @@ import { Veranda } from './veranda.js';
 import { Guest } from './guest.js';
 import { Resident } from './resident.js';
 import { Courier } from './courier.js';
+import { Him } from './him.js';
+import { makeBunting, swayBunting, dropBunting } from './party.js';
 import { makeFood } from './food.js';
 import { makeIngredient } from './meals.js';
 import { Fx } from './fx.js';
@@ -115,6 +117,7 @@ export class HouseWorld {
     this.guest = new Guest(this); //  Lorelei, when she comes round
     this.me = new Resident(this); //    …and the girl who lives here
     this.courier = new Courier(this); // …and at the door, now and then, the courier
+    this.him = new Him(this); //        …and her boyfriend, on a day he has said he will come round (him.js)
     this.cat = new Cat(this); //        …and 뭉치, the white cat: a stray on the street, then (taken home) hers (cat.js)
     this.catHome = false; //            (whether it lives here: the app's — look.cat)
     this.play = null; //                 the game she is playing with it (catplay.js)
@@ -122,7 +125,7 @@ export class HouseWorld {
     this.catAsked = -999;
     this.food = null; //                 what she has ordered and is waiting for (the app's: { order })
     this.fx = new Fx(scene);
-    this.bubbles = { guest: { el: null, until: 0 }, me: { el: null, until: 0 }, rider: { el: null, until: 0 }, clerk: { el: null, until: 0 }, barista: { el: null, until: 0 }, cat: { el: null, until: 0 } }; // what each of them says, over their head
+    this.bubbles = { guest: { el: null, until: 0 }, me: { el: null, until: 0 }, rider: { el: null, until: 0 }, clerk: { el: null, until: 0 }, barista: { el: null, until: 0 }, cat: { el: null, until: 0 }, him: { el: null, until: 0 } }; // what each of them says, over their head
     this.where = 'home'; //            …or 'town': she is out (and the street is shown)
     this.town = null; //               (built the first time she goes out)
     this.veranda = null; //            …and the veranda outside the window, the first time she steps out on it (veranda.js)
@@ -243,6 +246,7 @@ export class HouseWorld {
     this.pinch = null;
     this.drag = null;
     this.guest.leave(true);
+    this.him.leave(true);
     this.cat.hide();
     this.courier.vanish(true);
     if (this.where === 'town') this.backHome(true);
@@ -335,6 +339,7 @@ export class HouseWorld {
     if (!this.spec || this.spec.size !== spec.size) {
       this.spec = spec;
       this.room.build(spec);
+      this.partyKey = null; // (the walls are new: the bunting goes up on the new one)
       // (the things on the walls hang in the walls' new groups)
       this.items.forEach((e) => e.kind === 'wall' && this.hang(e));
       this.fitRoom();
@@ -354,6 +359,7 @@ export class HouseWorld {
     this.radioOn = !!look.radio;
     this.items.forEach((e) => e.id === 'radio' && e.it.set('on', this.radioOn));
     this.setGift(!!look.gift);
+    this.setParty(look.party || '');
     this.food = look.food || null;
     this.items.forEach((e) => e.id === 'cat-bowl' && e.it.set('bowl', look.cat));
     this.grid = null;
@@ -513,6 +519,22 @@ export class HouseWorld {
     }
   }
 
+  /** A day worth remembering: bunting across the back wall that says so (`text`) — or none (''). */
+  setParty(text) {
+    const key = `${this.spec ? this.spec.size : -1}:${text}`;
+    if (key === this.partyKey) return;
+    this.partyKey = key;
+    for (const b of this.bunting || []) dropBunting(b);
+    this.bunting = null;
+    if (!text) return;
+    // (on the back wall, and on the right one: whichever stands face-on to the camera — on a phone, the right one)
+    this.bunting = ['back', 'right'].filter((name) => this.room.walls[name]).map((name) => {
+      const b = makeBunting(this.spec, text, name);
+      this.room.walls[name].items.add(b);
+      return b;
+    });
+  }
+
   // ---------------------------------------------------------------- the light of the hour
 
   /** How the room is lit: by the day, the evening, the night outside — and at night by its light (if it is on) and her lamps. */
@@ -607,6 +629,7 @@ export class HouseWorld {
       e.lift = damp(e.lift, lift, 10, dt);
       if (e.kind !== 'wall') e.it.object.position.y = e.lift;
     });
+    if (this.bunting) for (const b of this.bunting) swayBunting(b, t);
     if (this.parcel && this.parcel.visible) {
       this.parcel.rotation.y = Math.sin(t * 1.4) * 0.12;
       this.parcel.position.y = Math.abs(Math.sin(t * 2.6)) * 0.03;
@@ -618,7 +641,7 @@ export class HouseWorld {
     _c.lerp(_c2.setScalar(Math.max(grey, 0.6)), 0.45);
     const sun = clamp(this.key.intensity / 1.6, 0.25, 1);
     FUR_SUN.value.copy(this.key.position).sub(this.key.target.position).normalize();
-    for (const who of [this.me, this.guest, this.courier]) {
+    for (const who of [this.me, this.guest, this.courier, this.him]) {
       if (!who.on) continue;
       who.light(_c, sun);
       who.update(dt);
@@ -639,19 +662,23 @@ export class HouseWorld {
 
   /* The two of them do not walk through each other: standing too close, each steps aside a little. */
   makeRoom() {
-    const a = this.me;
-    const b = this.guest;
-    if (!a.on || !b.on || a.seat || a.abed || b.seat || b.abed) return;
-    const dx = b.pos.x - a.pos.x;
-    const dz = b.pos.z - a.pos.z;
-    const d = Math.hypot(dx, dz);
-    const R = 0.3;
-    if (d >= R || d < 1e-4) return;
-    const push = (R - d) * 0.5;
-    a.pos.x -= (dx / d) * push;
-    a.pos.z -= (dz / d) * push;
-    b.pos.x += (dx / d) * push;
-    b.pos.z += (dz / d) * push;
+    const people = [this.me, this.guest, this.him];
+    for (let i = 0; i < people.length; i++)
+      for (let j = i + 1; j < people.length; j++) {
+        const a = people[i];
+        const b = people[j];
+        if (!a.on || !b.on || a.seat || a.abed || b.seat || b.abed) continue;
+        const dx = b.pos.x - a.pos.x;
+        const dz = b.pos.z - a.pos.z;
+        const d = Math.hypot(dx, dz);
+        const R = 0.3;
+        if (d >= R || d < 1e-4) continue;
+        const push = (R - d) * 0.5;
+        a.pos.x -= (dx / d) * push;
+        a.pos.z -= (dz / d) * push;
+        b.pos.x += (dx / d) * push;
+        b.pos.z += (dz / d) * push;
+      }
   }
 
   // ---------------------------------------------------------------- the camera
@@ -818,7 +845,7 @@ export class HouseWorld {
     });
     if (this.parcel && this.parcel.visible) targets.push(this.parcel);
     targets.push(...this.room.taps.filter((m) => this.visibleUp(m)));
-    targets.push(...this.guest.meshes(), ...this.me.meshes(), ...this.courier.meshes(), ...(this.cat.world === this ? this.cat.meshes() : []));
+    targets.push(...this.guest.meshes(), ...this.me.meshes(), ...this.courier.meshes(), ...this.him.meshes(), ...(this.cat.world === this ? this.cat.meshes() : []));
     const hits = ray.intersectObjects(targets, true).filter((h) => this.visibleUp(h.object) && h.object.type !== 'Sprite');
     // (one of the two — even half hidden, in bed, behind the sofa — or a fingertip from her: she is who was meant, not the furniture)
     if (!this.edit) {
@@ -856,7 +883,7 @@ export class HouseWorld {
     };
     let best = null;
     let bd = reach;
-    for (const who of [this.me, this.guest, this.courier, this.cat]) {
+    for (const who of [this.me, this.guest, this.courier, this.him, this.cat]) {
       if (!who.on || !who.rig || (who === this.cat && who.world !== this)) continue;
       const [hx, hy] = onPage(who.headPoint(_w));
       const [fx, fy] = onPage(_v.copy(who.pos));
@@ -976,6 +1003,10 @@ export class HouseWorld {
     if (hit.kind === 'rider') {
       this.courier.tapped();
       return this.host.onTap('rider');
+    }
+    if (hit.kind === 'him') {
+      this.him.tapped();
+      return this.host.onTap('him');
     }
     if (hit.kind === 'cat') return this.host.onTap('cat');
     this.host.onTap(hit.kind, hit.uid || null);
@@ -1469,12 +1500,26 @@ export class HouseWorld {
     return out.filter((s) => !s.at || this.reachable(s.at));
   }
 
-  /** Is that seat taken — by the other of the two? */
+  /** Is that seat taken — by one of the others? */
   taken(seat, who) {
-    const other = who === this.me ? this.guest : this.me;
-    if (!other.on) return false;
-    const on = other.seat || (other.task && other.task.do === 'sit' && other.task.seat);
-    return !!(on && on.at.distanceTo(seat.at) < 0.05);
+    return [this.me, this.guest, this.him].some((other) => {
+      if (other === who || !other.on) return false;
+      const on = other.seat || (other.task && other.task.do === 'sit' && other.task.seat);
+      return !!(on && on.at.distanceTo(seat.at) < 0.05);
+    });
+  }
+
+  /** Two seats side by side on one thing (the sofa — not the bed): [his, hers], or null if there is no such thing. */
+  seatPair() {
+    const by = new Map();
+    for (const s of this.spots()) {
+      if (!s.seat || s.line === 'bed') continue;
+      const uid = s.uid.split(':')[0];
+      if (!by.has(uid)) by.set(uid, []);
+      by.get(uid).push(s.seat);
+    }
+    for (const seats of by.values()) if (seats.length >= 2) return [seats[0], seats[1]];
+    return null;
   }
 
   /** Her bed: where her feet are when she lies in it (her head on the pillow), the side she gets in from, which way it lies, how high she lies. */
@@ -1586,7 +1631,7 @@ export class HouseWorld {
     const g = this.guest;
     const t = g.task;
     const coming = g.on && ((t && (t.do === 'door' || t.do === 'greet' || (t.do === 'walk' && t.direct))) || g.tasks.some((x) => x.do === 'door'));
-    return this.courier.on || g.going || coming;
+    return this.courier.on || this.him.on || g.going || coming;
   }
 
   /**
@@ -1610,6 +1655,17 @@ export class HouseWorld {
     v.target.copy(d.was.target);
   }
 
+  /**
+   * Her boyfriend at the door (`v`: { id, look, name, gift, note }: js/him.js). → false if he cannot come in just now:
+   * she is out (or on her way), at the stove, eating, playing with 뭉치 — or somebody else is at the door, or in.
+   */
+  himArrive(v) {
+    if (!this.stage || this.where !== 'home' || this.going || this.him.on || this.courier.on || this.guest.on || this.play) return false;
+    if (!this.me.on || this.me.cooking || this.me.busyEating()) return false;
+    this.him.arrive(v);
+    return true;
+  }
+
   /** She has ordered `order` ({ id, name }): her phone. */
   order(order) {
     if (this.stage) this.me.ordered(order);
@@ -1617,7 +1673,7 @@ export class HouseWorld {
 
   /** It is here: the courier comes up to the door. */
   deliver(order) {
-    if (!this.stage || this.courier.on || this.where !== 'home' || this.going) return false;
+    if (!this.stage || this.courier.on || this.him.on || this.where !== 'home' || this.going) return false;
     this.courier.come(order);
     return true;
   }
@@ -1627,7 +1683,7 @@ export class HouseWorld {
   /** She goes out: to the door, and out of it — then the street is shown, with her on it (`then` 'bus': on her way to
    *  the stop). → false if she cannot now. */
   goOut(then) {
-    if (!this.stage || this.where !== 'home' || this.going || this.courier.on || this.guest.on) return false;
+    if (!this.stage || this.where !== 'home' || this.going || this.courier.on || this.guest.on || this.him.on) return false;
     this.going = true;
     this.goingTo = then;
     this.me.leaveHouse();
@@ -2020,6 +2076,7 @@ export class HouseWorld {
     this.placeBubble('guest', this.guest);
     this.placeBubble('me', this.me);
     this.placeBubble('rider', this.courier);
+    this.placeBubble('him', this.him);
     this.placeBubble('cat', this.cat);
     if (this.town) {
       this.placeBubble('clerk', this.town.clerk);
@@ -2182,7 +2239,7 @@ export class HouseWorld {
   /** She goes out onto the veranda: to the window, and out through it — then the veranda is shown, with her on it.
    *  → false if she cannot now. */
   goVeranda() {
-    if (!this.stage || this.where !== 'home' || this.going || this.courier.on || this.guest.on || this.me.cooking) return false;
+    if (!this.stage || this.where !== 'home' || this.going || this.courier.on || this.guest.on || this.him.on || this.me.cooking) return false;
     this.going = true;
     const f = wallFrame(this.spec, 'back');
     const by = f.at(this.spec.win.u, 0, 0.5);
